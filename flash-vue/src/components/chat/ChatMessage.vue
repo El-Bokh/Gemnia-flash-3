@@ -88,17 +88,17 @@ function handleRegenerate() {
 <style scoped>
 .chat-message {
   display: flex;
-  gap: 12px;
-  max-width: 780px;
+  gap: 10px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 8px 16px;
-  animation: msgSlide 0.3s ease-out;
+  padding: 6px 16px;
+  animation: msgSlide 0.25s ease-out;
 }
 
 @keyframes msgSlide {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -110,16 +110,17 @@ function handleRegenerate() {
   flex-direction: row-reverse;
 }
 
+/* ─── Avatar ─────────────────────────────────── */
 .msg-avatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.78rem;
-  margin-top: 4px;
+  font-size: 0.62rem;
+  margin-top: 2px;
 }
 
 .msg-avatar.assistant {
@@ -132,10 +133,11 @@ function handleRegenerate() {
   color: var(--text-secondary);
 }
 
+/* ─── Bubble ─────────────────────────────────── */
 .msg-bubble {
   min-width: 0;
   flex: 1;
-  max-width: 600px;
+  max-width: 560px;
 }
 
 .chat-message.user .msg-bubble {
@@ -145,8 +147,8 @@ function handleRegenerate() {
 }
 
 .msg-content {
-  padding: 12px 16px;
-  border-radius: 18px;
+  padding: 8px 12px;
+  border-radius: 16px;
   position: relative;
 }
 
@@ -162,25 +164,27 @@ function handleRegenerate() {
   border-end-end-radius: 4px;
 }
 
+/* ─── Text ───────────────────────────────────── */
 .msg-text {
   margin: 0;
-  font-size: 0.88rem;
-  line-height: 1.65;
+  font-size: 0.82rem;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* ─── Image ──────────────────────────────────── */
 .msg-image-wrap {
   position: relative;
-  margin-top: 10px;
-  border-radius: 12px;
+  margin-top: 8px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
 .msg-image {
   width: 100%;
-  max-width: 400px;
-  border-radius: 12px;
+  max-width: 340px;
+  border-radius: 10px;
   display: block;
   transition: transform 0.3s;
 }
@@ -191,8 +195,8 @@ function handleRegenerate() {
 
 .image-overlay {
   position: absolute;
-  bottom: 8px;
-  inset-inline-end: 8px;
+  bottom: 6px;
+  inset-inline-end: 6px;
   display: flex;
   gap: 4px;
   opacity: 0;
@@ -207,13 +211,16 @@ function handleRegenerate() {
   background: rgba(0, 0, 0, 0.6) !important;
   color: #fff !important;
   backdrop-filter: blur(4px);
+  width: 28px !important;
+  height: 28px !important;
 }
 
+/* ─── Actions ────────────────────────────────── */
 .msg-actions {
   display: flex;
-  gap: 2px;
-  margin-top: 4px;
-  padding-inline-start: 4px;
+  gap: 1px;
+  margin-top: 2px;
+  padding-inline-start: 2px;
 }
 
 .action-btn {
@@ -221,9 +228,9 @@ function handleRegenerate() {
   background: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  padding: 3px 6px;
+  border-radius: 5px;
+  font-size: 0.68rem;
   transition: color 0.14s, background 0.14s;
 }
 
@@ -232,15 +239,16 @@ function handleRegenerate() {
   background: var(--hover-bg);
 }
 
+/* ─── Time ───────────────────────────────────── */
 .msg-time {
   display: block;
-  font-size: 0.64rem;
+  font-size: 0.58rem;
   color: var(--text-muted);
-  margin-top: 4px;
-  padding-inline-start: 4px;
+  margin-top: 2px;
+  padding-inline-start: 2px;
 }
 
-/* Animations */
+/* ─── Animations ─────────────────────────────── */
 .fade-slide-enter-active {
   transition: opacity 0.15s, transform 0.15s;
 }
@@ -258,24 +266,25 @@ function handleRegenerate() {
   opacity: 0;
 }
 
+/* ─── Mobile ─────────────────────────────────── */
 @media (max-width: 640px) {
   .chat-message {
-    padding: 6px 8px;
+    padding: 4px 8px;
     gap: 8px;
   }
 
   .msg-avatar {
-    width: 28px;
-    height: 28px;
-    font-size: 0.7rem;
+    width: 22px;
+    height: 22px;
+    font-size: 0.56rem;
   }
 
   .msg-content {
-    padding: 10px 14px;
+    padding: 7px 10px;
   }
 
   .msg-text {
-    font-size: 0.84rem;
+    font-size: 0.78rem;
   }
 }
 </style>

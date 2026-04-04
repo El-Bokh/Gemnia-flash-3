@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
+import { useLayoutStore } from '@/stores/layout'
 import Button from 'primevue/button'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
@@ -10,6 +11,7 @@ import TypingIndicator from '@/components/chat/TypingIndicator.vue'
 
 const { t } = useI18n()
 const chat = useChatStore()
+const layout = useLayoutStore()
 
 const messagesContainerRef = ref<HTMLDivElement | null>(null)
 const showStyles = ref(false)
@@ -61,16 +63,36 @@ onMounted(() => {
 })
 
 function handleSend(content: string) {
+  const isNewChat = !chat.activeConversationId
   chat.sendMessage(content, selectedStyle.value || undefined)
   selectedStyle.value = ''
   showStyles.value = false
+  if (isNewChat) {
+    layout.sidebarCollapsed = true
+    const title = content.slice(0, 40) + (content.length > 40 ? '…' : '')
+    window.dispatchEvent(
+      new CustomEvent('app-toast', {
+        detail: { type: 'info', message: `${t('chat.newChatStarted')}: ${title}` },
+      }),
+    )
+  }
 }
 
 function useSuggestion(text: string) {
+  const isNewChat = !chat.activeConversationId
   if (!chat.activeConversationId) {
     chat.createConversation()
   }
   chat.sendMessage(text)
+  if (isNewChat) {
+    layout.sidebarCollapsed = true
+    const title = text.slice(0, 40) + (text.length > 40 ? '…' : '')
+    window.dispatchEvent(
+      new CustomEvent('app-toast', {
+        detail: { type: 'info', message: `${t('chat.newChatStarted')}: ${title}` },
+      }),
+    )
+  }
 }
 
 function handleStyleSelect(style: string) {
@@ -258,20 +280,20 @@ function handleRegenerate(_messageId: string) {
 }
 
 .logo-circle {
-  width: 60px;
-  height: 60px;
-  border-radius: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 1.5rem;
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.25);
+  font-size: 1.2rem;
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.2);
 }
 
 .hero-title {
-  font-size: 1.7rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -280,12 +302,12 @@ function handleRegenerate(_messageId: string) {
 }
 
 .hero-sub {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
   margin: 0;
   text-align: center;
-  max-width: 460px;
-  line-height: 1.5;
+  max-width: 400px;
+  line-height: 1.45;
 }
 
 /* Suggestions */
@@ -302,13 +324,13 @@ function handleRegenerate(_messageId: string) {
 .suggestion-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 10px 18px;
-  border-radius: 14px;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 12px;
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -323,7 +345,7 @@ function handleRegenerate(_messageId: string) {
 }
 
 .suggestion-chip i {
-  font-size: 0.82rem;
+  font-size: 0.76rem;
 }
 
 .home-footer {
@@ -347,49 +369,49 @@ function handleRegenerate(_messageId: string) {
 .chat-header-area {
   display: flex;
   justify-content: center;
-  padding: 32px 16px 16px;
+  padding: 20px 16px 8px;
 }
 
 .chat-header-content {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 24px;
+  gap: 10px;
+  padding: 10px 16px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 16px;
-  max-width: 500px;
+  border-radius: 12px;
+  max-width: 420px;
   width: 100%;
 }
 
 .chat-header-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 0.78rem;
   flex-shrink: 0;
 }
 
 .chat-header-title {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
 }
 
 .chat-header-sub {
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   color: var(--text-muted);
-  margin: 2px 0 0;
+  margin: 1px 0 0;
 }
 
 .messages-list {
-  padding: 8px 0 24px;
+  padding: 4px 0 16px;
 }
 
 /* Scroll to bottom */

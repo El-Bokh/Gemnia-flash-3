@@ -20,7 +20,10 @@ const chat = useChatStore()
 const auth = useAuthStore()
 const notificationStore = useNotificationStore()
 
-const sidebarOpen = ref(true)
+const sidebarOpen = computed({
+  get: () => !layout.sidebarCollapsed,
+  set: (val: boolean) => { layout.sidebarCollapsed = !val },
+})
 const mobileSidebarOpen = ref(false)
 const showUserMenu = ref(false)
 const showNotifications = ref(false)
@@ -504,8 +507,8 @@ onBeforeUnmount(() => {
   display: flex;
   min-height: 100vh;
   background: var(--layout-bg);
-  --client-sidebar-width: 280px;
-  --client-sidebar-collapsed: 56px;
+  --client-sidebar-width: 240px;
+  --client-sidebar-collapsed: 48px;
 }
 
 /* ── Sidebar ── */
@@ -531,9 +534,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 12px;
-  gap: 8px;
-  min-height: 52px;
+  padding: 8px 10px;
+  gap: 6px;
+  min-height: 42px;
 }
 
 .brand {
@@ -550,9 +553,9 @@ onBeforeUnmount(() => {
 }
 
 .brand-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
   display: inline-flex;
@@ -563,13 +566,13 @@ onBeforeUnmount(() => {
 }
 
 .brand-text {
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .sidebar-new-chat {
-  padding: 0 12px 8px;
+  padding: 0 10px 6px;
 }
 
 .new-chat-btn {
@@ -588,7 +591,7 @@ onBeforeUnmount(() => {
 
 /* ── Search ── */
 .sidebar-search {
-  padding: 0 12px 8px;
+  padding: 0 10px 6px;
 }
 
 .search-box {
@@ -616,9 +619,9 @@ onBeforeUnmount(() => {
   border: none;
   background: transparent;
   outline: none;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--text-primary);
-  padding: 8px 0;
+  padding: 6px 0;
   min-width: 0;
 }
 
@@ -663,12 +666,12 @@ onBeforeUnmount(() => {
 }
 
 .conv-section-label {
-  font-size: 0.64rem;
+  font-size: 0.6rem;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 10px 8px 6px;
+  padding: 8px 8px 4px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -692,9 +695,9 @@ onBeforeUnmount(() => {
 .conv-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: 10px;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background 0.14s;
   overflow: hidden;
@@ -736,7 +739,7 @@ onBeforeUnmount(() => {
 }
 
 .conv-title {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -820,14 +823,14 @@ onBeforeUnmount(() => {
 }
 
 .sidebar-footer {
-  padding: 8px;
+  padding: 6px;
   border-top: 1px solid var(--sidebar-border);
 }
 
 .footer-link {
   width: 100%;
   justify-content: flex-start;
-  font-size: 0.76rem !important;
+  font-size: 0.72rem !important;
 }
 
 /* ── Main area ── */
@@ -849,11 +852,11 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 52px;
-  padding: 0 16px;
+  height: 42px;
+  padding: 0 12px;
   background: var(--topbar-bg);
   border-bottom: 1px solid var(--topbar-border);
-  gap: 12px;
+  gap: 8px;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -923,10 +926,10 @@ html.dark .client-topbar {
 }
 
 .nav-link {
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: var(--text-secondary);
-  padding: 6px 14px;
-  border-radius: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
   transition: color 0.14s, background 0.14s;
   text-decoration: none;
   font-weight: 500;
@@ -1109,9 +1112,9 @@ html.dark .client-topbar {
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
   display: flex;

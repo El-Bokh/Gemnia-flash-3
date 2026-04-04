@@ -192,7 +192,7 @@ function close() { emit('update:visible', false) }
           <small v-if="errors.name" class="field-error">{{ errors.name }}</small>
         </div>
         <div class="form-field">
-          <label>{{ t('common.name') }} <span class="req">*</span></label>
+          <label>{{ t('roleForm.slug') }} <span class="req">*</span></label>
           <InputText v-model="form.slug" :placeholder="t('roleForm.slugPlaceholder')" size="small" :class="{ 'p-invalid': errors.slug }" class="w-full" />
           <small v-if="errors.slug" class="field-error">{{ errors.slug }}</small>
         </div>
@@ -256,81 +256,194 @@ function close() { emit('update:visible', false) }
 </template>
 
 <style scoped>
-.form-section { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
-
-.form-field { display: flex; flex-direction: column; gap: 4px; }
-.form-field label, .perm-title {
-  font-size: 0.7rem; font-weight: 600; color: var(--text-secondary);
-  text-transform: uppercase; letter-spacing: 0.04em;
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
 }
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .form-row { grid-template-columns: 1fr; }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-field label,
+.perm-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .req { color: #ef4444; }
 .field-error { color: #ef4444; font-size: 0.66rem; }
 .w-full { width: 100%; }
 
-.form-field-inline { display: flex; align-items: center; gap: 8px; }
-.inline-label { font-size: 0.72rem; color: var(--text-primary); cursor: pointer; }
+.form-field-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-/* Permissions */
-.perm-section { border-top: 1px solid var(--card-border); padding-top: 10px; }
-.perm-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.perm-count { font-size: 0.66rem; color: var(--text-muted); }
-.perm-loading { font-size: 0.72rem; color: var(--text-muted); padding: 12px 0; }
+.inline-label {
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* ─── Permissions Section ──────────────────────────── */
+.perm-section {
+  border-top: 1px solid var(--card-border);
+  padding-top: 12px;
+}
+
+.perm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.perm-count {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.perm-loading {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding: 12px 0;
+}
 
 .perm-groups {
-  display: flex; flex-direction: column; gap: 6px;
-  max-height: 300px; overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
   scrollbar-width: thin;
+  padding-right: 2px;
 }
 
 .perm-group {
-  border: 1px solid var(--card-border); border-radius: 8px;
-  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
 }
+
 .pg-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 10px; background: var(--hover-bg);
-  cursor: pointer; user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--hover-bg);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--card-border);
 }
-.pg-check { flex-shrink: 0; }
-.pg-name { font-size: 0.72rem; font-weight: 700; color: var(--text-primary); flex: 1; }
+
+.pg-check {
+  flex-shrink: 0;
+}
+
+.pg-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+}
+
 .pg-badge {
-  font-size: 0.58rem; font-weight: 600; color: var(--text-muted);
-  background: var(--card-bg); border-radius: 10px; padding: 1px 7px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
 }
 
 .pg-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0;
-}
-@media (max-width: 480px) {
-  .pg-items { grid-template-columns: 1fr; }
+  display: flex;
+  flex-direction: column;
 }
 
 .perm-item {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px; cursor: pointer;
-  font-size: 0.68rem; color: var(--text-primary);
-  border-bottom: 1px solid var(--card-border);
-  transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 24px;
+  cursor: pointer;
+  font-size: 0.74rem;
+  color: var(--text-primary);
+  transition: background 0.12s;
+  box-sizing: border-box;
 }
-.perm-item:hover { background: var(--hover-bg); }
-.perm-item.selected { background: color-mix(in srgb, var(--active-color) 8%, transparent); }
-.perm-item:last-child { border-bottom: none; }
-.pi-check { flex-shrink: 0; }
-.pi-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Dialog theme override */
+.perm-item + .perm-item {
+  border-top: 1px solid color-mix(in srgb, var(--card-border) 50%, transparent);
+}
+
+.perm-item:hover {
+  background: var(--hover-bg);
+}
+
+.perm-item.selected {
+  background: color-mix(in srgb, var(--active-color) 8%, transparent);
+}
+
+.pi-check {
+  flex-shrink: 0;
+}
+
+.pi-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+/* ─── PrimeVue Checkbox sizing fix ─────────────────── */
+:deep(.p-checkbox) {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+:deep(.p-checkbox-box) {
+  width: 18px;
+  height: 18px;
+}
+
+/* ─── Dialog theme override ────────────────────────── */
 :deep(.role-form-dialog .p-dialog-header) {
-  background: var(--card-bg); border-color: var(--card-border);
-  color: var(--text-primary); padding: 12px 16px;
+  background: var(--card-bg);
+  border-color: var(--card-border);
+  color: var(--text-primary);
+  padding: 12px 16px;
 }
+
 :deep(.role-form-dialog .p-dialog-content) {
-  background: var(--card-bg); color: var(--text-primary); padding: 14px 16px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  padding: 14px 16px;
 }
+
 :deep(.role-form-dialog .p-dialog-footer) {
-  background: var(--card-bg); border-color: var(--card-border); padding: 8px 16px;
+  background: var(--card-bg);
+  border-color: var(--card-border);
+  padding: 8px 16px;
 }
 </style>

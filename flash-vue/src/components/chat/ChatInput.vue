@@ -302,9 +302,9 @@ function formatSize(bytes: number): string {
 .chat-input-wrapper {
   position: relative;
   width: 100%;
-  max-width: 780px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 0 16px 16px;
+  padding: 0 16px 12px;
 }
 
 .drag-over .chat-input-box {
@@ -337,8 +337,8 @@ function formatSize(bytes: number): string {
 .chat-input-box {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 20px;
-  padding: 8px 8px 8px 12px;
+  border-radius: 18px;
+  padding: 6px 6px 6px 10px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -359,8 +359,8 @@ function formatSize(bytes: number): string {
 }
 
 .tools-btn {
-  width: 34px !important;
-  height: 34px !important;
+  width: 30px !important;
+  height: 30px !important;
   color: var(--text-muted) !important;
   transition: transform 0.2s, color 0.2s !important;
 }
@@ -415,12 +415,12 @@ function formatSize(bytes: number): string {
   border: none;
   background: transparent;
   outline: none;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--text-primary);
-  padding: 7px 4px;
+  padding: 5px 4px;
   resize: none;
-  min-height: 34px;
-  max-height: 200px;
+  min-height: 30px;
+  max-height: 180px;
   line-height: 1.5;
   font-family: inherit;
 }
@@ -431,15 +431,15 @@ function formatSize(bytes: number): string {
 
 .mic-btn {
   flex-shrink: 0;
-  width: 34px !important;
-  height: 34px !important;
+  width: 30px !important;
+  height: 30px !important;
   color: var(--text-muted) !important;
 }
 
 .send-btn {
   flex-shrink: 0;
-  width: 34px !important;
-  height: 34px !important;
+  width: 30px !important;
+  height: 30px !important;
   transition: transform 0.15s !important;
 }
 
