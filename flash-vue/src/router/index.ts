@@ -22,7 +22,6 @@ const routes: RouteRecordRaw[] = [
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/client/ProfileView.vue'),
-        meta: { requiresAuth: true },
       },
     ],
   },
