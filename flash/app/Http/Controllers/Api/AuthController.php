@@ -3,14 +3,62 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\RegisterRequest;
+use App\Models\Role;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    private const TOKEN_NAME = 'web-session';
+
+    /**
+     * POST /api/auth/register
+     *
+     * Create a public account and immediately issue a Sanctum token.
+     */
+    public function register(RegisterRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+
+        $user = DB::transaction(function () use ($data) {
+            $user = User::create([
+                'name'     => $data['name'],
+                'email'    => Str::lower(trim($data['email'])),
+                'password' => Hash::make($data['password']),
+                'status'   => 'active',
+                'locale'   => $data['locale'] ?? app()->getLocale(),
+                'timezone' => $data['timezone'] ?? config('app.timezone', 'UTC'),
+            ]);
+
+            $defaultRole = Role::query()->where('is_default', true)->first();
+
+            if ($defaultRole) {
+                $user->roles()->attach($defaultRole->id);
+            }
+
+            return $user->load('roles');
+        });
+
+        // Send notifications
+        $notificationService = app(NotificationService::class);
+        $notificationService->sendWelcome($user);
+        $notificationService->notifyNewUserRegistered($user);
+
+        return $this->authenticatedResponse(
+            $user,
+            $request,
+            201,
+            'Account created successfully.'
+        );
+    }
+
     /**
      * POST /api/auth/login
      *
@@ -23,7 +71,9 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $email = Str::lower(trim((string) $request->input('email')));
+
+        $user = User::where('email', $email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
@@ -38,31 +88,7 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Revoke previous tokens for this device
-        $user->tokens()
-            ->where('name', 'admin-panel')
-            ->delete();
-
-        $token = $user->createToken('admin-panel', ['*'])->plainTextToken;
-
-        $user->update([
-            'last_login_at' => now(),
-            'last_login_ip' => $request->ip(),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'data'    => [
-                'token' => $token,
-                'user'  => [
-                    'id'     => $user->id,
-                    'name'   => $user->name,
-                    'email'  => $user->email,
-                    'avatar' => $user->avatar,
-                    'roles'  => $user->roles()->pluck('slug')->toArray(),
-                ],
-            ],
-        ]);
+        return $this->authenticatedResponse($user, $request);
     }
 
     /**
@@ -72,7 +98,15 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+
+        $token = $user?->currentAccessToken();
+
+        if ($token) {
+            $token->delete();
+        } else {
+            $user?->tokens()->delete();
+        }
 
         return response()->json([
             'success' => true,
@@ -97,7 +131,7 @@ class AuthController extends Controller
                 'name'   => $user->name,
                 'email'  => $user->email,
                 'phone'  => $user->phone,
-                'avatar' => $user->avatar,
+                'avatar' => $user->avatarUrl(),
                 'status' => $user->status,
                 'roles'  => $user->roles->pluck('slug')->toArray(),
                 'locale' => $user->locale,
@@ -105,5 +139,45 @@ class AuthController extends Controller
                 'last_login_at' => $user->last_login_at?->toIso8601String(),
             ],
         ]);
+    }
+
+    private function authenticatedResponse(
+        User $user,
+        Request $request,
+        int $statusCode = 200,
+        ?string $message = null,
+    ): JsonResponse {
+        $user->tokens()
+            ->where('name', self::TOKEN_NAME)
+            ->delete();
+
+        $token = $user->createToken(self::TOKEN_NAME, ['*'])->plainTextToken;
+
+        $user->update([
+            'last_login_at' => now(),
+            'last_login_ip' => $request->ip(),
+        ]);
+
+        $user->loadMissing('roles');
+
+        $response = [
+            'success' => true,
+            'data'    => [
+                'token' => $token,
+                'user'  => [
+                    'id'     => $user->id,
+                    'name'   => $user->name,
+                    'email'  => $user->email,
+                    'avatar' => $user->avatarUrl(),
+                    'roles'  => $user->roles->pluck('slug')->values()->all(),
+                ],
+            ],
+        ];
+
+        if ($message !== null) {
+            $response['message'] = $message;
+        }
+
+        return response()->json($response, $statusCode);
     }
 }

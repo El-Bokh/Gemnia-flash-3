@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -61,6 +63,19 @@ class User extends Authenticatable
         return $this->roles()->whereIn('slug', ['admin', 'super_admin'])->exists();
     }
 
+    public function avatarUrl(): ?string
+    {
+        if (! $this->avatar) {
+            return null;
+        }
+
+        if (Str::startsWith($this->avatar, ['http://', 'https://'])) {
+            return $this->avatar;
+        }
+
+        return Storage::disk('public')->url($this->avatar);
+    }
+
     /**
      * Check if user has a specific permission through any of their roles.
      */
@@ -74,6 +89,13 @@ class User extends Authenticatable
     public function userLimits(): HasMany
     {
         return $this->hasMany(UserLimit::class);
+    }
+
+    // ── Conversations ──
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
     }
 
     // ── Subscriptions ──

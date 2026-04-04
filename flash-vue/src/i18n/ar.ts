@@ -82,12 +82,14 @@ export default {
     toggleSidebar: 'تبديل الشريط الجانبي',
     collapseSidebar: 'طي الشريط الجانبي',
     switchLanguage: 'تغيير اللغة',
+    markAllRead: 'تعليم الكل كمقروء',
+    noNotifications: 'لا توجد إشعارات',
   },
 
   // ── تسجيل الدخول ────────────────────────────────────────
   login: {
     title: 'Klek AI',
-    subtitle: 'لوحة الإدارة',
+    subtitle: 'سجّل الدخول للمتابعة',
     email: 'البريد الإلكتروني',
     password: 'كلمة المرور',
     signIn: 'تسجيل الدخول',
@@ -989,6 +991,8 @@ export default {
     saveChanges: 'حفظ التغييرات',
     profileSaved: 'تم تحديث الملف الشخصي بنجاح.',
     saveFailed: 'فشل حفظ التغييرات.',
+    avatarInvalid: 'من فضلك اختر ملف صورة صحيح.',
+    avatarTooLarge: 'حجم الصورة يجب ألا يزيد عن 4 ميجابايت.',
     changePassword: 'تغيير كلمة المرور',
     changePasswordDesc: 'استخدم كلمة مرور قوية بـ 8 أحرف على الأقل.',
     currentPassword: 'كلمة المرور الحالية',
@@ -1025,6 +1029,10 @@ export default {
     usageTrend: 'اتجاه الاستهلاك',
     last7days: 'النشاط خلال آخر 7 أيام.',
     recentActivity: 'النشاط الأخير',
+    noSubscription: 'لا يوجد اشتراك نشط',
+    noSubscriptionDesc: 'ليس لديك اشتراك نشط حالياً. ستتوفر خطط الاشتراك قريباً.',
+    noUsageData: 'لا توجد بيانات استخدام',
+    noUsageDataDesc: 'ستظهر إحصائيات استخدامك هنا بمجرد بدء استخدام المنصة.',
   },
 
   // ── Chat ──────────────────────────────────────────────────

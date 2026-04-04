@@ -3,21 +3,28 @@ import { ref, computed } from 'vue'
 import router from '@/router'
 import { logout as logoutApi, getMe } from '@/services/authService'
 import type { AuthUser } from '@/services/authService'
+import { clearStoredAuth, getStoredAuthUser, storeAuthUser } from '@/utils/auth'
 
-export const useAuthStore = defineStore('auth', () => {
-  const user = ref<AuthUser>({
+function emptyAuthUser(): AuthUser {
+  return {
     id: 0,
     name: '',
     email: '',
     avatar: null,
     roles: [],
-  })
+  }
+}
+
+export const useAuthStore = defineStore('auth', () => {
+  const storedUser = getStoredAuthUser()
+  const user = ref<AuthUser>(storedUser ?? emptyAuthUser())
 
   const isAuthenticated = computed(() => !!localStorage.getItem('auth_token'))
-  const isLoaded = ref(false)
+  const isLoaded = ref(!!storedUser)
 
   function setUser(data: AuthUser) {
     user.value = data
+    storeAuthUser(data)
     isLoaded.value = true
   }
 
@@ -25,18 +32,18 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await getMe()
       if (res.success && res.data) {
-        user.value = {
+        setUser({
           id: res.data.id,
           name: res.data.name,
           email: res.data.email,
           avatar: res.data.avatar,
           roles: res.data.roles,
-        }
-        isLoaded.value = true
+        })
       }
     } catch {
       // Token invalid — clear and redirect
-      localStorage.removeItem('auth_token')
+      clearStoredAuth()
+      user.value = emptyAuthUser()
       isLoaded.value = false
       void router.replace({ name: 'login' })
     }
@@ -48,8 +55,8 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // Even if API fails, proceed with local logout
     }
-    localStorage.removeItem('auth_token')
-    user.value = { id: 0, name: '', email: '', avatar: null, roles: [] }
+    clearStoredAuth()
+    user.value = emptyAuthUser()
     isLoaded.value = false
     void router.replace({ name: 'login' })
   }

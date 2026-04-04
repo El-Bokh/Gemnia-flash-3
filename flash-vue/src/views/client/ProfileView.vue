@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { getMe, type MeResponse } from '@/services/authService'
+import {
+  updateProfile,
+  uploadProfileAvatar,
+  changePassword as changePasswordApi,
+  type ProfileData,
+} from '@/services/profileService'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
-import ProgressBar from 'primevue/progressbar'
-import Chart from 'primevue/chart'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -24,14 +29,18 @@ const successMsg = ref('')
 const errorMsg = ref('')
 const pwSuccess = ref('')
 const pwError = ref('')
+const profileLoading = ref(true)
+const avatarInputRef = ref<HTMLInputElement | null>(null)
+const selectedAvatarFile = ref<File | null>(null)
+const avatarPreviewUrl = ref<string | null>(auth.user.avatar)
 
-// ── Profile form ──
+// ── Profile form — populated from backend ──
 const profileForm = ref({
-  name: 'محمد ابواخوات',
-  email: 'mohammad@klek.ai',
-  phone: '+966 55 123 4567',
-  timezone: 'Asia/Riyadh',
-  locale: 'ar',
+  name: '',
+  email: '',
+  phone: '',
+  timezone: '',
+  locale: '',
 })
 
 // ── Password form ──
@@ -51,109 +60,149 @@ const pwValid = computed(() =>
   pwMatch.value,
 )
 
-// ── Subscription mock data ──
-const subscription = ref({
-  plan: { id: 3, name: 'Professional', slug: 'pro' },
-  status: 'active',
-  billing_cycle: 'monthly',
-  current_period_start: '2026-03-04',
-  current_period_end: '2026-04-04',
-  price: 29,
-  currency: 'USD',
-  next_billing_date: '2026-04-04',
-  auto_renew: true,
+const avatarInitials = computed(() => {
+  const parts = profileForm.value.name.trim().split(/\s+/).filter(Boolean)
+  const initials = parts.map(part => part[0]).join('').slice(0, 2).toUpperCase()
+
+  return initials || 'U'
 })
 
-// ── Usage mock data ──
-const usage = ref({
-  images_generated: 187,
-  images_limit: 500,
-  credits_used: 842,
-  credits_limit: 1500,
-  api_calls: 56,
-  api_limit: 200,
-  storage_used_mb: 312,
-  storage_limit_mb: 2048,
-  upscales_used: 14,
-  upscales_limit: 50,
+function syncAuthUser(profile: ProfileData | MeResponse) {
+  auth.setUser({
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    avatar: profile.avatar,
+    roles: profile.roles,
+  })
+}
+
+function applyProfileData(profile: ProfileData | MeResponse) {
+  profileForm.value = {
+    name: profile.name ?? '',
+    email: profile.email ?? '',
+    phone: profile.phone ?? '',
+    timezone: profile.timezone ?? '',
+    locale: profile.locale ?? '',
+  }
+
+  if (!selectedAvatarFile.value) {
+    avatarPreviewUrl.value = profile.avatar ?? null
+  }
+}
+
+function revokeAvatarPreview() {
+  if (avatarPreviewUrl.value?.startsWith('blob:')) {
+    URL.revokeObjectURL(avatarPreviewUrl.value)
+  }
+}
+
+function clearAvatarSelection() {
+  selectedAvatarFile.value = null
+  if (avatarInputRef.value) {
+    avatarInputRef.value.value = ''
+  }
+}
+
+function extractFirstError(err: unknown, fallback: string) {
+  const responseData = (err as any)?.response?.data
+  const firstValidationError = Object.values(responseData?.errors ?? {}).flat()[0]
+
+  if (typeof firstValidationError === 'string') {
+    return firstValidationError
+  }
+
+  if (typeof responseData?.message === 'string' && responseData.message.trim() !== '') {
+    return responseData.message
+  }
+
+  return fallback
+}
+
+function openAvatarPicker() {
+  avatarInputRef.value?.click()
+}
+
+function handleAvatarSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    errorMsg.value = t('profile.avatarInvalid')
+    clearAvatarSelection()
+    return
+  }
+
+  if (file.size > 4 * 1024 * 1024) {
+    errorMsg.value = t('profile.avatarTooLarge')
+    clearAvatarSelection()
+    return
+  }
+
+  errorMsg.value = ''
+  successMsg.value = ''
+  revokeAvatarPreview()
+  selectedAvatarFile.value = file
+  avatarPreviewUrl.value = URL.createObjectURL(file)
+}
+
+// ── Load real user data on mount ──
+onMounted(async () => {
+  try {
+    const res = await getMe()
+    if (res.success && res.data) {
+      syncAuthUser(res.data)
+      applyProfileData(res.data)
+    }
+  } catch {
+    // Fallback to auth store data
+    profileForm.value.name = auth.user.name ?? ''
+    profileForm.value.email = auth.user.email ?? ''
+    avatarPreviewUrl.value = auth.user.avatar
+  } finally {
+    profileLoading.value = false
+  }
 })
 
-const imagesPercent = computed(() => Math.round((usage.value.images_generated / usage.value.images_limit) * 100))
-const creditsPercent = computed(() => Math.round((usage.value.credits_used / usage.value.credits_limit) * 100))
-const apiPercent = computed(() => Math.round((usage.value.api_calls / usage.value.api_limit) * 100))
-const storagePercent = computed(() => Math.round((usage.value.storage_used_mb / usage.value.storage_limit_mb) * 100))
-const upscalesPercent = computed(() => Math.round((usage.value.upscales_used / usage.value.upscales_limit) * 100))
-
-// ── Usage history chart ──
-const usageChartData = computed(() => ({
-  labels: ['Mar 29', 'Mar 30', 'Mar 31', 'Apr 01', 'Apr 02', 'Apr 03', 'Apr 04'],
-  datasets: [
-    {
-      label: t('profile.images'),
-      data: [22, 31, 18, 27, 35, 29, 25],
-      borderColor: '#8b5cf6',
-      backgroundColor: 'rgba(139, 92, 246, 0.08)',
-      fill: true,
-      tension: 0.35,
-      borderWidth: 2,
-      pointRadius: 3,
-    },
-    {
-      label: t('profile.credits'),
-      data: [95, 142, 88, 118, 156, 131, 112],
-      borderColor: '#0ea5e9',
-      backgroundColor: 'rgba(14, 165, 233, 0.04)',
-      fill: false,
-      tension: 0.35,
-      borderWidth: 2,
-      pointRadius: 3,
-    },
-  ],
-}))
-
-function mutedText() {
-  return document.documentElement.classList.contains('dark') ? '#71717a' : '#94a3b8'
-}
-function gridColor() {
-  return document.documentElement.classList.contains('dark') ? 'rgba(113,113,122,0.13)' : 'rgba(148,163,184,0.13)'
-}
-
-const usageChartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { labels: { color: mutedText(), usePointStyle: true, pointStyle: 'circle' } } },
-  scales: {
-    x: { grid: { color: gridColor() }, ticks: { color: mutedText(), font: { size: 10 } } },
-    y: { grid: { color: gridColor() }, ticks: { color: mutedText(), font: { size: 10 } }, beginAtZero: true },
-  },
-}))
-
-// ── Recent activity ──
-const recentActivity = ref([
-  { id: 1, action: 'image_generated', description: 'Professional logo design', date: '2026-04-04T14:22:00Z', credits: 8 },
-  { id: 2, action: 'image_generated', description: 'Product photo background removal', date: '2026-04-04T12:05:00Z', credits: 5 },
-  { id: 3, action: 'image_upscaled', description: 'Upscale editorial banner', date: '2026-04-03T18:30:00Z', credits: 12 },
-  { id: 4, action: 'image_generated', description: 'Cartoon character illustration', date: '2026-04-03T10:15:00Z', credits: 6 },
-  { id: 5, action: 'style_applied', description: 'Watercolor effect applied', date: '2026-04-02T16:44:00Z', credits: 4 },
-])
-
-// ── Invoices ──
-const invoices = ref([
-  { id: 1, number: 'INV-2026-0042', date: '2026-04-04', amount: 29, status: 'paid' },
-  { id: 2, number: 'INV-2026-0031', date: '2026-03-04', amount: 29, status: 'paid' },
-  { id: 3, number: 'INV-2026-0019', date: '2026-02-04', amount: 29, status: 'paid' },
-])
+onBeforeUnmount(() => {
+  revokeAvatarPreview()
+})
 
 // ── Handlers ──
 async function saveProfile() {
   saving.value = true
   successMsg.value = ''
   errorMsg.value = ''
+
   try {
-    await new Promise(r => setTimeout(r, 1000))
-    successMsg.value = t('profile.profileSaved')
-  } catch {
-    errorMsg.value = t('profile.saveFailed')
+    const profileRes = await updateProfile({
+      name: profileForm.value.name,
+      email: profileForm.value.email,
+      phone: profileForm.value.phone || undefined,
+      locale: profileForm.value.locale || undefined,
+      timezone: profileForm.value.timezone || undefined,
+    })
+
+    let savedProfile = profileRes.data
+
+    if (selectedAvatarFile.value) {
+      const avatarRes = await uploadProfileAvatar(selectedAvatarFile.value)
+      savedProfile = avatarRes.data
+      revokeAvatarPreview()
+      clearAvatarSelection()
+    }
+
+    if (profileRes.success && savedProfile) {
+      syncAuthUser(savedProfile)
+      applyProfileData(savedProfile)
+      successMsg.value = t('profile.profileSaved')
+    }
+  } catch (err: unknown) {
+    errorMsg.value = extractFirstError(err, t('profile.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -165,50 +214,20 @@ async function changePassword() {
   pwSuccess.value = ''
   pwError.value = ''
   try {
-    await new Promise(r => setTimeout(r, 1000))
-    pwSuccess.value = t('profile.passwordChanged')
-    pwForm.value = { current: '', password: '', confirm: '' }
-  } catch {
-    pwError.value = t('profile.passwordFailed')
+    const res = await changePasswordApi({
+      current_password: pwForm.value.current,
+      password: pwForm.value.password,
+      password_confirmation: pwForm.value.confirm,
+    })
+    if (res.success) {
+      pwSuccess.value = t('profile.passwordChanged')
+      pwForm.value = { current: '', password: '', confirm: '' }
+    }
+  } catch (err: unknown) {
+    pwError.value = extractFirstError(err, t('profile.passwordFailed'))
   } finally {
     pwSaving.value = false
   }
-}
-
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function formatDateTime(d: string) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function actionIcon(action: string) {
-  const map: Record<string, string> = {
-    image_generated: 'pi pi-image',
-    image_upscaled: 'pi pi-expand',
-    style_applied: 'pi pi-palette',
-  }
-  return map[action] || 'pi pi-bolt'
-}
-
-function actionColor(action: string) {
-  const map: Record<string, string> = {
-    image_generated: '#8b5cf6',
-    image_upscaled: '#0ea5e9',
-    style_applied: '#f59e0b',
-  }
-  return map[action] || '#64748b'
-}
-
-function usageBarColor(percent: number): string {
-  if (percent >= 90) return '#ef4444'
-  if (percent >= 70) return '#f59e0b'
-  return '#10b981'
-}
-
-function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secondary' {
-  return status === 'paid' ? 'success' : status === 'overdue' ? 'danger' : 'warn'
 }
 </script>
 
@@ -244,27 +263,46 @@ function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secon
                 <!-- Avatar -->
                 <div class="avatar-row">
                   <div class="avatar-circle">
-                    <span class="avatar-initials">{{ profileForm.name.split(' ').map(w => w[0]).join('').slice(0, 2) }}</span>
+                    <img v-if="avatarPreviewUrl" :src="avatarPreviewUrl" :alt="profileForm.name || 'Avatar'" />
+                    <span v-else class="avatar-initials">{{ avatarInitials }}</span>
                   </div>
                   <div class="avatar-info">
                     <span class="avatar-name">{{ profileForm.name }}</span>
                     <span class="avatar-email">{{ profileForm.email }}</span>
+                    <span v-if="selectedAvatarFile" class="avatar-helper">{{ selectedAvatarFile.name }}</span>
                   </div>
-                  <Button :label="t('profile.changeAvatar')" icon="pi pi-camera" severity="secondary" outlined size="small" class="avatar-btn" />
+                  <input
+                    ref="avatarInputRef"
+                    type="file"
+                    accept="image/*"
+                    class="avatar-input-hidden"
+                    @change="handleAvatarSelected"
+                  />
+                  <Button
+                    type="button"
+                    :label="t('profile.changeAvatar')"
+                    icon="pi pi-camera"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    class="avatar-btn"
+                    :disabled="saving"
+                    @click="openAvatarPicker"
+                  />
                 </div>
 
                 <div class="form-grid">
                   <div class="form-field">
                     <label class="field-label">{{ t('profile.fullName') }}</label>
-                    <InputText v-model="profileForm.name" size="small" class="field-input" />
+                    <InputText v-model="profileForm.name" size="small" class="field-input" :disabled="profileLoading || saving" />
                   </div>
                   <div class="form-field">
                     <label class="field-label">{{ t('profile.emailAddress') }}</label>
-                    <InputText v-model="profileForm.email" type="email" size="small" class="field-input" />
+                    <InputText v-model="profileForm.email" type="email" size="small" class="field-input" :disabled="profileLoading || saving" />
                   </div>
                   <div class="form-field">
                     <label class="field-label">{{ t('profile.phone') }}</label>
-                    <InputText v-model="profileForm.phone" size="small" class="field-input" />
+                    <InputText v-model="profileForm.phone" size="small" class="field-input" :disabled="profileLoading || saving" />
                   </div>
                   <div class="form-field">
                     <label class="field-label">{{ t('profile.timezone') }}</label>
@@ -273,7 +311,7 @@ function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secon
                 </div>
 
                 <div class="form-actions">
-                  <Button type="submit" :label="t('profile.saveChanges')" icon="pi pi-check" :loading="saving" size="small" />
+                  <Button type="submit" :label="t('profile.saveChanges')" icon="pi pi-check" :loading="saving" :disabled="profileLoading" size="small" />
                 </div>
               </form>
             </section>
@@ -349,7 +387,7 @@ function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secon
               </form>
             </section>
 
-            <!-- Sessions -->
+            <!-- Sessions — real session info not available yet -->
             <section class="section-card">
               <div class="section-head">
                 <h2 class="section-title">{{ t('profile.activeSessions') }}</h2>
@@ -359,18 +397,9 @@ function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secon
                 <div class="session-item current">
                   <div class="session-icon"><i class="pi pi-desktop" /></div>
                   <div class="session-info">
-                    <span class="session-device">Windows · Chrome 124</span>
-                    <span class="session-meta">Riyadh, SA · {{ t('profile.currentSession') }}</span>
+                    <span class="session-device">{{ t('profile.currentSession') }}</span>
                   </div>
                   <Tag :value="t('profile.thisDevice')" severity="success" class="mini-tag" />
-                </div>
-                <div class="session-item">
-                  <div class="session-icon"><i class="pi pi-mobile" /></div>
-                  <div class="session-info">
-                    <span class="session-device">iPhone 15 · Safari</span>
-                    <span class="session-meta">Riyadh, SA · 2h ago</span>
-                  </div>
-                  <Button :label="t('profile.revoke')" severity="danger" text size="small" />
                 </div>
               </div>
             </section>
@@ -380,91 +409,10 @@ function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secon
         <!-- ═══ SUBSCRIPTION TAB ═══ -->
         <TabPanel value="subscription">
           <div class="tab-content">
-            <!-- Current plan card -->
-            <section class="section-card plan-hero">
-              <div class="plan-hero-row">
-                <div class="plan-hero-info">
-                  <div class="plan-badge">
-                    <i class="pi pi-crown" />
-                    <span>{{ subscription.plan.name }}</span>
-                  </div>
-                  <h2 class="plan-price-big">${{ subscription.price }}<span class="plan-cycle">/{{ t('profile.month') }}</span></h2>
-                  <div class="plan-meta">
-                    <Tag :value="subscription.status" :severity="subscription.status === 'active' ? 'success' : 'warn'" class="mini-tag" />
-                    <span class="plan-period">
-                      {{ formatDate(subscription.current_period_start) }} — {{ formatDate(subscription.current_period_end) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="plan-hero-actions">
-                  <Button :label="t('profile.upgradePlan')" icon="pi pi-arrow-up" size="small" />
-                  <Button :label="t('profile.manageBilling')" icon="pi pi-credit-card" severity="secondary" outlined size="small" />
-                </div>
-              </div>
-            </section>
-
-            <!-- Quick usage summary -->
-            <div class="usage-summary-grid">
-              <article class="usage-mini-card">
-                <div class="usage-mini-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
-                  <i class="pi pi-image" />
-                </div>
-                <div class="usage-mini-body">
-                  <span class="usage-mini-value">{{ usage.images_generated }}/{{ usage.images_limit }}</span>
-                  <span class="usage-mini-label">{{ t('profile.images') }}</span>
-                </div>
-                <ProgressBar :value="imagesPercent" :showValue="false" class="usage-mini-bar" :style="{ '--p-progressbar-value-background': usageBarColor(imagesPercent) }" />
-              </article>
-              <article class="usage-mini-card">
-                <div class="usage-mini-icon" style="background: rgba(14, 165, 233, 0.1); color: #0ea5e9;">
-                  <i class="pi pi-bolt" />
-                </div>
-                <div class="usage-mini-body">
-                  <span class="usage-mini-value">{{ usage.credits_used }}/{{ usage.credits_limit }}</span>
-                  <span class="usage-mini-label">{{ t('profile.credits') }}</span>
-                </div>
-                <ProgressBar :value="creditsPercent" :showValue="false" class="usage-mini-bar" :style="{ '--p-progressbar-value-background': usageBarColor(creditsPercent) }" />
-              </article>
-              <article class="usage-mini-card">
-                <div class="usage-mini-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
-                  <i class="pi pi-code" />
-                </div>
-                <div class="usage-mini-body">
-                  <span class="usage-mini-value">{{ usage.api_calls }}/{{ usage.api_limit }}</span>
-                  <span class="usage-mini-label">{{ t('profile.apiCalls') }}</span>
-                </div>
-                <ProgressBar :value="apiPercent" :showValue="false" class="usage-mini-bar" :style="{ '--p-progressbar-value-background': usageBarColor(apiPercent) }" />
-              </article>
-              <article class="usage-mini-card">
-                <div class="usage-mini-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
-                  <i class="pi pi-database" />
-                </div>
-                <div class="usage-mini-body">
-                  <span class="usage-mini-value">{{ usage.storage_used_mb }}MB/{{ (usage.storage_limit_mb / 1024).toFixed(0) }}GB</span>
-                  <span class="usage-mini-label">{{ t('profile.storage') }}</span>
-                </div>
-                <ProgressBar :value="storagePercent" :showValue="false" class="usage-mini-bar" :style="{ '--p-progressbar-value-background': usageBarColor(storagePercent) }" />
-              </article>
-            </div>
-
-            <!-- Invoices -->
-            <section class="section-card">
-              <div class="section-head">
-                <h2 class="section-title">{{ t('profile.billingHistory') }}</h2>
-              </div>
-              <div class="invoices-list">
-                <div v-for="inv in invoices" :key="inv.id" class="invoice-row">
-                  <div class="invoice-info">
-                    <span class="invoice-number">{{ inv.number }}</span>
-                    <span class="invoice-date">{{ formatDate(inv.date) }}</span>
-                  </div>
-                  <div class="invoice-end">
-                    <span class="invoice-amount">${{ inv.amount }}</span>
-                    <Tag :value="inv.status" :severity="invoiceSeverity(inv.status)" class="mini-tag" />
-                    <Button icon="pi pi-download" severity="secondary" text rounded size="small" />
-                  </div>
-                </div>
-              </div>
+            <section class="section-card" style="text-align: center; padding: 40px 20px;">
+              <i class="pi pi-credit-card" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;" />
+              <h2 class="section-title" style="margin-bottom: 4px;">{{ t('profile.noSubscription') }}</h2>
+              <p class="section-desc">{{ t('profile.noSubscriptionDesc') }}</p>
             </section>
           </div>
         </TabPanel>
@@ -472,66 +420,10 @@ function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secon
         <!-- ═══ USAGE TAB ═══ -->
         <TabPanel value="usage">
           <div class="tab-content">
-            <!-- Usage Meters -->
-            <section class="section-card">
-              <div class="section-head">
-                <h2 class="section-title">{{ t('profile.currentUsage') }}</h2>
-                <p class="section-desc">{{ t('profile.currentUsageDesc') }}</p>
-              </div>
-              <div class="meters-grid">
-                <div class="meter-item" v-for="m in [
-                  { label: t('profile.imagesGenerated'), used: usage.images_generated, limit: usage.images_limit, percent: imagesPercent, icon: 'pi pi-image', color: '#8b5cf6' },
-                  { label: t('profile.creditsConsumed'), used: usage.credits_used, limit: usage.credits_limit, percent: creditsPercent, icon: 'pi pi-bolt', color: '#0ea5e9' },
-                  { label: t('profile.apiRequests'), used: usage.api_calls, limit: usage.api_limit, percent: apiPercent, icon: 'pi pi-code', color: '#f59e0b' },
-                  { label: t('profile.storageUsed'), used: `${usage.storage_used_mb}MB`, limit: `${(usage.storage_limit_mb / 1024).toFixed(0)}GB`, percent: storagePercent, icon: 'pi pi-database', color: '#10b981' },
-                  { label: t('profile.upscales'), used: usage.upscales_used, limit: usage.upscales_limit, percent: upscalesPercent, icon: 'pi pi-expand', color: '#ec4899' },
-                ]" :key="m.label">
-                  <div class="meter-head">
-                    <div class="meter-icon" :style="{ background: m.color + '18', color: m.color }">
-                      <i :class="m.icon" />
-                    </div>
-                    <div class="meter-label-wrap">
-                      <span class="meter-label">{{ m.label }}</span>
-                      <span class="meter-count">{{ m.used }} / {{ m.limit }}</span>
-                    </div>
-                    <span class="meter-percent" :style="{ color: usageBarColor(m.percent) }">{{ m.percent }}%</span>
-                  </div>
-                  <ProgressBar :value="m.percent" :showValue="false" class="meter-bar" :style="{ '--p-progressbar-value-background': usageBarColor(m.percent) }" />
-                </div>
-              </div>
-            </section>
-
-            <!-- Usage chart -->
-            <section class="section-card">
-              <div class="section-head">
-                <h2 class="section-title">{{ t('profile.usageTrend') }}</h2>
-                <p class="section-desc">{{ t('profile.last7days') }}</p>
-              </div>
-              <div class="chart-shell">
-                <Chart type="line" :data="usageChartData" :options="usageChartOptions" />
-              </div>
-            </section>
-
-            <!-- Recent Activity -->
-            <section class="section-card">
-              <div class="section-head">
-                <h2 class="section-title">{{ t('profile.recentActivity') }}</h2>
-              </div>
-              <div class="activity-list">
-                <div v-for="item in recentActivity" :key="item.id" class="activity-row">
-                  <div class="activity-icon" :style="{ background: actionColor(item.action) + '18', color: actionColor(item.action) }">
-                    <i :class="actionIcon(item.action)" />
-                  </div>
-                  <div class="activity-info">
-                    <span class="activity-desc">{{ item.description }}</span>
-                    <span class="activity-date">{{ formatDateTime(item.date) }}</span>
-                  </div>
-                  <div class="activity-credits">
-                    <i class="pi pi-bolt" />
-                    <span>{{ item.credits }}</span>
-                  </div>
-                </div>
-              </div>
+            <section class="section-card" style="text-align: center; padding: 40px 20px;">
+              <i class="pi pi-chart-bar" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;" />
+              <h2 class="section-title" style="margin-bottom: 4px;">{{ t('profile.noUsageData') }}</h2>
+              <p class="section-desc">{{ t('profile.noUsageDataDesc') }}</p>
             </section>
           </div>
         </TabPanel>
@@ -613,12 +505,21 @@ function invoiceSeverity(status: string): 'success' | 'warn' | 'danger' | 'secon
   font-size: 1rem;
   font-weight: 700;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .avatar-name { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
 .avatar-email { font-size: 0.7rem; color: var(--text-muted); }
+.avatar-helper { font-size: 0.66rem; color: var(--active-color); margin-top: 2px; }
 .avatar-btn { flex-shrink: 0; }
+.avatar-input-hidden { display: none; }
 
 /* ── Form grid ── */
 .form-grid {

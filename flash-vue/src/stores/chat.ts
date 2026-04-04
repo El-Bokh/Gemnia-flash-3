@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import {
+  getConversations as fetchConversationsApi,
+  createConversation as createConversationApi,
+  updateConversation as updateConversationApi,
+  deleteConversation as deleteConversationApi,
+  sendMessage as sendMessageApi,
+} from '@/services/chatService'
+import type { ConversationData, MessageData } from '@/services/chatService'
 
 export interface ChatMessage {
   id: string
@@ -13,6 +21,7 @@ export interface ChatMessage {
 
 export interface Conversation {
   id: string
+  serverId: number | null
   title: string
   pinned: boolean
   messages: ChatMessage[]
@@ -20,62 +29,37 @@ export interface Conversation {
   updatedAt: Date
 }
 
-export const useChatStore = defineStore('chat', () => {
-  const conversations = ref<Conversation[]>([
-    {
-      id: 'c1',
-      title: 'تصميم شعار احترافي',
-      pinned: true,
-      messages: [
-        { id: 'm1', role: 'user', content: 'أريد شعار بألوان زرقاء وذهبية لشركة تقنية', timestamp: new Date('2026-04-04T10:00:00'), status: 'sent' },
-        { id: 'm2', role: 'assistant', content: 'سأقوم بتصميم شعار عصري يجمع بين الأزرق والذهبي مع عناصر تقنية متميزة.', imageUrl: 'https://placehold.co/512x512/6366f1/ffffff?text=Logo+Design', timestamp: new Date('2026-04-04T10:00:15'), status: 'sent' },
-      ],
-      createdAt: new Date('2026-04-04'),
-      updatedAt: new Date('2026-04-04'),
-    },
-    {
-      id: 'c2',
-      title: 'صورة منتج للتسويق',
-      pinned: false,
-      messages: [
-        { id: 'm3', role: 'user', content: 'صورة عالية الدقة لمنتج إلكتروني', timestamp: new Date('2026-04-03T14:00:00'), status: 'sent' },
-        { id: 'm4', role: 'assistant', content: 'تم إنشاء صورة منتج احترافية بجودة عالية.', imageUrl: 'https://placehold.co/512x512/8b5cf6/ffffff?text=Product+Shot', timestamp: new Date('2026-04-03T14:00:20'), status: 'sent' },
-      ],
-      createdAt: new Date('2026-04-03'),
-      updatedAt: new Date('2026-04-03'),
-    },
-    {
-      id: 'c3',
-      title: 'تعديل خلفية الصورة',
-      pinned: false,
-      messages: [
-        { id: 'm5', role: 'user', content: 'إزالة الخلفية وتبديلها', timestamp: new Date('2026-04-02T09:00:00'), status: 'sent' },
-      ],
-      createdAt: new Date('2026-04-02'),
-      updatedAt: new Date('2026-04-02'),
-    },
-    {
-      id: 'c4',
-      title: 'رسم توضيحي تعليمي',
-      pinned: true,
-      messages: [],
-      createdAt: new Date('2026-04-01'),
-      updatedAt: new Date('2026-04-01'),
-    },
-    {
-      id: 'c5',
-      title: 'تحويل صورة لكرتون',
-      pinned: false,
-      messages: [],
-      createdAt: new Date('2026-03-31'),
-      updatedAt: new Date('2026-03-31'),
-    },
-  ])
+function apiMsgToLocal(m: MessageData): ChatMessage {
+  return {
+    id: String(m.id),
+    role: m.role,
+    content: m.content,
+    imageUrl: m.image_url ?? undefined,
+    imageStyle: m.image_style ?? undefined,
+    timestamp: new Date(m.created_at),
+    status: m.status === 'sent' ? 'sent' : 'sent',
+  }
+}
 
+function apiConvToLocal(c: ConversationData): Conversation {
+  return {
+    id: String(c.id),
+    serverId: c.id,
+    title: c.title,
+    pinned: c.pinned,
+    messages: (c.messages ?? []).map(apiMsgToLocal),
+    createdAt: new Date(c.created_at),
+    updatedAt: new Date(c.updated_at),
+  }
+}
+
+export const useChatStore = defineStore('chat', () => {
+  const conversations = ref<Conversation[]>([])
   const activeConversationId = ref<string | null>(null)
   const isAiTyping = ref(false)
   const editingConversationId = ref<string | null>(null)
   const searchQuery = ref('')
+  const loaded = ref(false)
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeConversationId.value) ?? null,
@@ -97,14 +81,40 @@ export const useChatStore = defineStore('chat', () => {
     )
   })
 
+  async function loadConversations() {
+    if (loaded.value) return
+    try {
+      const res = await fetchConversationsApi()
+      if (res.success && res.data) {
+        conversations.value = res.data.map(apiConvToLocal)
+        loaded.value = true
+      }
+    } catch {
+      // Silently fail — user may not be authenticated yet
+    }
+  }
+
   function setActiveConversation(id: string | null) {
     activeConversationId.value = id
   }
 
-  function createConversation(): string {
-    const id = 'c' + Date.now()
+  async function createConversation(): Promise<string> {
+    try {
+      const res = await createConversationApi()
+      if (res.success && res.data) {
+        const conv = apiConvToLocal(res.data)
+        conversations.value.unshift(conv)
+        activeConversationId.value = conv.id
+        return conv.id
+      }
+    } catch {
+      // Fallback: create local-only conversation
+    }
+
+    const id = 'local-' + Date.now()
     const conv: Conversation = {
       id,
+      serverId: null,
       title: 'New Chat',
       pinned: false,
       messages: [],
@@ -116,7 +126,16 @@ export const useChatStore = defineStore('chat', () => {
     return id
   }
 
-  function deleteConversation(id: string) {
+  async function deleteConversation(id: string) {
+    const conv = conversations.value.find(c => c.id === id)
+    if (conv?.serverId) {
+      try {
+        await deleteConversationApi(conv.serverId)
+      } catch {
+        // Continue with local removal
+      }
+    }
+
     const idx = conversations.value.findIndex(c => c.id === id)
     if (idx !== -1) {
       conversations.value.splice(idx, 1)
@@ -126,20 +145,37 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function renameConversation(id: string, newTitle: string) {
+  async function renameConversation(id: string, newTitle: string) {
     const conv = conversations.value.find(c => c.id === id)
-    if (conv) {
-      conv.title = newTitle.trim() || conv.title
-      conv.updatedAt = new Date()
-    }
+    if (!conv) return
+
+    const title = newTitle.trim() || conv.title
+    conv.title = title
+    conv.updatedAt = new Date()
     editingConversationId.value = null
+
+    if (conv.serverId) {
+      try {
+        await updateConversationApi(conv.serverId, { title })
+      } catch {
+        // Already updated locally
+      }
+    }
   }
 
-  function togglePin(id: string) {
+  async function togglePin(id: string) {
     const conv = conversations.value.find(c => c.id === id)
-    if (conv) {
-      conv.pinned = !conv.pinned
-      conv.updatedAt = new Date()
+    if (!conv) return
+
+    conv.pinned = !conv.pinned
+    conv.updatedAt = new Date()
+
+    if (conv.serverId) {
+      try {
+        await updateConversationApi(conv.serverId, { pinned: conv.pinned })
+      } catch {
+        // Already updated locally
+      }
     }
   }
 
@@ -153,45 +189,73 @@ export const useChatStore = defineStore('chat', () => {
 
   async function sendMessage(content: string, imageStyle?: string) {
     if (!activeConversationId.value) {
-      createConversation()
+      await createConversation()
     }
 
     const conv = conversations.value.find(c => c.id === activeConversationId.value)
     if (!conv) return
 
+    // Optimistic user message
+    const tempUserMsgId = 'tmp-' + Date.now()
     const userMsg: ChatMessage = {
-      id: 'm' + Date.now(),
+      id: tempUserMsgId,
       role: 'user',
       content,
       imageStyle,
       timestamp: new Date(),
-      status: 'sent',
+      status: 'sending',
     }
     conv.messages.push(userMsg)
     conv.updatedAt = new Date()
 
-    // Update title from first message
-    if (conv.messages.length === 1) {
+    if (conv.messages.filter(m => m.role === 'user').length === 1) {
       conv.title = content.slice(0, 40) + (content.length > 40 ? '…' : '')
     }
 
-    // Simulate AI response
-    isAiTyping.value = true
-    await new Promise(r => setTimeout(r, 1500 + Math.random() * 2000))
-
-    const aiMsg: ChatMessage = {
-      id: 'm' + Date.now(),
-      role: 'assistant',
-      content: 'تم معالجة طلبك بنجاح! إليك النتيجة المطلوبة.',
-      imageUrl: imageStyle
-        ? `https://placehold.co/512x512/6366f1/ffffff?text=${encodeURIComponent(imageStyle)}`
-        : undefined,
-      timestamp: new Date(),
-      status: 'sent',
+    // If no server ID yet, create conversation on server first
+    if (!conv.serverId) {
+      try {
+        const res = await createConversationApi(conv.title)
+        if (res.success && res.data) {
+          conv.serverId = res.data.id
+          conv.id = String(res.data.id)
+          activeConversationId.value = conv.id
+        }
+      } catch {
+        userMsg.status = 'error'
+        return
+      }
     }
-    conv.messages.push(aiMsg)
-    conv.updatedAt = new Date()
-    isAiTyping.value = false
+
+    isAiTyping.value = true
+    try {
+      const res = await sendMessageApi(conv.serverId!, content, imageStyle)
+      if (res.success && res.data) {
+        // Replace temp user message with real one
+        const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+        if (idx !== -1) {
+          conv.messages[idx] = apiMsgToLocal(res.data.user_message)
+        }
+
+        // Add AI message
+        conv.messages.push(apiMsgToLocal(res.data.ai_message))
+
+        // Sync title from server
+        if (res.data.conversation) {
+          conv.title = res.data.conversation.title
+        }
+      }
+    } catch {
+      userMsg.status = 'error'
+    } finally {
+      isAiTyping.value = false
+    }
+  }
+
+  function $reset() {
+    conversations.value = []
+    activeConversationId.value = null
+    loaded.value = false
   }
 
   return {
@@ -204,6 +268,8 @@ export const useChatStore = defineStore('chat', () => {
     isAiTyping,
     editingConversationId,
     searchQuery,
+    loaded,
+    loadConversations,
     setActiveConversation,
     createConversation,
     deleteConversation,
@@ -212,5 +278,6 @@ export const useChatStore = defineStore('chat', () => {
     startEditing,
     cancelEditing,
     sendMessage,
+    $reset,
   }
 })

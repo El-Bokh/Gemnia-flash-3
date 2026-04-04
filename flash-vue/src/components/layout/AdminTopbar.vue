@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
 import Button from 'primevue/button'
 import Badge from 'primevue/badge'
 import Menu from 'primevue/menu'
@@ -10,6 +11,7 @@ import Popover from 'primevue/popover'
 
 const layout = useLayoutStore()
 const auth = useAuthStore()
+const notificationStore = useNotificationStore()
 const { t } = useI18n()
 
 const profileMenu = ref()
@@ -34,13 +36,8 @@ const profileItems = computed(() => [
   },
 ])
 
-const notifications = ref([
-  { id: 1, text: 'New user registered', time: '2 min ago', read: false },
-  { id: 2, text: 'Payment received — $49.00', time: '15 min ago', read: false },
-  { id: 3, text: 'AI request completed', time: '1 hr ago', read: true },
-])
-
-const unreadCount = computed(() => notifications.value.filter((n) => !n.read).length)
+const notifications = computed(() => notificationStore.notifications)
+const unreadCount = computed(() => notificationStore.unreadCount)
 
 const apiOnline = ref(true)
 
@@ -50,7 +47,19 @@ function toggleProfile(event: Event) {
 
 function toggleNotifications(event: Event) {
   notifPanel.value.toggle(event)
+  if (notificationStore.notifications.length === 0) {
+    notificationStore.fetchNotifications()
+  }
 }
+
+onMounted(() => {
+  notificationStore.setMode(true)
+  notificationStore.startPolling()
+})
+
+onUnmounted(() => {
+  notificationStore.stopPolling()
+})
 </script>
 
 <template>
@@ -138,19 +147,26 @@ function toggleNotifications(event: Event) {
       <Popover ref="notifPanel" class="notif-panel">
         <div class="notif-header">
           <span class="notif-title">{{ t('topbar.notifications') }}</span>
-          <span class="notif-count">{{ unreadCount }} {{ t('common.new') }}</span>
+          <button v-if="unreadCount > 0" class="notif-mark-read" @click="notificationStore.markAllRead()">
+            {{ t('topbar.markAllRead') }}
+          </button>
+          <span v-else class="notif-count">{{ unreadCount }} {{ t('common.new') }}</span>
         </div>
         <ul class="notif-list">
+          <li v-if="notificationStore.loading" class="notif-empty">{{ t('common.loading') }}...</li>
+          <li v-else-if="notifications.length === 0" class="notif-empty">{{ t('topbar.noNotifications') }}</li>
           <li
             v-for="n in notifications"
             :key="n.id"
             class="notif-item"
-            :class="{ 'notif-unread': !n.read }"
+            :class="{ 'notif-unread': !n.is_read }"
+            @click="notificationStore.markRead(n.id)"
           >
-            <div class="notif-dot" v-if="!n.read" />
+            <div class="notif-dot" v-if="!n.is_read" />
             <div class="notif-content">
-              <p class="notif-text">{{ n.text }}</p>
-              <span class="notif-time">{{ n.time }}</span>
+              <p class="notif-text">{{ n.title }}</p>
+              <p class="notif-body">{{ n.body }}</p>
+              <span class="notif-time">{{ n.created_at }}</span>
             </div>
           </li>
         </ul>
@@ -370,6 +386,38 @@ function toggleNotifications(event: Event) {
 .notif-time {
   font-size: 0.68rem;
   color: var(--text-muted, #94a3b8);
+}
+
+.notif-body {
+  font-size: 0.72rem;
+  color: var(--text-muted, #94a3b8);
+  margin: 2px 0 0;
+  line-height: 1.3;
+}
+
+.notif-mark-read {
+  background: none;
+  border: none;
+  font-size: 0.7rem;
+  color: var(--primary-color, #6366f1);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+}
+
+.notif-mark-read:hover {
+  text-decoration: underline;
+}
+
+.notif-empty {
+  padding: 20px 14px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.notif-item {
+  cursor: pointer;
 }
 
 /* Profile */

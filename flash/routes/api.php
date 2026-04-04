@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Admin\CouponController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\FeatureController;
 use App\Http\Controllers\Api\Admin\InvoiceController;
+use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\Admin\PaymentController;
 use App\Http\Controllers\Api\Admin\PermissionController;
 use App\Http\Controllers\Api\Admin\PlanController;
@@ -13,6 +14,9 @@ use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\SupportTicketController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -30,11 +34,38 @@ use Illuminate\Support\Facades\Route;
 // ──────────────────────────────────────────────
 
 Route::prefix('auth')->name('auth.')->group(function () {
+    Route::post('/register', [AuthController::class, 'register'])->name('register');
     Route::post('/login',  [AuthController::class, 'login'])->name('login');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/me',      [AuthController::class, 'me'])->name('me');
+    });
+});
+
+// ──────────────────────────────────────────────
+//  Client Routes (authenticated)
+// ──────────────────────────────────────────────
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    // Profile
+    Route::put('/profile',          [ProfileController::class, 'update']);
+    Route::post('/profile/avatar',  [ProfileController::class, 'uploadAvatar']);
+    Route::put('/profile/password', [ProfileController::class, 'changePassword']);
+
+    // Conversations
+    Route::apiResource('conversations', ConversationController::class);
+    Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage'])
+        ->name('conversations.messages');
+
+    // Notifications
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/',                         [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread-count',             [NotificationController::class, 'unreadCount'])->name('unread-count');
+        Route::post('/read-all',                [NotificationController::class, 'markAllAsRead'])->name('read-all');
+        Route::post('/{notification}/read',     [NotificationController::class, 'markAsRead'])->name('read');
+        Route::delete('/{notification}',        [NotificationController::class, 'destroy'])->name('destroy');
     });
 });
 
@@ -239,6 +270,15 @@ Route::prefix('admin')
             Route::post('/{ticket}/reopen',    [SupportTicketController::class, 'reopen'])->name('reopen');
             Route::delete('/{ticketId}/force',   [SupportTicketController::class, 'forceDelete'])->name('force-delete');
             Route::post('/{ticketId}/restore',   [SupportTicketController::class, 'restore'])->name('restore');
+        });
+
+        // Notifications Management
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/',                         [AdminNotificationController::class, 'index'])->name('index');
+            Route::get('/unread-count',             [AdminNotificationController::class, 'unreadCount'])->name('unread-count');
+            Route::post('/read-all',                [AdminNotificationController::class, 'markAllAsRead'])->name('read-all');
+            Route::post('/{notification}/read',     [AdminNotificationController::class, 'markAsRead'])->name('read');
+            Route::delete('/{notification}',        [AdminNotificationController::class, 'destroy'])->name('destroy');
         });
 
         // System Settings Management

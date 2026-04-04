@@ -8,6 +8,13 @@ export interface LoginCredentials {
   password: string
 }
 
+export interface RegisterPayload {
+  name: string
+  email: string
+  password: string
+  password_confirmation: string
+}
+
 export interface AuthUser {
   id: number
   name: string
@@ -39,6 +46,10 @@ export interface MeResponse {
 
 export function login(credentials: LoginCredentials) {
   return apiPost<ApiResponse<LoginResponse>>('/auth/login', credentials)
+}
+
+export function register(payload: RegisterPayload) {
+  return apiPost<ApiResponse<LoginResponse>>('/auth/register', payload)
 }
 
 export function logout() {

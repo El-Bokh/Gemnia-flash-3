@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\Payment;
 use App\Models\UsageLog;
+use App\Services\NotificationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -148,6 +149,14 @@ class PaymentManagementService
                 'old_status' => $oldStatus,
                 'new_status' => $data['status'],
             ]);
+
+            // Notify on payment completion
+            if ($data['status'] === 'completed') {
+                $ns = app(NotificationService::class);
+                $user = $payment->user;
+                $ns->sendPaymentSuccess($user, (float) $payment->amount, $payment->currency ?? 'USD');
+                $ns->notifyPaymentReceived($user, (float) $payment->amount, $payment->currency ?? 'USD', $payment->payment_gateway ?? 'manual');
+            }
         }
 
         return $payment->fresh([

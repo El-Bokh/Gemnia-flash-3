@@ -82,12 +82,14 @@ export default {
     toggleSidebar: 'Toggle sidebar',
     collapseSidebar: 'Collapse sidebar',
     switchLanguage: 'Switch language',
+    markAllRead: 'Mark all read',
+    noNotifications: 'No notifications',
   },
 
   // ── Login ───────────────────────────────────────────────
   login: {
     title: 'Klek AI',
-    subtitle: 'Admin Panel',
+    subtitle: 'Sign in to continue',
     email: 'Email',
     password: 'Password',
     signIn: 'Sign In',
@@ -989,6 +991,8 @@ export default {
     saveChanges: 'Save Changes',
     profileSaved: 'Profile updated successfully.',
     saveFailed: 'Failed to save changes.',
+    avatarInvalid: 'Please choose a valid image file.',
+    avatarTooLarge: 'The image size must be 4 MB or less.',
     changePassword: 'Change Password',
     changePasswordDesc: 'Use a strong password with at least 8 characters.',
     currentPassword: 'Current Password',
@@ -1025,6 +1029,10 @@ export default {
     usageTrend: 'Usage Trend',
     last7days: 'Activity over the last 7 days.',
     recentActivity: 'Recent Activity',
+    noSubscription: 'No Active Subscription',
+    noSubscriptionDesc: 'You don\'t have an active subscription yet. Subscription plans will be available soon.',
+    noUsageData: 'No Usage Data',
+    noUsageDataDesc: 'Your usage statistics will appear here once you start using the platform.',
   },
 
   // ── Chat ──────────────────────────────────────────────────

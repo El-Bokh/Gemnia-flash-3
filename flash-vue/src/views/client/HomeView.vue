@@ -54,6 +54,7 @@ watch(() => chat.isAiTyping, (typing) => {
 })
 
 onMounted(() => {
+  chat.loadConversations()
   if (messages.value.length) {
     scrollToBottom(false)
   }

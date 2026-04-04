@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLayoutStore } from '@/stores/layout'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tooltip from 'primevue/tooltip'
@@ -17,6 +18,7 @@ const route = useRoute()
 const layout = useLayoutStore()
 const chat = useChatStore()
 const auth = useAuthStore()
+const notificationStore = useNotificationStore()
 
 const sidebarOpen = ref(true)
 const mobileSidebarOpen = ref(false)
@@ -24,17 +26,19 @@ const showUserMenu = ref(false)
 const showNotifications = ref(false)
 const editTitle = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
+const userMenuRef = ref<HTMLElement | null>(null)
+const notificationMenuRef = ref<HTMLElement | null>(null)
 
 const isHome = computed(() => route.name === 'home' && !chat.activeConversationId)
 
-// Notifications mock
-const notifications = ref([
-  { id: 1, text: 'Image generation completed', time: '2m ago', read: false },
-  { id: 2, text: 'Your plan has been upgraded', time: '1h ago', read: false },
-  { id: 3, text: 'Welcome to Klek AI!', time: '1d ago', read: true },
-])
+const notifications = computed(() => notificationStore.notifications)
+const unreadCount = computed(() => notificationStore.unreadCount)
+const userInitials = computed(() => {
+  const parts = auth.user.name.trim().split(/\s+/).filter(Boolean)
+  const initials = parts.map(part => part[0]).join('').slice(0, 2).toUpperCase()
 
-const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
+  return initials || 'U'
+})
 
 function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value
@@ -46,13 +50,13 @@ function toggleMobileSidebar() {
 
 function newChat() {
   chat.setActiveConversation(null)
-  router.push({ name: 'home' })
+  void router.push({ name: 'home' })
   mobileSidebarOpen.value = false
 }
 
 function openConversation(id: string) {
   chat.setActiveConversation(id)
-  router.push({ name: 'home' })
+  void router.push({ name: 'home' })
   mobileSidebarOpen.value = false
 }
 
@@ -88,27 +92,83 @@ function handlePinConv(id: string) {
   chat.togglePin(id)
 }
 
+function closeOverlays() {
+  showUserMenu.value = false
+  showNotifications.value = false
+}
+
 function goToPricing() {
-  router.push({ name: 'pricing' })
+  closeOverlays()
+  void router.push({ name: 'pricing' })
 }
 
 function goToLogin() {
-  router.push({ name: 'login' })
+  closeOverlays()
+  void router.push({ name: 'login' })
 }
 
 function goToProfile() {
-  router.push({ name: 'profile' })
-  showUserMenu.value = false
+  closeOverlays()
+  void router.push({ name: 'profile' })
+}
+
+async function handleLogout() {
+  closeOverlays()
+  chat.$reset()
+  await auth.logout()
 }
 
 function markAllRead() {
-  notifications.value.forEach(n => (n.read = true))
+  notificationStore.markAllRead()
 }
 
 function focusSearch() {
   chat.searchQuery = ''
   nextTick(() => searchInputRef.value?.focus())
 }
+
+function handleCollapsedSearch() {
+  toggleSidebar()
+  focusSearch()
+}
+
+function toggleNotificationsMenu() {
+  showNotifications.value = !showNotifications.value
+  if (showNotifications.value) {
+    showUserMenu.value = false
+    if (notificationStore.notifications.length === 0) {
+      notificationStore.fetchNotifications()
+    }
+  }
+}
+
+function toggleUserDropdown() {
+  showUserMenu.value = !showUserMenu.value
+  if (showUserMenu.value) {
+    showNotifications.value = false
+  }
+}
+
+function handleDocumentPointerDown(e: PointerEvent) {
+  const target = e.target as Node
+  if (showUserMenu.value && userMenuRef.value && !userMenuRef.value.contains(target)) {
+    showUserMenu.value = false
+  }
+  if (showNotifications.value && notificationMenuRef.value && !notificationMenuRef.value.contains(target)) {
+    showNotifications.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
+  notificationStore.setMode(false)
+  notificationStore.startPolling()
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  notificationStore.stopPolling()
+})
 </script>
 
 <template>
@@ -175,7 +235,7 @@ function focusSearch() {
         </div>
       </div>
       <div class="sidebar-search" v-else>
-        <Button icon="pi pi-search" severity="secondary" text rounded size="small" @click="focusSearch; toggleSidebar()"
+        <Button icon="pi pi-search" severity="secondary" text rounded size="small" @click="handleCollapsedSearch"
           v-tooltip.left="t('chat.searchConversations')" />
       </div>
 
@@ -353,11 +413,11 @@ function focusSearch() {
             v-tooltip.bottom="layout.locale === 'ar' ? 'English' : 'العربية'"
           />
           <!-- Notifications -->
-          <div class="notification-container">
+          <div class="notification-container" ref="notificationMenuRef">
             <Button icon="pi pi-bell" severity="secondary" text rounded size="small"
               class="notif-btn"
               :class="{ 'has-unread': unreadCount > 0 }"
-              @click="showNotifications = !showNotifications"
+              @click="toggleNotificationsMenu"
             />
             <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount }}</span>
 
@@ -368,16 +428,20 @@ function focusSearch() {
                   <button class="notif-mark-read" @click="markAllRead">{{ t('chat.markAllRead') }}</button>
                 </div>
                 <div class="notif-list">
+                  <div v-if="notificationStore.loading" class="notif-empty">{{ t('common.loading') }}...</div>
+                  <div v-else-if="notifications.length === 0" class="notif-empty">{{ t('topbar.noNotifications') }}</div>
                   <div
                     v-for="notif in notifications"
                     :key="notif.id"
                     class="notif-item"
-                    :class="{ unread: !notif.read }"
+                    :class="{ unread: !notif.is_read }"
+                    @click="notificationStore.markRead(notif.id)"
                   >
-                    <div class="notif-dot" v-if="!notif.read" />
+                    <div class="notif-dot" v-if="!notif.is_read" />
                     <div class="notif-content">
-                      <span class="notif-text">{{ notif.text }}</span>
-                      <span class="notif-time">{{ notif.time }}</span>
+                      <span class="notif-text">{{ notif.title }}</span>
+                      <span class="notif-body">{{ notif.body }}</span>
+                      <span class="notif-time">{{ notif.created_at }}</span>
                     </div>
                   </div>
                 </div>
@@ -386,17 +450,19 @@ function focusSearch() {
           </div>
 
           <!-- User / Login -->
-          <div v-if="auth.isAuthenticated" class="user-container">
-            <button class="user-avatar-btn" @click="showUserMenu = !showUserMenu">
+          <div v-if="auth.isAuthenticated" class="user-container" ref="userMenuRef">
+            <button type="button" class="user-avatar-btn" @click.stop="toggleUserDropdown">
               <div class="user-avatar">
-                <span>{{ auth.user.name?.charAt(0) || 'U' }}</span>
+                <img v-if="auth.user.avatar" :src="auth.user.avatar" :alt="auth.user.name" />
+                <span v-else>{{ userInitials }}</span>
               </div>
             </button>
             <Transition name="pop">
-              <div v-if="showUserMenu" class="user-dropdown">
+              <div v-if="showUserMenu" class="user-dropdown" @click.stop>
                 <div class="user-info">
                   <div class="user-avatar-lg">
-                    <span>{{ auth.user.name?.charAt(0) || 'U' }}</span>
+                    <img v-if="auth.user.avatar" :src="auth.user.avatar" :alt="auth.user.name" />
+                    <span v-else>{{ userInitials }}</span>
                   </div>
                   <div>
                     <div class="user-name">{{ auth.user.name }}</div>
@@ -404,16 +470,16 @@ function focusSearch() {
                   </div>
                 </div>
                 <div class="user-menu-divider" />
-                <button class="user-menu-item" @click="goToProfile">
+                <button type="button" class="user-menu-item" @click="goToProfile">
                   <i class="pi pi-user" />
                   <span>{{ t('chat.myProfile') }}</span>
                 </button>
-                <button class="user-menu-item" @click="goToPricing; showUserMenu = false">
+                <button type="button" class="user-menu-item" @click="goToPricing">
                   <i class="pi pi-tag" />
                   <span>{{ t('client.pricing') }}</span>
                 </button>
                 <div class="user-menu-divider" />
-                <button class="user-menu-item danger" @click="auth.logout(); showUserMenu = false">
+                <button type="button" class="user-menu-item danger" @click="handleLogout">
                   <i class="pi pi-sign-out" />
                   <span>{{ t('chat.logout') }}</span>
                 </button>
@@ -430,12 +496,6 @@ function focusSearch() {
       </main>
     </div>
 
-    <!-- Click-outside handler for dropdowns -->
-    <div
-      v-if="showUserMenu || showNotifications"
-      class="click-outside-overlay"
-      @click="showUserMenu = false; showNotifications = false"
-    />
   </div>
 </template>
 
@@ -1013,6 +1073,25 @@ html.dark .client-topbar {
 .notif-time {
   font-size: 0.66rem;
   color: var(--text-muted);
+}
+
+.notif-body {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  display: block;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.notif-empty {
+  padding: 20px 14px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.notif-item {
+  cursor: pointer;
   margin-top: 2px;
   display: block;
 }
@@ -1041,6 +1120,14 @@ html.dark .client-topbar {
   font-size: 0.78rem;
   font-weight: 600;
   transition: transform 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+
+.user-avatar img,
+.user-avatar-lg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .user-avatar:hover {
@@ -1081,6 +1168,7 @@ html.dark .client-topbar {
   font-size: 0.95rem;
   font-weight: 600;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .user-name {
@@ -1138,13 +1226,6 @@ html.dark .client-topbar {
   flex-direction: column;
   min-width: 0;
   overflow-x: hidden;
-}
-
-/* ── Click outside ── */
-.click-outside-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 55;
 }
 
 /* ── Mobile overlay ── */

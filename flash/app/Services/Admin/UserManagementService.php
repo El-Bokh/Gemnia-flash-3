@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -148,6 +149,11 @@ class UserManagementService
 
             $user->load('roles', 'subscriptions.plan');
 
+            // Send notifications
+            $ns = app(NotificationService::class);
+            $ns->sendWelcome($user);
+            $ns->notifyNewUserRegistered($user);
+
             return $user;
         });
     }
@@ -189,6 +195,11 @@ class UserManagementService
             'reference_id'    => $subscription->id,
             'description'     => "Initial credits from {$plan->name} plan ({$billingCycle})",
         ]);
+
+        // Notify subscription activated
+        $ns = app(NotificationService::class);
+        $ns->sendSubscriptionActivated($user, $plan->name, $billingCycle);
+        $ns->notifyNewSubscription($user, $plan->name, $billingCycle);
 
         return $subscription;
     }

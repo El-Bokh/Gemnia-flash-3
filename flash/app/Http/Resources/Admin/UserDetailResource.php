@@ -14,7 +14,7 @@ class UserDetailResource extends JsonResource
             'name'              => $this->name,
             'email'             => $this->email,
             'phone'             => $this->phone,
-            'avatar'            => $this->avatar,
+            'avatar'            => $this->avatarUrl(),
             'status'            => $this->status,
             'locale'            => $this->locale,
             'timezone'          => $this->timezone,

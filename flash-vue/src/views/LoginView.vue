@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { login as loginApi } from '@/services/authService'
 import { useAuthStore } from '@/stores/auth'
+import { getAuthenticatedHome } from '@/utils/auth'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
@@ -21,6 +22,18 @@ const showPassword = ref(false)
 
 const isFormValid = computed(() => email.value.trim() !== '' && password.value.length >= 1)
 
+function extractApiErrorMessage(err: unknown): string | null {
+  const responseData = (err as any)?.response?.data
+  const validationErrors = Object.values(responseData?.errors ?? {}).flat()
+  const firstValidationError = validationErrors[0]
+
+  if (typeof responseData?.message === 'string' && responseData.message.trim() !== '') {
+    return responseData.message
+  }
+
+  return typeof firstValidationError === 'string' ? firstValidationError : null
+}
+
 async function handleLogin() {
   if (!isFormValid.value) return
   loading.value = true
@@ -31,12 +44,12 @@ async function handleLogin() {
     if (res.success && res.data) {
       localStorage.setItem('auth_token', res.data.token)
       auth.setUser(res.data.user)
-      await router.replace('/admin')
+      await router.replace(getAuthenticatedHome(res.data.user))
     } else {
       errorMsg.value = res.message || t('login.loginFailed')
     }
   } catch (err: any) {
-    const msg = err?.response?.data?.message
+    const msg = extractApiErrorMessage(err)
     if (msg) {
       errorMsg.value = msg
     } else if (err?.code === 'ERR_NETWORK') {
@@ -83,7 +96,7 @@ async function handleLogin() {
               <InputText
                 id="login-email"
                 v-model="email"
-                placeholder="admin@klek.ai"
+                placeholder="you@example.com"
                 type="email"
                 autocomplete="email"
                 size="small"

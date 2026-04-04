@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
 import router from '@/router'
+import { clearStoredAuth } from '@/utils/auth'
 
 // ─── Base API Configuration ─────────────────────────────────
 
@@ -37,7 +38,7 @@ apiClient.interceptors.response.use(
       const { status } = error.response
 
       if (status === 401) {
-        localStorage.removeItem('auth_token')
+        clearStoredAuth()
         // Only redirect if not already on the login page
         if (router.currentRoute.value.name !== 'login') {
           void router.replace({ name: 'login' })

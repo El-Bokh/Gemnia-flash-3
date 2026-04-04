@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import ClientLayout from '@/layouts/ClientLayout.vue'
+import { getAuthenticatedHome, getStoredAuthUser, isAdminUser } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
   // ── Client (public) ──────────────────────────
@@ -22,6 +23,7 @@ const routes: RouteRecordRaw[] = [
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/client/ProfileView.vue'),
+        meta: { requiresAuth: true },
       },
     ],
   },
@@ -40,7 +42,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin',
     component: AdminLayout,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
     children: [
       {
         path: '',
@@ -106,15 +108,21 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('auth_token')
   const isAuthenticated = !!token
+  const storedUser = getStoredAuthUser()
 
   // Going to a protected route without a token → redirect to login
   if (to.matched.some(r => r.meta.requiresAuth) && !isAuthenticated) {
     return next({ name: 'login', query: { redirect: to.fullPath } })
   }
 
-  // Going to login while already authenticated → redirect to admin
+  // Going to an admin-only route with a non-admin account → redirect to profile
+  if (to.matched.some(r => r.meta.requiresAdmin) && isAuthenticated && storedUser && !isAdminUser(storedUser)) {
+    return next('/profile')
+  }
+
+  // Going to a guest page while authenticated → redirect by role
   if (to.meta.guest && isAuthenticated) {
-    return next('/admin')
+    return next(getAuthenticatedHome(storedUser))
   }
 
   next()

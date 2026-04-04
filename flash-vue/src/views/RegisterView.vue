@@ -2,13 +2,15 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLayoutStore } from '@/stores/layout'
+import { register as registerApi } from '@/services/authService'
+import { useAuthStore } from '@/stores/auth'
+import { getAuthenticatedHome } from '@/utils/auth'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 
 const router = useRouter()
-const layout = useLayoutStore()
+const auth = useAuthStore()
 const { t } = useI18n()
 
 const name = ref('')
@@ -30,18 +32,40 @@ const isFormValid = computed(() =>
   agreeTerms.value,
 )
 
+function extractApiErrorMessage(err: unknown): string | null {
+  const responseData = (err as any)?.response?.data
+  const validationErrors = Object.values(responseData?.errors ?? {}).flat()
+  const firstValidationError = validationErrors[0]
+
+  if (typeof responseData?.message === 'string' && responseData.message.trim() !== '') {
+    return responseData.message
+  }
+
+  return typeof firstValidationError === 'string' ? firstValidationError : null
+}
+
 async function handleRegister() {
   if (!isFormValid.value) return
   loading.value = true
   errorMsg.value = ''
 
   try {
-    // Future: call register API
-    // const res = await register({ name: name.value.trim(), email: email.value.trim(), password: password.value, password_confirmation: passwordConfirm.value })
-    await new Promise(resolve => setTimeout(resolve, 1200))
-    await router.replace({ name: 'login' })
+    const res = await registerApi({
+      name: name.value.trim(),
+      email: email.value.trim(),
+      password: password.value,
+      password_confirmation: passwordConfirm.value,
+    })
+
+    if (res.success && res.data) {
+      localStorage.setItem('auth_token', res.data.token)
+      auth.setUser(res.data.user)
+      await router.replace(getAuthenticatedHome(res.data.user))
+    } else {
+      errorMsg.value = res.message || t('register.unexpectedError')
+    }
   } catch (err: any) {
-    const msg = err?.response?.data?.message
+    const msg = extractApiErrorMessage(err)
     if (msg) {
       errorMsg.value = msg
     } else if (err?.code === 'ERR_NETWORK') {
