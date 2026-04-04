@@ -3,8 +3,15 @@ import AdminLayout from '@/layouts/AdminLayout.vue'
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/LoginView.vue'),
+    meta: { guest: true },
+  },
+  {
     path: '/admin',
     component: AdminLayout,
+    meta: { requiresAuth: true },
     children: [
       {
         path: '',
@@ -59,11 +66,33 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     redirect: '/admin',
   },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/admin',
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+})
+
+// ── Navigation Guard ────────────────────────────────────────
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('auth_token')
+  const isAuthenticated = !!token
+
+  // Going to a protected route without a token → redirect to login
+  if (to.matched.some(r => r.meta.requiresAuth) && !isAuthenticated) {
+    return next({ name: 'login', query: { redirect: to.fullPath } })
+  }
+
+  // Going to login while already authenticated → redirect to admin
+  if (to.meta.guest && isAuthenticated) {
+    return next('/admin')
+  }
+
+  next()
 })
 
 export default router

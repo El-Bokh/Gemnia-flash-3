@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   assignTicket,
   closeTicket,
@@ -44,6 +45,7 @@ const emit = defineEmits<{
   (e: 'updated'): void
 }>()
 
+const { t } = useI18n()
 const loading = ref(false)
 const saving = ref(false)
 const replying = ref(false)
@@ -54,20 +56,20 @@ const destructiveLoading = ref(false)
 const detail = ref<SupportTicketDetail | null>(null)
 const agentOptions = ref<Array<{ label: string; value: number; meta: string }>>([])
 
-const statusOptions = [
-  { label: 'Open', value: 'open' },
-  { label: 'In Progress', value: 'in_progress' },
-  { label: 'Waiting Reply', value: 'waiting_reply' },
-  { label: 'Resolved', value: 'resolved' },
-  { label: 'Closed', value: 'closed' },
-] as Array<{ label: string; value: TicketStatus }>
+const statusOptions = computed(() => [
+  { label: t('support.open'), value: 'open' },
+  { label: t('support.inProgress'), value: 'in_progress' },
+  { label: t('support.waitingReply'), value: 'waiting_reply' },
+  { label: t('support.resolved'), value: 'resolved' },
+  { label: t('ticketDetail.closed'), value: 'closed' },
+] as Array<{ label: string; value: TicketStatus }>)
 
-const priorityOptions = [
-  { label: 'Low', value: 'low' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'High', value: 'high' },
-  { label: 'Urgent', value: 'urgent' },
-] as Array<{ label: string; value: TicketPriority }>
+const priorityOptions = computed(() => [
+  { label: t('support.low'), value: 'low' },
+  { label: t('support.medium'), value: 'medium' },
+  { label: t('support.high'), value: 'high' },
+  { label: t('support.urgent'), value: 'urgent' },
+] as Array<{ label: string; value: TicketPriority }>)
 
 const form = ref<{
   status: TicketStatus
@@ -83,8 +85,8 @@ const assignForm = ref<{ assigned_to: number | null }>({ assigned_to: null })
 const replyForm = ref<{ message: string }>({ message: '' })
 
 const stateActionLabel = computed(() => {
-  if (!detail.value) return 'Close Ticket'
-  return detail.value.status === 'closed' ? 'Reopen Ticket' : 'Close Ticket'
+  if (!detail.value) return t('ticketDetail.closeTicket')
+  return detail.value.status === 'closed' ? t('ticketDetail.reopenTicket') : t('ticketDetail.closeTicket')
 })
 
 watch(
@@ -114,9 +116,9 @@ async function loadAgents() {
     }))
   } catch {
     agentOptions.value = [
-      { label: 'Nour Sayed', value: 6, meta: 'nour@flash.io · Support Agent' },
-      { label: 'Mona Khaled', value: 3, meta: 'mona@flash.io · Admin' },
-      { label: 'Omar Ali', value: 2, meta: 'omar@flash.io · Moderator' },
+      { label: 'Nour Sayed', value: 6, meta: 'nour@klek.ai · Support Agent' },
+      { label: 'Mona Khaled', value: 3, meta: 'mona@klek.ai · Admin' },
+      { label: 'Omar Ali', value: 2, meta: 'omar@klek.ai · Moderator' },
     ]
   }
 }
@@ -272,7 +274,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
     user: {
       id: 1,
       name: 'Sara Ahmed',
-      email: 'sara@flash.io',
+      email: 'sara@klek.ai',
       avatar: null,
       phone: '+20 1000000000',
       status: 'active',
@@ -285,7 +287,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
         plan: { id: 3, name: 'Pro', slug: 'pro' },
       },
     },
-    assigned_agent: { id: 6, name: 'Nour Sayed', email: 'nour@flash.io', avatar: null },
+    assigned_agent: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', avatar: null },
     replies: [
       {
         id: 91,
@@ -294,7 +296,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
         attachments: null,
         created_at: '2026-04-04T08:55:00Z',
         updated_at: '2026-04-04T08:55:00Z',
-        user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null },
+        user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
       },
       {
         id: 92,
@@ -303,7 +305,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
         attachments: null,
         created_at: '2026-04-04T09:12:00Z',
         updated_at: '2026-04-04T09:12:00Z',
-        user: { id: 6, name: 'Nour Sayed', email: 'nour@flash.io', avatar: null },
+        user: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', avatar: null },
       },
       {
         id: 93,
@@ -312,7 +314,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
         attachments: ['billing-page.png'],
         created_at: '2026-04-04T09:38:00Z',
         updated_at: '2026-04-04T09:38:00Z',
-        user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null },
+        user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
       },
     ],
   }
@@ -363,7 +365,7 @@ function formatJson(value: Record<string, unknown> | null) {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="Ticket Detail"
+    :header="t('ticketDetail.title')"
     :modal="true"
     position="right"
     :style="{ width: '720px', maxWidth: '96vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -393,22 +395,22 @@ function formatJson(value: Record<string, unknown> | null) {
 
         <div class="stats-grid">
           <article class="stat-card">
-            <span class="stat-k">Replies</span>
+            <span class="stat-k">{{ t('ticketDetail.replies') }}</span>
             <strong>{{ detail.replies_count }}</strong>
             <small>{{ formatDateTime(detail.last_reply_at) }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Assigned</span>
-            <strong>{{ detail.assigned_agent?.name || 'Unassigned' }}</strong>
-            <small>{{ detail.assigned_agent?.email || 'Queue' }}</small>
+            <span class="stat-k">{{ t('ticketDetail.assigned') }}</span>
+            <strong>{{ detail.assigned_agent?.name || t('ticketDetail.unassigned') }}</strong>
+            <small>{{ detail.assigned_agent?.email || t('ticketDetail.queue') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Created</span>
+            <span class="stat-k">{{ t('ticketDetail.created') }}</span>
             <strong>{{ formatDateTime(detail.created_at) }}</strong>
             <small>{{ formatDateTime(detail.updated_at) }} updated</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Closed</span>
+            <span class="stat-k">{{ t('ticketDetail.closed') }}</span>
             <strong>{{ detail.closed_at ? 'Yes' : 'No' }}</strong>
             <small>{{ formatDateTime(detail.closed_at) }}</small>
           </article>
@@ -417,16 +419,16 @@ function formatJson(value: Record<string, unknown> | null) {
 
       <Tabs value="overview" class="drawer-tabs">
         <TabList>
-          <Tab value="overview">Overview</Tab>
-          <Tab value="conversation">Conversation</Tab>
-          <Tab value="workflow">Workflow</Tab>
-          <Tab value="payloads">Payloads</Tab>
+          <Tab value="overview">{{ t('ticketDetail.overview') }}</Tab>
+          <Tab value="conversation">{{ t('ticketDetail.conversation') }}</Tab>
+          <Tab value="workflow">{{ t('ticketDetail.workflow') }}</Tab>
+          <Tab value="payloads">{{ t('ticketDetail.payloads') }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="overview">
             <div class="section-grid">
               <section class="info-card">
-                <h3 class="section-title">Customer</h3>
+                <h3 class="section-title">{{ t('ticketDetail.customer') }}</h3>
                 <div class="user-row">
                   <div class="user-avatar">
                     <img v-if="detail.user.avatar" :src="detail.user.avatar" :alt="detail.user.name" />
@@ -435,29 +437,29 @@ function formatJson(value: Record<string, unknown> | null) {
                   <div class="user-copy">
                     <span class="user-name">{{ detail.user.name }}</span>
                     <span class="user-sub">{{ detail.user.email }}</span>
-                    <span class="user-sub">{{ detail.user.phone || 'No phone' }} · {{ detail.user.status }}</span>
+                    <span class="user-sub">{{ detail.user.phone || t('ticketDetail.noPhone') }} · {{ detail.user.status }}</span>
                   </div>
                 </div>
               </section>
 
               <section class="info-card">
-                <h3 class="section-title">Subscription</h3>
+                <h3 class="section-title">{{ t('ticketDetail.subscription') }}</h3>
                 <div class="meta-list">
-                  <div class="meta-row"><span>Plan</span><span>{{ detail.user.subscription?.plan?.name || '—' }}</span></div>
-                  <div class="meta-row"><span>Cycle</span><span>{{ detail.user.subscription?.billing_cycle || '—' }}</span></div>
-                  <div class="meta-row"><span>Status</span><span>{{ detail.user.subscription?.status || '—' }}</span></div>
-                  <div class="meta-row"><span>Ends</span><span>{{ formatDateTime(detail.user.subscription?.ends_at || null) }}</span></div>
+                  <div class="meta-row"><span>{{ t('invoiceDetail.plan') }}</span><span>{{ detail.user.subscription?.plan?.name || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('invoiceDetail.cycle') }}</span><span>{{ detail.user.subscription?.billing_cycle || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('common.status') }}</span><span>{{ detail.user.subscription?.status || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('ticketDetail.ends') }}</span><span>{{ formatDateTime(detail.user.subscription?.ends_at || null) }}</span></div>
                 </div>
               </section>
             </div>
 
             <section class="info-card">
-              <h3 class="section-title">Ticket Meta</h3>
+              <h3 class="section-title">{{ t('ticketDetail.ticketMeta') }}</h3>
               <div class="meta-list">
-                <div class="meta-row"><span>UUID</span><span>{{ detail.uuid }}</span></div>
-                <div class="meta-row"><span>Category</span><span>{{ detail.category || '—' }}</span></div>
-                <div class="meta-row"><span>Resolved</span><span>{{ formatDateTime(detail.resolved_at) }}</span></div>
-                <div class="meta-row"><span>Closed</span><span>{{ formatDateTime(detail.closed_at) }}</span></div>
+                <div class="meta-row"><span>{{ t('ticketDetail.uuid') }}</span><span>{{ detail.uuid }}</span></div>
+                <div class="meta-row"><span>{{ t('ticketDetail.category') }}</span><span>{{ detail.category || '—' }}</span></div>
+                <div class="meta-row"><span>{{ t('ticketDetail.resolved') }}</span><span>{{ formatDateTime(detail.resolved_at) }}</span></div>
+                <div class="meta-row"><span>{{ t('ticketDetail.closed') }}</span><span>{{ formatDateTime(detail.closed_at) }}</span></div>
               </div>
             </section>
           </TabPanel>
@@ -470,10 +472,10 @@ function formatJson(value: Record<string, unknown> | null) {
                     <div class="thread-avatar">{{ initials(reply.user.name) }}</div>
                     <div class="thread-copy">
                       <span class="thread-name">{{ reply.user.name }}</span>
-                      <span class="thread-meta">{{ reply.is_staff_reply ? 'Staff reply' : 'Customer reply' }} · {{ formatDateTime(reply.created_at) }}</span>
+                      <span class="thread-meta">{{ reply.is_staff_reply ? t('ticketDetail.staffReply') : t('ticketDetail.customerReply') }} · {{ formatDateTime(reply.created_at) }}</span>
                     </div>
                   </div>
-                  <Tag :value="reply.is_staff_reply ? 'Staff' : 'Customer'" :severity="reply.is_staff_reply ? 'info' : 'secondary'" class="mini-tag" />
+                  <Tag :value="reply.is_staff_reply ? t('ticketDetail.staff') : t('ticketDetail.customerTag')" :severity="reply.is_staff_reply ? 'info' : 'secondary'" class="mini-tag" />
                 </div>
                 <p class="thread-message">{{ reply.message }}</p>
                 <div v-if="reply.attachments?.length" class="attachment-row">
@@ -485,31 +487,31 @@ function formatJson(value: Record<string, unknown> | null) {
 
           <TabPanel value="workflow">
             <section class="info-card">
-              <h3 class="section-title">Ticket Settings</h3>
+              <h3 class="section-title">{{ t('ticketDetail.ticketSettings') }}</h3>
               <div class="edit-grid">
                 <div class="form-field">
-                  <label>Status</label>
+                  <label>{{ t('common.status') }}</label>
                   <Select v-model="form.status" :options="statusOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
                 </div>
                 <div class="form-field">
-                  <label>Priority</label>
+                  <label>{{ t('support.priority') }}</label>
                   <Select v-model="form.priority" :options="priorityOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
                 </div>
                 <div class="form-field form-field-full">
-                  <label>Category</label>
+                  <label>{{ t('ticketDetail.category') }}</label>
                   <InputText v-model="form.category" size="small" class="w-full" placeholder="billing / technical / account" />
                 </div>
               </div>
               <div class="edit-actions">
-                <Button label="Save Changes" size="small" :loading="saving" @click="saveChanges" />
+                <Button :label="t('ticketDetail.saveChanges')" size="small" :loading="saving" @click="saveChanges" />
               </div>
             </section>
 
             <section class="info-card">
-              <h3 class="section-title">Assignment</h3>
+              <h3 class="section-title">{{ t('ticketDetail.assignment') }}</h3>
               <div class="edit-grid">
                 <div class="form-field form-field-full">
-                  <label>Assign To</label>
+                  <label>{{ t('ticketDetail.assignTo') }}</label>
                   <Select v-model="assignForm.assigned_to" :options="agentOptions" optionLabel="label" optionValue="value" size="small" class="w-full">
                     <template #option="slotProps">
                       <div class="agent-option">
@@ -521,18 +523,18 @@ function formatJson(value: Record<string, unknown> | null) {
                 </div>
               </div>
               <div class="edit-actions">
-                <Button label="Assign Ticket" size="small" severity="secondary" :disabled="!assignForm.assigned_to" :loading="assigning" @click="saveAssignment" />
+                <Button :label="t('ticketDetail.assignTicket')" size="small" severity="secondary" :disabled="!assignForm.assigned_to" :loading="assigning" @click="saveAssignment" />
               </div>
             </section>
 
             <section class="info-card">
-              <h3 class="section-title">Reply</h3>
+              <h3 class="section-title">{{ t('ticketDetail.reply') }}</h3>
               <div class="form-field form-field-full">
-                <label>Message</label>
-                <Textarea v-model="replyForm.message" rows="5" autoResize class="w-full" placeholder="Write a clear operational update for the customer" />
+                <label>{{ t('ticketDetail.message') }}</label>
+                <Textarea v-model="replyForm.message" rows="5" autoResize class="w-full" :placeholder="t('ticketDetail.messagePlaceholder')" />
               </div>
               <div class="edit-actions">
-                <Button label="Send Reply" size="small" :disabled="!replyForm.message.trim()" :loading="replying" @click="sendReply" />
+                <Button :label="t('ticketDetail.sendReply')" size="small" :disabled="!replyForm.message.trim()" :loading="replying" @click="sendReply" />
               </div>
             </section>
           </TabPanel>
@@ -540,14 +542,14 @@ function formatJson(value: Record<string, unknown> | null) {
           <TabPanel value="payloads">
             <div class="payload-grid">
               <section class="payload-card">
-                <h3 class="section-title">Attachments</h3>
+                <h3 class="section-title">{{ t('ticketDetail.attachments') }}</h3>
                 <div v-if="detail.attachments?.length" class="attachment-row multi-line">
                   <span v-for="attachment in detail.attachments" :key="attachment" class="attachment-chip">{{ attachment }}</span>
                 </div>
                 <pre v-else>—</pre>
               </section>
               <section class="payload-card">
-                <h3 class="section-title">Metadata</h3>
+                <h3 class="section-title">{{ t('invoiceDetail.metadata') }}</h3>
                 <pre>{{ formatJson(detail.metadata) }}</pre>
               </section>
             </div>

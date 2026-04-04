@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getPlansComparison } from '@/services/planService'
 import type { ComparisonFeatureItem, ComparisonFeatureRef, ComparisonPlan, ComparisonResponse } from '@/types/plans'
 import Tag from 'primevue/tag'
 
+const { t } = useI18n()
 const loading = ref(true)
 const comparison = ref<ComparisonResponse | null>(null)
 
@@ -36,10 +38,10 @@ const summaryCards = computed(() => {
   const plans = comparison.value?.plans || []
   const features = comparison.value?.features || []
   return [
-    { label: 'Plans', value: plans.length },
-    { label: 'Features', value: features.length },
-    { label: 'Featured', value: plans.filter(item => item.plan.is_featured).length },
-    { label: 'Free', value: plans.filter(item => item.plan.is_free).length },
+    { label: t('comparison.plans'), value: plans.length },
+    { label: t('comparison.features'), value: features.length },
+    { label: t('comparison.featured'), value: plans.filter(item => item.plan.is_featured).length },
+    { label: t('comparison.free'), value: plans.filter(item => item.plan.is_free).length },
   ]
 })
 
@@ -118,7 +120,7 @@ function formatMoney(amount: number) {
 
 function featureUsageLabel(feature: ComparisonFeatureItem | null) {
   if (!feature || !feature.included) return '—'
-  if (feature.usage_limit === null) return 'Unlimited'
+  if (feature.usage_limit === null) return t('comparison.unlimited')
   return `${feature.usage_limit}/${feature.limit_period || 'lifetime'}`
 }
 
@@ -130,7 +132,7 @@ function includedCount(plan: ComparisonPlan) {
 <template>
   <div class="comparison-view">
     <div v-if="loading" class="comparison-loading">
-      <i class="pi pi-spin pi-spinner" /> Loading comparison matrix…
+      <i class="pi pi-spin pi-spinner" /> {{ t('comparison.loading') }}
     </div>
 
     <template v-else-if="comparison">
@@ -147,8 +149,8 @@ function includedCount(plan: ComparisonPlan) {
             <div>
               <div class="card-title-row">
                 <h3>{{ item.plan.name }}</h3>
-                <Tag v-if="item.plan.is_featured" value="Featured" severity="warn" class="mini-tag" />
-                <Tag v-if="item.plan.is_free" value="Free" severity="info" class="mini-tag" />
+                <Tag v-if="item.plan.is_featured" :value="t('comparison.featured')" severity="warn" class="mini-tag" />
+                <Tag v-if="item.plan.is_free" :value="t('comparison.free')" severity="info" class="mini-tag" />
               </div>
               <p>{{ item.plan.slug }}</p>
             </div>
@@ -177,7 +179,7 @@ function includedCount(plan: ComparisonPlan) {
         <table class="matrix-table">
           <thead>
             <tr>
-              <th class="sticky-col corner-col">Features</th>
+              <th class="sticky-col corner-col">{{ t('comparison.features') }}</th>
               <th v-for="item in comparison.plans" :key="item.plan.id" class="plan-col">
                 <div class="head-plan-name">{{ item.plan.name }}</div>
                 <div class="head-plan-price">{{ formatMoney(item.plan.price_monthly) }}</div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   cancelAiRequest,
   deleteAiRequest,
@@ -36,17 +37,18 @@ const loading = ref(false)
 const saving = ref(false)
 const actionLoading = ref(false)
 const notifying = ref<'completed' | 'failed' | null>(null)
+const { t } = useI18n()
 
 const detail = ref<AiRequestDetail | null>(null)
 
-const statusOptions = [
-  { label: 'Pending', value: 'pending' },
-  { label: 'Processing', value: 'processing' },
-  { label: 'Completed', value: 'completed' },
-  { label: 'Failed', value: 'failed' },
-  { label: 'Cancelled', value: 'cancelled' },
-  { label: 'Timeout', value: 'timeout' },
-] as Array<{ label: string; value: AiRequestStatus }>
+const statusOptions = computed(() => [
+  { label: t('aiDetail.pending'), value: 'pending' },
+  { label: t('aiDetail.processing'), value: 'processing' },
+  { label: t('aiDetail.completed'), value: 'completed' },
+  { label: t('aiDetail.failed'), value: 'failed' },
+  { label: t('aiDetail.cancelled'), value: 'cancelled' },
+  { label: t('aiDetail.timeout'), value: 'timeout' },
+] as Array<{ label: string; value: AiRequestStatus }>)
 
 const form = ref({
   status: 'pending' as AiRequestStatus,
@@ -226,7 +228,7 @@ function buildMockRequest(requestId: number): AiRequestDetail {
     created_at: '2026-04-04T08:30:00Z',
     updated_at: '2026-04-04T08:30:04Z',
     deleted_at: null,
-    user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null, status: 'active' },
+    user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null, status: 'active' },
     subscription: { id: 10, status: 'active', plan: { id: 2, name: 'Starter', slug: 'starter' } },
     visual_style: { id: 3, name: 'Editorial Luxe', slug: 'editorial-luxe', thumbnail: null, category: 'Luxury', prompt_prefix: 'premium studio shot', prompt_suffix: 'dramatic highlights' },
     generated_images: [
@@ -302,7 +304,7 @@ function canCancel(status: string) {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="AI Request Detail"
+    :header="t('aiDetail.title')"
     :modal="true"
     position="right"
     :style="{ width: '680px', maxWidth: '95vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -323,7 +325,7 @@ function canCancel(status: string) {
               <Tag :value="typeLabel(detail.type)" severity="info" class="mini-tag" />
             </div>
             <p class="hero-sub">
-              {{ detail.user?.name || 'Unknown User' }}
+              {{ detail.user?.name || t('aiDetail.unknownUser') }}
               <template v-if="detail.subscription?.plan"> · {{ detail.subscription.plan.name }}</template>
               <template v-if="detail.engine_provider"> · {{ detail.engine_provider }}</template>
               <template v-if="detail.model_used"> · {{ detail.model_used }}</template>
@@ -340,101 +342,101 @@ function canCancel(status: string) {
 
         <div class="stats-grid">
           <article class="stat-card">
-            <span class="stat-k">Credits</span>
+            <span class="stat-k">{{ t('aiDetail.credits') }}</span>
             <strong>{{ detail.credits_consumed }}</strong>
-            <small>{{ detail.stats.total_credits_logged }} logged</small>
+            <small>{{ t('aiDetail.logged', { count: detail.stats.total_credits_logged }) }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Images</span>
+            <span class="stat-k">{{ t('aiDetail.images') }}</span>
             <strong>{{ detail.stats.generated_images_count }}</strong>
-            <small>{{ detail.num_images }} requested</small>
+            <small>{{ t('aiDetail.requested', { count: detail.num_images }) }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Duration</span>
+            <span class="stat-k">{{ t('aiDetail.duration') }}</span>
             <strong>{{ formatDuration(detail.processing_time_ms) }}</strong>
-            <small>{{ detail.retry_count }} retries</small>
+            <small>{{ t('aiDetail.retries', { count: detail.retry_count }) }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Resolution</span>
+            <span class="stat-k">{{ t('aiDetail.resolution') }}</span>
             <strong>{{ detail.width || '—' }}×{{ detail.height || '—' }}</strong>
-            <small>{{ detail.steps || '—' }} steps</small>
+            <small>{{ t('aiDetail.steps', { count: detail.steps || '—' }) }}</small>
           </article>
         </div>
 
         <div class="notify-row">
-          <Button label="Notify Completed" size="small" severity="success" outlined :loading="notifying === 'completed'" @click="handleNotify('completed')" />
-          <Button label="Notify Failed" size="small" severity="danger" outlined :loading="notifying === 'failed'" @click="handleNotify('failed')" />
+          <Button :label="t('aiDetail.notifyCompleted')" size="small" severity="success" outlined :loading="notifying === 'completed'" @click="handleNotify('completed')" />
+          <Button :label="t('aiDetail.notifyFailed')" size="small" severity="danger" outlined :loading="notifying === 'failed'" @click="handleNotify('failed')" />
         </div>
       </div>
 
       <Tabs value="overview" class="drawer-tabs">
         <TabList>
-          <Tab value="overview">Overview</Tab>
-          <Tab value="outputs">Outputs</Tab>
-          <Tab value="payloads">Payloads</Tab>
-          <Tab value="edit">Edit</Tab>
+          <Tab value="overview">{{ t('aiDetail.overview') }}</Tab>
+          <Tab value="outputs">{{ t('aiDetail.outputs') }}</Tab>
+          <Tab value="payloads">{{ t('aiDetail.payloads') }}</Tab>
+          <Tab value="edit">{{ t('aiDetail.edit') }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="overview">
             <div class="section-grid">
               <section class="info-card">
-                <h3 class="section-title">User</h3>
+                <h3 class="section-title">{{ t('aiDetail.user') }}</h3>
                 <div class="user-row">
                   <div class="user-avatar">
                     <img v-if="detail.user?.avatar" :src="detail.user.avatar" :alt="detail.user.name" />
-                    <span v-else>{{ initials(detail.user?.name || 'Unknown User') }}</span>
+                    <span v-else>{{ initials(detail.user?.name || t('aiDetail.unknownUser')) }}</span>
                   </div>
                   <div class="user-copy">
-                    <span class="user-name">{{ detail.user?.name || 'Unknown User' }}</span>
-                    <span class="user-sub">{{ detail.user?.email || 'No email' }}</span>
-                    <span class="user-sub">Status: {{ detail.user?.status || '—' }}</span>
+                    <span class="user-name">{{ detail.user?.name || t('aiDetail.unknownUser') }}</span>
+                    <span class="user-sub">{{ detail.user?.email || t('aiDetail.noEmail') }}</span>
+                    <span class="user-sub">{{ t('aiDetail.status') }}: {{ detail.user?.status || '—' }}</span>
                   </div>
                 </div>
               </section>
 
               <section class="info-card">
-                <h3 class="section-title">Generation Params</h3>
+                <h3 class="section-title">{{ t('aiDetail.generationParams') }}</h3>
                 <div class="meta-list">
-                  <div class="meta-row"><span>Model</span><span>{{ detail.model_used || '—' }}</span></div>
-                  <div class="meta-row"><span>Engine</span><span>{{ detail.engine_provider || '—' }}</span></div>
-                  <div class="meta-row"><span>Sampler</span><span>{{ detail.sampler || '—' }}</span></div>
-                  <div class="meta-row"><span>CFG Scale</span><span>{{ detail.cfg_scale || '—' }}</span></div>
-                  <div class="meta-row"><span>Seed</span><span>{{ detail.seed || '—' }}</span></div>
-                  <div class="meta-row"><span>Started</span><span>{{ formatDateTime(detail.started_at) }}</span></div>
+                  <div class="meta-row"><span>{{ t('aiDetail.model') }}</span><span>{{ detail.model_used || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('aiDetail.engine') }}</span><span>{{ detail.engine_provider || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('aiDetail.sampler') }}</span><span>{{ detail.sampler || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('aiDetail.cfgScale') }}</span><span>{{ detail.cfg_scale || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('aiDetail.seed') }}</span><span>{{ detail.seed || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('aiDetail.started') }}</span><span>{{ formatDateTime(detail.started_at) }}</span></div>
                 </div>
               </section>
             </div>
 
             <section class="info-card">
-              <h3 class="section-title">Prompt Stack</h3>
+              <h3 class="section-title">{{ t('aiDetail.promptStack') }}</h3>
               <div class="prompt-stack">
                 <div class="prompt-block">
-                  <span class="prompt-label">User Prompt</span>
+                  <span class="prompt-label">{{ t('aiDetail.userPrompt') }}</span>
                   <p>{{ detail.user_prompt }}</p>
                 </div>
                 <div class="prompt-block">
-                  <span class="prompt-label">Processed Prompt</span>
+                  <span class="prompt-label">{{ t('aiDetail.processedPrompt') }}</span>
                   <p>{{ detail.processed_prompt || '—' }}</p>
                 </div>
                 <div class="prompt-block">
-                  <span class="prompt-label">Negative Prompt</span>
+                  <span class="prompt-label">{{ t('aiDetail.negativePrompt') }}</span>
                   <p>{{ detail.negative_prompt || '—' }}</p>
                 </div>
               </div>
             </section>
 
             <section v-if="detail.error_message || detail.error_code" class="info-card error-card">
-              <h3 class="section-title">Error Info</h3>
+              <h3 class="section-title">{{ t('aiDetail.errorInfo') }}</h3>
               <div class="meta-list">
-                <div class="meta-row"><span>Error Code</span><span>{{ detail.error_code || '—' }}</span></div>
-                <div class="meta-row"><span>Message</span><span>{{ detail.error_message || '—' }}</span></div>
+                <div class="meta-row"><span>{{ t('aiDetail.errorCode') }}</span><span>{{ detail.error_code || '—' }}</span></div>
+                <div class="meta-row"><span>{{ t('aiDetail.message') }}</span><span>{{ detail.error_message || '—' }}</span></div>
               </div>
             </section>
           </TabPanel>
 
           <TabPanel value="outputs">
             <section class="info-card">
-              <h3 class="section-title">Generated Images</h3>
+              <h3 class="section-title">{{ t('aiDetail.generatedImages') }}</h3>
               <div class="image-grid">
                 <article v-for="image in detail.generated_images || []" :key="image.id" class="image-card">
                   <div class="image-preview">
@@ -444,22 +446,22 @@ function canCancel(status: string) {
                   <div class="image-copy">
                     <span class="image-name">{{ image.file_name }}</span>
                     <span class="image-meta">{{ image.width }}×{{ image.height }} · {{ formatBytes(image.file_size) }}</span>
-                    <span class="image-meta">Views {{ image.view_count }} · Downloads {{ image.download_count }}</span>
+                    <span class="image-meta">{{ t('aiDetail.views') }} {{ image.view_count }} · {{ t('aiDetail.downloads') }} {{ image.download_count }}</span>
                   </div>
                 </article>
               </div>
             </section>
 
             <section class="info-card">
-              <h3 class="section-title">Usage Logs</h3>
+              <h3 class="section-title">{{ t('aiDetail.usageLogs') }}</h3>
               <div class="log-list">
                 <div v-for="log in detail.usage_logs || []" :key="log.id" class="log-row">
                   <div>
                     <span class="log-action">{{ log.action }}</span>
-                    <span class="log-sub">{{ log.feature?.name || 'No feature linked' }}</span>
+                    <span class="log-sub">{{ log.feature?.name || t('aiDetail.noFeatureLinked') }}</span>
                   </div>
                   <div class="log-meta">
-                    <strong>{{ log.credits_used }} cr</strong>
+                    <strong>{{ log.credits_used }} {{ t('aiDetail.cr') }}</strong>
                     <span>{{ formatDateTime(log.created_at) }}</span>
                   </div>
                 </div>
@@ -470,15 +472,15 @@ function canCancel(status: string) {
           <TabPanel value="payloads">
             <div class="payload-grid">
               <section class="payload-card">
-                <h3 class="section-title">Request Payload</h3>
+                <h3 class="section-title">{{ t('aiDetail.requestPayload') }}</h3>
                 <pre>{{ formatJson(detail.request_payload) }}</pre>
               </section>
               <section class="payload-card">
-                <h3 class="section-title">Response Payload</h3>
+                <h3 class="section-title">{{ t('aiDetail.responsePayload') }}</h3>
                 <pre>{{ formatJson(detail.response_payload) }}</pre>
               </section>
               <section class="payload-card">
-                <h3 class="section-title">Metadata</h3>
+                <h3 class="section-title">{{ t('aiDetail.metadata') }}</h3>
                 <pre>{{ formatJson(detail.metadata) }}</pre>
               </section>
             </div>
@@ -487,37 +489,37 @@ function canCancel(status: string) {
           <TabPanel value="edit">
             <div class="edit-grid">
               <div class="form-field">
-                <label>Status</label>
+                <label>{{ t('aiDetail.status') }}</label>
                 <Select v-model="form.status" :options="statusOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
               </div>
               <div class="form-field">
-                <label>Model</label>
+                <label>{{ t('aiDetail.model') }}</label>
                 <InputText v-model="form.model_used" size="small" class="w-full" placeholder="flux-pro" />
               </div>
               <div class="form-field">
-                <label>Provider</label>
+                <label>{{ t('aiDetail.provider') }}</label>
                 <InputText v-model="form.engine_provider" size="small" class="w-full" placeholder="fal" />
               </div>
               <div class="form-field form-field-full">
-                <label>Processed Prompt</label>
+                <label>{{ t('aiDetail.processedPrompt') }}</label>
                 <Textarea v-model="form.processed_prompt" rows="4" autoResize class="w-full" />
               </div>
               <div class="form-field form-field-full">
-                <label>Negative Prompt</label>
+                <label>{{ t('aiDetail.negativePrompt') }}</label>
                 <Textarea v-model="form.negative_prompt" rows="3" autoResize class="w-full" />
               </div>
               <div class="form-field form-field-full">
-                <label>Error Message</label>
+                <label>{{ t('aiDetail.errorMessage') }}</label>
                 <Textarea v-model="form.error_message" rows="3" autoResize class="w-full" />
               </div>
               <div class="form-field">
-                <label>Error Code</label>
+                <label>{{ t('aiDetail.errorCode') }}</label>
                 <InputText v-model="form.error_code" size="small" class="w-full" placeholder="WORKER_TIMEOUT" />
               </div>
             </div>
 
             <div class="edit-actions">
-              <Button label="Save Changes" size="small" :loading="saving" @click="saveChanges" />
+              <Button :label="t('aiDetail.saveChanges')" size="small" :loading="saving" @click="saveChanges" />
             </div>
           </TabPanel>
         </TabPanels>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getCoupon, getCouponUsage, toggleCoupon, deleteCoupon, restoreCoupon } from '@/services/couponService'
 import type { CouponDetail, CouponUsageStats } from '@/types/payments'
 import Dialog from 'primevue/dialog'
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   (e: 'edit', id: number): void
 }>()
 
+const { t } = useI18n()
 const loading = ref(false)
 const actionLoading = ref(false)
 const destructiveLoading = ref(false)
@@ -139,9 +141,9 @@ function statusSeverity(active: boolean, expired: boolean): 'success' | 'danger'
 }
 
 function statusLabel(active: boolean, expired: boolean) {
-  if (!active) return 'Inactive'
-  if (expired) return 'Expired'
-  return 'Active'
+  if (!active) return t('couponDetail.inactive')
+  if (expired) return t('couponDetail.expired')
+  return t('couponDetail.active')
 }
 
 function formatDate(value: string | null) {
@@ -203,11 +205,11 @@ function buildMockUsage(): CouponUsageStats {
   return {
     summary: { total_uses: 148, total_discount_given: 712, total_revenue: 7252, unique_users: 91, avg_discount: 4.81 },
     user_breakdown: [
-      { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', uses: 2, total_discount: 9.8, total_amount: 98 },
-      { id: 2, name: 'Omar Ali', email: 'omar@flash.io', uses: 1, total_discount: 4.9, total_amount: 49 },
-      { id: 4, name: 'Karim Mostafa', email: 'karim@flash.io', uses: 2, total_discount: 9.8, total_amount: 98 },
-      { id: 5, name: 'Layla Hassan', email: 'layla@flash.io', uses: 1, total_discount: 4.9, total_amount: 49 },
-      { id: 6, name: 'Nour Sayed', email: 'nour@flash.io', uses: 1, total_discount: 4.9, total_amount: 49 },
+      { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', uses: 2, total_discount: 9.8, total_amount: 98 },
+      { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', uses: 1, total_discount: 4.9, total_amount: 49 },
+      { id: 4, name: 'Karim Mostafa', email: 'karim@klek.ai', uses: 2, total_discount: 9.8, total_amount: 98 },
+      { id: 5, name: 'Layla Hassan', email: 'layla@klek.ai', uses: 1, total_discount: 4.9, total_amount: 49 },
+      { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', uses: 1, total_discount: 4.9, total_amount: 49 },
     ],
     daily_trend: [
       { date: '2026-04-01', uses: 22, discount_total: 104 },
@@ -223,7 +225,7 @@ function buildMockUsage(): CouponUsageStats {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="Coupon Detail"
+    :header="t('couponDetail.title')"
     :modal="true"
     position="right"
     :style="{ width: '720px', maxWidth: '96vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -246,7 +248,7 @@ function buildMockUsage(): CouponUsageStats {
             <p v-if="detail.description" class="hero-desc">{{ detail.description }}</p>
           </div>
           <div class="hero-actions">
-            <Button :label="detail.is_active ? 'Deactivate' : 'Activate'" size="small" :severity="detail.is_active ? 'secondary' : 'success'" outlined :loading="actionLoading" @click="handleToggle" />
+            <Button :label="detail.is_active ? t('couponDetail.deactivate') : t('couponDetail.activate')" size="small" :severity="detail.is_active ? 'secondary' : 'success'" outlined :loading="actionLoading" @click="handleToggle" />
             <Button icon="pi pi-pencil" severity="secondary" text rounded size="small" @click="emit('edit', detail.id)" />
             <Button v-if="detail.deleted_at" icon="pi pi-replay" severity="secondary" text rounded size="small" :loading="destructiveLoading" @click="handleRestore" />
             <Button v-else icon="pi pi-trash" severity="danger" text rounded size="small" :loading="destructiveLoading" @click="handleDelete" />
@@ -255,22 +257,22 @@ function buildMockUsage(): CouponUsageStats {
 
         <div class="stats-grid">
           <article class="stat-card">
-            <span class="stat-k">Used</span>
+            <span class="stat-k">{{ t('couponDetail.used') }}</span>
             <strong>{{ detail.times_used }}</strong>
-            <small>{{ usagePercent(detail) }} of limit</small>
+            <small>{{ usagePercent(detail) }} {{ t('couponDetail.ofLimit') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Revenue</span>
+            <span class="stat-k">{{ t('couponDetail.revenue') }}</span>
             <strong>{{ formatCurrency(detail.payments_total) }}</strong>
-            <small>{{ detail.payments_count }} payments</small>
+            <small>{{ detail.payments_count }} {{ t('payments.title').toLowerCase() }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Discount Given</span>
+            <span class="stat-k">{{ t('couponDetail.discountGiven') }}</span>
             <strong>{{ formatCurrency(detail.discount_given_total) }}</strong>
-            <small>{{ discountLabel(detail) }} each</small>
+            <small>{{ discountLabel(detail) }} {{ t('couponDetail.each', { label: '' }).trim() }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Validity</span>
+            <span class="stat-k">{{ t('couponDetail.validity') }}</span>
             <strong>{{ formatDate(detail.starts_at) }}</strong>
             <small>→ {{ formatDate(detail.expires_at) }}</small>
           </article>
@@ -280,25 +282,25 @@ function buildMockUsage(): CouponUsageStats {
       <!-- Tabs -->
       <Tabs value="overview" class="drawer-tabs">
         <TabList>
-          <Tab value="overview">Overview</Tab>
-          <Tab value="usage">Usage</Tab>
-          <Tab value="payloads">Payloads</Tab>
+          <Tab value="overview">{{ t('couponDetail.overview') }}</Tab>
+          <Tab value="usage">{{ t('couponDetail.usage') }}</Tab>
+          <Tab value="payloads">{{ t('couponDetail.payloads') }}</Tab>
         </TabList>
         <TabPanels>
           <!-- Overview -->
           <TabPanel value="overview">
             <section class="info-card">
-              <h3 class="section-title">Configuration</h3>
+              <h3 class="section-title">{{ t('couponDetail.configuration') }}</h3>
               <div class="meta-list">
-                <div class="meta-row"><span>Discount Type</span><span>{{ detail.discount_type }}</span></div>
-                <div class="meta-row"><span>Discount Value</span><span>{{ discountLabel(detail) }}</span></div>
-                <div class="meta-row"><span>Currency</span><span>{{ detail.currency }}</span></div>
-                <div class="meta-row"><span>Min Order</span><span>{{ detail.min_order_amount ? formatCurrency(detail.min_order_amount) : '—' }}</span></div>
-                <div class="meta-row"><span>Max Uses</span><span>{{ detail.max_uses ?? '∞' }}</span></div>
-                <div class="meta-row"><span>Max Uses / User</span><span>{{ detail.max_uses_per_user ?? '∞' }}</span></div>
-                <div class="meta-row"><span>Plan</span><span>{{ detail.applicable_plan?.name || 'All' }}</span></div>
-                <div class="meta-row"><span>Created</span><span>{{ formatDateTime(detail.created_at) }}</span></div>
-                <div class="meta-row"><span>Updated</span><span>{{ formatDateTime(detail.updated_at) }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.discountType') }}</span><span>{{ detail.discount_type }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.discountValue') }}</span><span>{{ discountLabel(detail) }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.currency') }}</span><span>{{ detail.currency }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.minOrder') }}</span><span>{{ detail.min_order_amount ? formatCurrency(detail.min_order_amount) : '—' }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.maxUses') }}</span><span>{{ detail.max_uses ?? '∞' }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.maxUsesPerUser') }}</span><span>{{ detail.max_uses_per_user ?? '∞' }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.plan') }}</span><span>{{ detail.applicable_plan?.name || t('couponDetail.all') }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.created') }}</span><span>{{ formatDateTime(detail.created_at) }}</span></div>
+                <div class="meta-row"><span>{{ t('couponDetail.updated') }}</span><span>{{ formatDateTime(detail.updated_at) }}</span></div>
               </div>
             </section>
           </TabPanel>
@@ -326,16 +328,16 @@ function buildMockUsage(): CouponUsageStats {
               </div>
 
               <section v-if="usageChartData" class="chart-section">
-                <h3 class="section-title">Daily Trend</h3>
+                <h3 class="section-title">{{ t('couponDetail.dailyTrend') }}</h3>
                 <div class="chart-wrap"><Chart type="bar" :data="usageChartData" :options="usageChartOptions" /></div>
               </section>
 
               <section class="info-card">
-                <h3 class="section-title">User Breakdown</h3>
+                <h3 class="section-title">{{ t('couponDetail.userBreakdown') }}</h3>
                 <!-- Desktop -->
                 <div class="hidden md:block">
                   <DataTable :value="usage.user_breakdown" size="small" stripedRows class="compact-table">
-                    <Column field="name" header="User" style="min-width: 120px">
+                    <Column field="name" :header="t('common.user')" style="min-width: 120px">
                       <template #body="{ data }">
                         <div class="cell-stack">
                           <span class="cell-primary">{{ data.name }}</span>
@@ -343,11 +345,11 @@ function buildMockUsage(): CouponUsageStats {
                         </div>
                       </template>
                     </Column>
-                    <Column field="uses" header="Uses" style="width: 60px" />
-                    <Column header="Discount" style="width: 90px">
+                    <Column field="uses" :header="t('couponDetail.uses')" style="width: 60px" />
+                    <Column :header="t('couponDetail.discount')" style="width: 90px">
                       <template #body="{ data }">{{ formatCurrency(data.total_discount) }}</template>
                     </Column>
-                    <Column header="Amount" style="width: 90px">
+                    <Column :header="t('couponDetail.amount')" style="width: 90px">
                       <template #body="{ data }">{{ formatCurrency(data.total_amount) }}</template>
                     </Column>
                   </DataTable>
@@ -360,19 +362,19 @@ function buildMockUsage(): CouponUsageStats {
                       <span class="mc-badge">{{ u.uses }} uses</span>
                     </div>
                     <p class="mc-sub">{{ u.email }}</p>
-                    <div class="mc-row"><span>Discount</span><span>{{ formatCurrency(u.total_discount) }}</span></div>
-                    <div class="mc-row"><span>Amount</span><span>{{ formatCurrency(u.total_amount) }}</span></div>
+                    <div class="mc-row"><span>{{ t('couponDetail.discount') }}</span><span>{{ formatCurrency(u.total_discount) }}</span></div>
+                    <div class="mc-row"><span>{{ t('couponDetail.amount') }}</span><span>{{ formatCurrency(u.total_amount) }}</span></div>
                   </article>
                 </div>
               </section>
             </div>
-            <div v-else class="empty-state">No usage data available</div>
+            <div v-else class="empty-state">{{ t('couponDetail.noUsageData') }}</div>
           </TabPanel>
 
           <!-- Payloads -->
           <TabPanel value="payloads">
             <section class="payload-card">
-              <h3 class="section-title">Metadata</h3>
+              <h3 class="section-title">{{ t('couponDetail.metadata') }}</h3>
               <pre>{{ formatJson(detail.metadata) }}</pre>
             </section>
           </TabPanel>

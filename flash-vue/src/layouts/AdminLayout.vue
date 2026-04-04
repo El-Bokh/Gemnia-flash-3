@@ -33,20 +33,22 @@ const mainClass = computed(() => ({
 }
 
 .main-content {
-  margin-left: var(--admin-sidebar-width);
+  margin-inline-start: var(--admin-sidebar-width);
   min-height: calc(100vh - var(--admin-topbar-height));
   padding: 16px;
-  transition: margin-left 0.2s ease;
+  transition: margin-inline-start 0.2s ease;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .main-collapsed {
-  margin-left: var(--admin-sidebar-collapsed-width);
+  margin-inline-start: var(--admin-sidebar-collapsed-width);
 }
 
 @media (max-width: 1023px) {
   .main-content,
   .main-collapsed {
-    margin-left: 0;
+    margin-inline-start: 0;
     padding: 14px;
   }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { deleteInvoice, getInvoiceAggregations, getInvoices, restoreInvoice } from '@/services/invoiceService'
 import { deletePayment, getPaymentAggregations, getPayments, restorePayment } from '@/services/paymentService'
 import type {
@@ -26,6 +27,8 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import PaymentDetailDrawer from '@/components/payments/PaymentDetailDrawer.vue'
 import InvoiceDetailDrawer from '@/components/payments/InvoiceDetailDrawer.vue'
+
+const { t } = useI18n()
 
 const activeTab = ref('overview')
 
@@ -68,32 +71,32 @@ const invoiceDetailId = ref<number | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<{ kind: 'payment' | 'invoice'; id: number; label: string } | null>(null)
 
-const paymentStatusOptions = [
-  { label: 'All Status', value: 'all' },
-  { label: 'Pending', value: 'pending' },
-  { label: 'Completed', value: 'completed' },
-  { label: 'Failed', value: 'failed' },
-  { label: 'Refunded', value: 'refunded' },
-  { label: 'Partially Refunded', value: 'partially_refunded' },
-  { label: 'Cancelled', value: 'cancelled' },
-  { label: 'Disputed', value: 'disputed' },
-] as Array<{ label: string; value: 'all' | NonNullable<ListPaymentsParams['status']> }>
+const paymentStatusOptions = computed(() => [
+  { label: t('payments.allStatus'), value: 'all' },
+  { label: t('payments.pending'), value: 'pending' },
+  { label: t('payments.completed'), value: 'completed' },
+  { label: t('payments.failed'), value: 'failed' },
+  { label: t('payments.refundedStatus'), value: 'refunded' },
+  { label: t('payments.partiallyRefunded'), value: 'partially_refunded' },
+  { label: t('payments.cancelled'), value: 'cancelled' },
+  { label: t('payments.disputed'), value: 'disputed' },
+] as Array<{ label: string; value: 'all' | NonNullable<ListPaymentsParams['status']> }>)
 
-const invoiceStatusOptions = [
-  { label: 'All Status', value: 'all' },
-  { label: 'Draft', value: 'draft' },
-  { label: 'Issued', value: 'issued' },
-  { label: 'Paid', value: 'paid' },
-  { label: 'Overdue', value: 'overdue' },
-  { label: 'Cancelled', value: 'cancelled' },
-  { label: 'Refunded', value: 'refunded' },
-] as Array<{ label: string; value: 'all' | NonNullable<ListInvoicesParams['status']> }>
+const invoiceStatusOptions = computed(() => [
+  { label: t('payments.allStatus'), value: 'all' },
+  { label: t('payments.draft'), value: 'draft' },
+  { label: t('payments.issued'), value: 'issued' },
+  { label: t('payments.paid'), value: 'paid' },
+  { label: t('payments.overdueStatus'), value: 'overdue' },
+  { label: t('payments.cancelled'), value: 'cancelled' },
+  { label: t('payments.refundedStatus'), value: 'refunded' },
+] as Array<{ label: string; value: 'all' | NonNullable<ListInvoicesParams['status']> }>)
 
-const trashOptions = [
-  { label: 'Active Only', value: 'without' },
-  { label: 'With Trashed', value: 'with' },
-  { label: 'Only Trashed', value: 'only' },
-] as Array<{ label: string; value: 'without' | 'with' | 'only' }>
+const trashOptions = computed(() => [
+  { label: t('payments.activeOnly'), value: 'without' },
+  { label: t('payments.withTrashed'), value: 'with' },
+  { label: t('payments.onlyTrashed'), value: 'only' },
+] as Array<{ label: string; value: 'without' | 'with' | 'only' }>)
 
 const gatewayOptions = computed(() => {
   const values = [
@@ -101,7 +104,7 @@ const gatewayOptions = computed(() => {
     ...(paymentAggregations.value?.by_gateway || []).map(item => item.payment_gateway),
   ]
   const unique = Array.from(new Set(values.filter(Boolean)))
-  return [{ label: 'All Gateways', value: '' }, ...unique.map(value => ({ label: value, value }))]
+  return [{ label: t('payments.allGateways'), value: '' }, ...unique.map(value => ({ label: value, value }))]
 })
 
 async function fetchPayments() {
@@ -165,22 +168,22 @@ async function fetchAggregations() {
 
 function loadMockPayments() {
   payments.value = [
-    { id: 501, uuid: 'pay_001', payment_gateway: 'stripe', gateway_payment_id: 'pi_001', status: 'completed', amount: 49, discount_amount: 5, tax_amount: 2.2, net_amount: 46.2, currency: 'USD', payment_method: 'card', description: 'Pro monthly renewal', refunded_amount: 0, refunded_at: null, paid_at: '2026-04-04T08:30:00Z', created_at: '2026-04-04T08:28:00Z', updated_at: '2026-04-04T08:30:00Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null }, subscription: { id: 21, status: 'active', plan: { id: 3, name: 'Pro', slug: 'pro' } }, coupon: { id: 3, code: 'SPRING10', discount_type: 'percent', discount_value: 10 }, invoices_count: 1 },
-    { id: 502, uuid: 'pay_002', payment_gateway: 'paypal', gateway_payment_id: 'txn_002', status: 'pending', amount: 19, discount_amount: 0, tax_amount: 0.95, net_amount: 19.95, currency: 'USD', payment_method: 'paypal_balance', description: 'Starter monthly', refunded_amount: 0, refunded_at: null, paid_at: null, created_at: '2026-04-04T09:05:00Z', updated_at: '2026-04-04T09:05:00Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@flash.io', avatar: null }, subscription: { id: 22, status: 'pending', plan: { id: 2, name: 'Starter', slug: 'starter' } }, coupon: null, invoices_count: 0 },
-    { id: 503, uuid: 'pay_003', payment_gateway: 'stripe', gateway_payment_id: 'pi_003', status: 'refunded', amount: 199, discount_amount: 20, tax_amount: 8.95, net_amount: 187.95, currency: 'USD', payment_method: 'card', description: 'Enterprise annual', refunded_amount: 187.95, refunded_at: '2026-04-03T18:00:00Z', paid_at: '2026-04-02T16:40:00Z', created_at: '2026-04-02T16:38:00Z', updated_at: '2026-04-03T18:00:00Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@flash.io', avatar: null }, subscription: { id: 23, status: 'cancelled', plan: { id: 4, name: 'Enterprise', slug: 'enterprise' } }, coupon: { id: 8, code: 'VIP20', discount_type: 'amount', discount_value: 20 }, invoices_count: 1 },
-    { id: 504, uuid: 'pay_004', payment_gateway: 'stripe', gateway_payment_id: 'pi_004', status: 'failed', amount: 19, discount_amount: 0, tax_amount: 0.95, net_amount: 19.95, currency: 'USD', payment_method: 'card', description: 'Starter upgrade attempt', refunded_amount: 0, refunded_at: null, paid_at: null, created_at: '2026-04-03T11:10:00Z', updated_at: '2026-04-03T11:12:00Z', deleted_at: null, user: { id: 4, name: 'Karim Mostafa', email: 'karim@flash.io', avatar: null }, subscription: null, coupon: null, invoices_count: 0 },
-    { id: 505, uuid: 'pay_005', payment_gateway: 'stripe', gateway_payment_id: 'pi_005', status: 'completed', amount: 49, discount_amount: 0, tax_amount: 2.45, net_amount: 51.45, currency: 'USD', payment_method: 'card', description: 'Pro monthly', refunded_amount: 0, refunded_at: null, paid_at: '2026-04-01T13:12:00Z', created_at: '2026-04-01T13:10:00Z', updated_at: '2026-04-01T13:12:00Z', deleted_at: '2026-04-03T00:00:00Z', user: { id: 5, name: 'Layla Hassan', email: 'layla@flash.io', avatar: null }, subscription: { id: 24, status: 'active', plan: { id: 3, name: 'Pro', slug: 'pro' } }, coupon: null, invoices_count: 1 },
+    { id: 501, uuid: 'pay_001', payment_gateway: 'stripe', gateway_payment_id: 'pi_001', status: 'completed', amount: 49, discount_amount: 5, tax_amount: 2.2, net_amount: 46.2, currency: 'USD', payment_method: 'card', description: 'Pro monthly renewal', refunded_amount: 0, refunded_at: null, paid_at: '2026-04-04T08:30:00Z', created_at: '2026-04-04T08:28:00Z', updated_at: '2026-04-04T08:30:00Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null }, subscription: { id: 21, status: 'active', plan: { id: 3, name: 'Pro', slug: 'pro' } }, coupon: { id: 3, code: 'SPRING10', discount_type: 'percent', discount_value: 10 }, invoices_count: 1 },
+    { id: 502, uuid: 'pay_002', payment_gateway: 'paypal', gateway_payment_id: 'txn_002', status: 'pending', amount: 19, discount_amount: 0, tax_amount: 0.95, net_amount: 19.95, currency: 'USD', payment_method: 'paypal_balance', description: 'Starter monthly', refunded_amount: 0, refunded_at: null, paid_at: null, created_at: '2026-04-04T09:05:00Z', updated_at: '2026-04-04T09:05:00Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null }, subscription: { id: 22, status: 'pending', plan: { id: 2, name: 'Starter', slug: 'starter' } }, coupon: null, invoices_count: 0 },
+    { id: 503, uuid: 'pay_003', payment_gateway: 'stripe', gateway_payment_id: 'pi_003', status: 'refunded', amount: 199, discount_amount: 20, tax_amount: 8.95, net_amount: 187.95, currency: 'USD', payment_method: 'card', description: 'Enterprise annual', refunded_amount: 187.95, refunded_at: '2026-04-03T18:00:00Z', paid_at: '2026-04-02T16:40:00Z', created_at: '2026-04-02T16:38:00Z', updated_at: '2026-04-03T18:00:00Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null }, subscription: { id: 23, status: 'cancelled', plan: { id: 4, name: 'Enterprise', slug: 'enterprise' } }, coupon: { id: 8, code: 'VIP20', discount_type: 'amount', discount_value: 20 }, invoices_count: 1 },
+    { id: 504, uuid: 'pay_004', payment_gateway: 'stripe', gateway_payment_id: 'pi_004', status: 'failed', amount: 19, discount_amount: 0, tax_amount: 0.95, net_amount: 19.95, currency: 'USD', payment_method: 'card', description: 'Starter upgrade attempt', refunded_amount: 0, refunded_at: null, paid_at: null, created_at: '2026-04-03T11:10:00Z', updated_at: '2026-04-03T11:12:00Z', deleted_at: null, user: { id: 4, name: 'Karim Mostafa', email: 'karim@klek.ai', avatar: null }, subscription: null, coupon: null, invoices_count: 0 },
+    { id: 505, uuid: 'pay_005', payment_gateway: 'stripe', gateway_payment_id: 'pi_005', status: 'completed', amount: 49, discount_amount: 0, tax_amount: 2.45, net_amount: 51.45, currency: 'USD', payment_method: 'card', description: 'Pro monthly', refunded_amount: 0, refunded_at: null, paid_at: '2026-04-01T13:12:00Z', created_at: '2026-04-01T13:10:00Z', updated_at: '2026-04-01T13:12:00Z', deleted_at: '2026-04-03T00:00:00Z', user: { id: 5, name: 'Layla Hassan', email: 'layla@klek.ai', avatar: null }, subscription: { id: 24, status: 'active', plan: { id: 3, name: 'Pro', slug: 'pro' } }, coupon: null, invoices_count: 1 },
   ]
   paymentTotalRecords.value = 184
 }
 
 function loadMockInvoices() {
   invoices.value = [
-    { id: 701, uuid: 'inv_001', invoice_number: 'INV-2026-0001', status: 'paid', subtotal: 49, discount_amount: 5, tax_amount: 2.2, total: 46.2, currency: 'USD', issued_at: '2026-04-04T08:29:00Z', due_at: '2026-04-11T08:29:00Z', paid_at: '2026-04-04T08:30:00Z', created_at: '2026-04-04T08:29:00Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io' }, payment: { id: 501, uuid: 'pay_001', payment_gateway: 'stripe', status: 'completed', amount: 49 }, subscription: { id: 21, status: 'active', plan: { id: 3, name: 'Pro' } } },
-    { id: 702, uuid: 'inv_002', invoice_number: 'INV-2026-0002', status: 'issued', subtotal: 19, discount_amount: 0, tax_amount: 0.95, total: 19.95, currency: 'USD', issued_at: '2026-04-04T09:05:00Z', due_at: '2026-04-11T09:05:00Z', paid_at: null, created_at: '2026-04-04T09:05:00Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@flash.io' }, payment: null, subscription: { id: 22, status: 'pending', plan: { id: 2, name: 'Starter' } } },
-    { id: 703, uuid: 'inv_003', invoice_number: 'INV-2026-0003', status: 'refunded', subtotal: 199, discount_amount: 20, tax_amount: 8.95, total: 187.95, currency: 'USD', issued_at: '2026-04-02T16:39:00Z', due_at: '2026-04-09T16:39:00Z', paid_at: '2026-04-02T16:40:00Z', created_at: '2026-04-02T16:39:00Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@flash.io' }, payment: { id: 503, uuid: 'pay_003', payment_gateway: 'stripe', status: 'refunded', amount: 199 }, subscription: { id: 23, status: 'cancelled', plan: { id: 4, name: 'Enterprise' } } },
-    { id: 704, uuid: 'inv_004', invoice_number: 'INV-2026-0004', status: 'overdue', subtotal: 99, discount_amount: 0, tax_amount: 4.95, total: 103.95, currency: 'USD', issued_at: '2026-03-26T10:00:00Z', due_at: '2026-04-02T10:00:00Z', paid_at: null, created_at: '2026-03-26T10:00:00Z', deleted_at: null, user: { id: 6, name: 'Nour Sayed', email: 'nour@flash.io' }, payment: null, subscription: null },
-    { id: 705, uuid: 'inv_005', invoice_number: 'INV-2026-0005', status: 'paid', subtotal: 49, discount_amount: 0, tax_amount: 2.45, total: 51.45, currency: 'USD', issued_at: '2026-04-01T13:11:00Z', due_at: '2026-04-08T13:11:00Z', paid_at: '2026-04-01T13:12:00Z', created_at: '2026-04-01T13:11:00Z', deleted_at: '2026-04-03T00:00:00Z', user: { id: 5, name: 'Layla Hassan', email: 'layla@flash.io' }, payment: { id: 505, uuid: 'pay_005', payment_gateway: 'stripe', status: 'completed', amount: 49 }, subscription: { id: 24, status: 'active', plan: { id: 3, name: 'Pro' } } },
+    { id: 701, uuid: 'inv_001', invoice_number: 'INV-2026-0001', status: 'paid', subtotal: 49, discount_amount: 5, tax_amount: 2.2, total: 46.2, currency: 'USD', issued_at: '2026-04-04T08:29:00Z', due_at: '2026-04-11T08:29:00Z', paid_at: '2026-04-04T08:30:00Z', created_at: '2026-04-04T08:29:00Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai' }, payment: { id: 501, uuid: 'pay_001', payment_gateway: 'stripe', status: 'completed', amount: 49 }, subscription: { id: 21, status: 'active', plan: { id: 3, name: 'Pro' } } },
+    { id: 702, uuid: 'inv_002', invoice_number: 'INV-2026-0002', status: 'issued', subtotal: 19, discount_amount: 0, tax_amount: 0.95, total: 19.95, currency: 'USD', issued_at: '2026-04-04T09:05:00Z', due_at: '2026-04-11T09:05:00Z', paid_at: null, created_at: '2026-04-04T09:05:00Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai' }, payment: null, subscription: { id: 22, status: 'pending', plan: { id: 2, name: 'Starter' } } },
+    { id: 703, uuid: 'inv_003', invoice_number: 'INV-2026-0003', status: 'refunded', subtotal: 199, discount_amount: 20, tax_amount: 8.95, total: 187.95, currency: 'USD', issued_at: '2026-04-02T16:39:00Z', due_at: '2026-04-09T16:39:00Z', paid_at: '2026-04-02T16:40:00Z', created_at: '2026-04-02T16:39:00Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai' }, payment: { id: 503, uuid: 'pay_003', payment_gateway: 'stripe', status: 'refunded', amount: 199 }, subscription: { id: 23, status: 'cancelled', plan: { id: 4, name: 'Enterprise' } } },
+    { id: 704, uuid: 'inv_004', invoice_number: 'INV-2026-0004', status: 'overdue', subtotal: 99, discount_amount: 0, tax_amount: 4.95, total: 103.95, currency: 'USD', issued_at: '2026-03-26T10:00:00Z', due_at: '2026-04-02T10:00:00Z', paid_at: null, created_at: '2026-03-26T10:00:00Z', deleted_at: null, user: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai' }, payment: null, subscription: null },
+    { id: 705, uuid: 'inv_005', invoice_number: 'INV-2026-0005', status: 'paid', subtotal: 49, discount_amount: 0, tax_amount: 2.45, total: 51.45, currency: 'USD', issued_at: '2026-04-01T13:11:00Z', due_at: '2026-04-08T13:11:00Z', paid_at: '2026-04-01T13:12:00Z', created_at: '2026-04-01T13:11:00Z', deleted_at: '2026-04-03T00:00:00Z', user: { id: 5, name: 'Layla Hassan', email: 'layla@klek.ai' }, payment: { id: 505, uuid: 'pay_005', payment_gateway: 'stripe', status: 'completed', amount: 49 }, subscription: { id: 24, status: 'active', plan: { id: 3, name: 'Pro' } } },
   ]
   invoiceTotalRecords.value = 129
 }
@@ -217,9 +220,9 @@ function loadMockAggregations() {
       { date: '2026-04-04', count: 77, total: 3480, net_total: 3286 },
     ],
     top_users: [
-      { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', payments_count: 18, total_spent: 882 },
-      { id: 2, name: 'Omar Ali', email: 'omar@flash.io', payments_count: 15, total_spent: 631 },
-      { id: 3, name: 'Mona Khaled', email: 'mona@flash.io', payments_count: 13, total_spent: 594 },
+      { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', payments_count: 18, total_spent: 882 },
+      { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', payments_count: 15, total_spent: 631 },
+      { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', payments_count: 13, total_spent: 594 },
     ],
     status_distribution: [
       { status: 'completed', count: 3782, total: 171804 },
@@ -374,10 +377,10 @@ const overviewCards = computed(() => {
   const overdue = invoiceAggregations.value?.overdue
   if (!paymentSummary || !invoiceSummary || !overdue) return []
   return [
-    { label: 'Gross Revenue', value: formatMoney(paymentSummary.total_revenue), sub: `${paymentSummary.total_payments} payments`, tone: '#10b981', icon: 'pi pi-dollar' },
-    { label: 'Net Revenue', value: formatMoney(paymentSummary.total_net_revenue), sub: `${formatMoney(paymentSummary.total_refunded)} refunded`, tone: '#06b6d4', icon: 'pi pi-chart-line' },
-    { label: 'Paid Invoices', value: invoiceSummary.paid_count.toLocaleString(), sub: `${formatMoney(invoiceSummary.total_paid)} collected`, tone: '#8b5cf6', icon: 'pi pi-file-check' },
-    { label: 'Overdue', value: overdue.count.toLocaleString(), sub: `${formatMoney(overdue.total)} pending`, tone: '#f59e0b', icon: 'pi pi-clock' },
+    { label: t('payments.grossRevenue'), value: formatMoney(paymentSummary.total_revenue), sub: t('payments.paymentsCount', { count: paymentSummary.total_payments }), tone: '#10b981', icon: 'pi pi-dollar' },
+    { label: t('payments.netRevenue'), value: formatMoney(paymentSummary.total_net_revenue), sub: t('payments.refunded', { amount: formatMoney(paymentSummary.total_refunded) }), tone: '#06b6d4', icon: 'pi pi-chart-line' },
+    { label: t('payments.paidInvoices'), value: invoiceSummary.paid_count.toLocaleString(), sub: t('payments.collected', { amount: formatMoney(invoiceSummary.total_paid) }), tone: '#8b5cf6', icon: 'pi pi-file-check' },
+    { label: t('payments.overdue'), value: overdue.count.toLocaleString(), sub: t('payments.pendingAmount', { amount: formatMoney(overdue.total) }), tone: '#f59e0b', icon: 'pi pi-clock' },
   ]
 })
 
@@ -395,7 +398,7 @@ const revenueTrendData = computed(() => {
     labels: items.map(item => formatShortDate(item.date)),
     datasets: [
       {
-        label: 'Revenue',
+        label: t('payments.revenue'),
         data: items.map(item => item.total),
         borderColor: '#10b981',
         backgroundColor: 'rgba(16, 185, 129, 0.08)',
@@ -519,14 +522,14 @@ function capitalize(value: string) {
 <template>
   <div class="billing-page">
     <div class="page-toolbar">
-      <h1 class="page-title">Payments & Billing</h1>
+      <h1 class="page-title">{{ t('payments.title') }}</h1>
     </div>
 
     <Tabs v-model:value="activeTab" class="billing-tabs">
       <TabList>
-        <Tab value="overview"><i class="pi pi-chart-line" /> <span>Overview</span></Tab>
-        <Tab value="payments"><i class="pi pi-credit-card" /> <span>Payments</span></Tab>
-        <Tab value="invoices"><i class="pi pi-file" /> <span>Invoices</span></Tab>
+        <Tab value="overview"><i class="pi pi-chart-line" /> <span>{{ t('payments.overviewTab') }}</span></Tab>
+        <Tab value="payments"><i class="pi pi-credit-card" /> <span>{{ t('payments.paymentsTab') }}</span></Tab>
+        <Tab value="invoices"><i class="pi pi-file" /> <span>{{ t('payments.invoicesTab') }}</span></Tab>
       </TabList>
 
       <TabPanels>
@@ -548,7 +551,7 @@ function capitalize(value: string) {
             <section class="chart-card chart-wide">
               <div class="card-head">
                 <div>
-                  <h3>Revenue Trend</h3>
+                  <h3>{{ t('payments.revenueTrend') }}</h3>
                   <p>Gross and net billing activity across the last 7 days.</p>
                 </div>
               </div>
@@ -560,7 +563,7 @@ function capitalize(value: string) {
             <section class="chart-card">
               <div class="card-head">
                 <div>
-                  <h3>Payment Status</h3>
+                  <h3>{{ t('payments.byStatus') }}</h3>
                   <p>Distribution by operational state.</p>
                 </div>
               </div>
@@ -572,7 +575,7 @@ function capitalize(value: string) {
             <section class="chart-card">
               <div class="card-head">
                 <div>
-                  <h3>Gateway Mix</h3>
+                  <h3>{{ t('payments.byGateway') }}</h3>
                   <p>Processed totals by gateway.</p>
                 </div>
               </div>
@@ -602,9 +605,9 @@ function capitalize(value: string) {
                   <h3>Invoice Health</h3>
                 </div>
                 <div class="health-list">
-                  <div class="health-row"><span>Draft</span><strong>{{ invoiceAggregations.summary.draft_count }}</strong></div>
-                  <div class="health-row"><span>Issued</span><strong>{{ invoiceAggregations.summary.issued_count }}</strong></div>
-                  <div class="health-row"><span>Overdue</span><strong>{{ invoiceAggregations.summary.overdue_count }}</strong></div>
+                  <div class="health-row"><span>{{ t('payments.draft') }}</span><strong>{{ invoiceAggregations.summary.draft_count }}</strong></div>
+                  <div class="health-row"><span>{{ t('payments.issued') }}</span><strong>{{ invoiceAggregations.summary.issued_count }}</strong></div>
+                  <div class="health-row"><span>{{ t('payments.overdueStatus') }}</span><strong>{{ invoiceAggregations.summary.overdue_count }}</strong></div>
                   <div class="health-row"><span>Avg Invoice</span><strong>{{ formatMoney(invoiceAggregations.summary.avg_invoice_total || 0) }}</strong></div>
                 </div>
               </div>
@@ -616,12 +619,12 @@ function capitalize(value: string) {
           <div class="filters-bar">
             <span class="filter-search">
               <i class="pi pi-search" />
-              <InputText v-model="paymentSearch" placeholder="Search payment, user, gateway..." size="small" class="filter-input" />
+              <InputText v-model="paymentSearch" :placeholder="t('payments.searchPayments')" size="small" class="filter-input" />
             </span>
             <Select v-model="paymentStatusFilter" :options="paymentStatusOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="paymentGatewayFilter" :options="gatewayOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="paymentTrashFilter" :options="trashOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
-            <span class="filter-count">{{ paymentTotalRecords }} payments</span>
+            <span class="filter-count">{{ paymentTotalRecords }} {{ t('payments.paymentsTab').toLowerCase() }}</span>
           </div>
 
           <div class="cards-list d-mobile">
@@ -728,15 +731,15 @@ function capitalize(value: string) {
           <div class="filters-bar">
             <span class="filter-search">
               <i class="pi pi-search" />
-              <InputText v-model="invoiceSearch" placeholder="Search invoice, user, payment..." size="small" class="filter-input" />
+              <InputText v-model="invoiceSearch" :placeholder="t('payments.searchInvoices')" size="small" class="filter-input" />
             </span>
             <Select v-model="invoiceStatusFilter" :options="invoiceStatusOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="invoiceTrashFilter" :options="trashOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <label class="toggle-filter">
               <Checkbox v-model="invoiceOverdueFilter" :binary="true" />
-              <span>Overdue Only</span>
+              <span>{{ t('payments.overdueOnly') }}</span>
             </label>
-            <span class="filter-count">{{ invoiceTotalRecords }} invoices</span>
+            <span class="filter-count">{{ invoiceTotalRecords }} {{ t('payments.invoicesTab').toLowerCase() }}</span>
           </div>
 
           <div class="cards-list d-mobile">
@@ -842,22 +845,22 @@ function capitalize(value: string) {
     <PaymentDetailDrawer v-model:visible="showPaymentDetail" :paymentId="paymentDetailId" @updated="onEntityUpdated" />
     <InvoiceDetailDrawer v-model:visible="showInvoiceDetail" :invoiceId="invoiceDetailId" @updated="onEntityUpdated" />
 
-    <Dialog v-model:visible="showDeleteConfirm" header="Delete Billing Record" :modal="true" :style="{ width: '360px' }">
+    <Dialog v-model:visible="showDeleteConfirm" :header="t('common.delete')" :modal="true" :style="{ width: '360px' }">
       <div class="confirm-body">
         <i class="pi pi-exclamation-triangle confirm-icon" />
-        <p>Delete <strong>{{ deleteTarget?.label }}</strong>?</p>
-        <p class="confirm-sub">This performs a soft delete and can be restored later from the same module.</p>
+        <p>{{ t('payments.deleteConfirm', { label: deleteTarget?.label }) }}</p>
+        <p class="confirm-sub">{{ t('payments.noUndo') }}</p>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
+        <Button :label="t('common.delete')" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
       </template>
     </Dialog>
   </div>
 </template>
 
 <style scoped>
-.billing-page { display: flex; flex-direction: column; gap: 10px; }
+.billing-page { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden; }
 .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .page-title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
 
@@ -924,6 +927,8 @@ function capitalize(value: string) {
   border-radius: 10px;
   background: var(--card-bg);
   padding: 10px 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 .card-head {
   display: flex;
@@ -935,7 +940,7 @@ function capitalize(value: string) {
 .card-head h3 { margin: 0; font-size: 0.8rem; color: var(--text-primary); }
 .card-head p { margin: 2px 0 0; font-size: 0.64rem; color: var(--text-muted); }
 .compact-head { margin-bottom: 6px; }
-.chart-shell { height: 220px; }
+.chart-shell { height: 220px; overflow: hidden; min-width: 0; position: relative; }
 .chart-shell.tall { height: 240px; }
 .insight-card { display: flex; flex-direction: column; gap: 10px; }
 .mini-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1032,6 +1037,7 @@ function capitalize(value: string) {
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   overflow: hidden;
+  min-width: 0;
 }
 .entity-table { font-size: 0.75rem; }
 :deep(.entity-table .p-datatable-table-container) {

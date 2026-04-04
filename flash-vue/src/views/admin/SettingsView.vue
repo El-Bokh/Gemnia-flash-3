@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   getSettings,
   updateSetting,
@@ -39,6 +40,8 @@ import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
+
+const { t } = useI18n()
 
 // ── State ───────────────────────────────────────────────────
 const loading = ref(true)
@@ -216,8 +219,8 @@ function loadMockSettings() {
       group: 'general',
       count: 5,
       settings: [
-        { id: 1, group: 'general', key: 'app_name', value: 'Flash AI', raw_value: 'Flash AI', type: 'string', display_name: 'Application Name', description: 'The name of the application displayed in the header and emails.', is_public: true, is_encrypted: false, options: null, sort_order: 1, updated_at: '2026-04-01T10:00:00Z' },
-        { id: 2, group: 'general', key: 'app_url', value: 'https://flash.io', raw_value: 'https://flash.io', type: 'string', display_name: 'Application URL', description: 'The base URL of the application.', is_public: true, is_encrypted: false, options: null, sort_order: 2, updated_at: '2026-03-15T08:00:00Z' },
+        { id: 1, group: 'general', key: 'app_name', value: 'Klek AI', raw_value: 'Klek AI', type: 'string', display_name: 'Application Name', description: 'The name of the application displayed in the header and emails.', is_public: true, is_encrypted: false, options: null, sort_order: 1, updated_at: '2026-04-01T10:00:00Z' },
+        { id: 2, group: 'general', key: 'app_url', value: 'https://klek.ai', raw_value: 'https://klek.ai', type: 'string', display_name: 'Application URL', description: 'The base URL of the application.', is_public: true, is_encrypted: false, options: null, sort_order: 2, updated_at: '2026-03-15T08:00:00Z' },
         { id: 3, group: 'general', key: 'app_description', value: 'AI-powered image generation platform', raw_value: 'AI-powered image generation platform', type: 'text', display_name: 'App Description', description: 'Short description for SEO and meta tags.', is_public: true, is_encrypted: false, options: null, sort_order: 3, updated_at: '2026-03-10T12:00:00Z' },
         { id: 4, group: 'general', key: 'registration_enabled', value: true, raw_value: '1', type: 'boolean', display_name: 'Enable Registration', description: 'Allow new users to register on the platform.', is_public: true, is_encrypted: false, options: null, sort_order: 4, updated_at: '2026-04-02T14:00:00Z' },
         { id: 5, group: 'general', key: 'default_locale', value: 'en', raw_value: 'en', type: 'string', display_name: 'Default Locale', description: 'Default language for the application.', is_public: true, is_encrypted: false, options: [{ value: 'en', label: 'English' }, { value: 'ar', label: 'Arabic' }], sort_order: 5, updated_at: '2026-03-20T09:00:00Z' },
@@ -228,8 +231,8 @@ function loadMockSettings() {
       count: 4,
       settings: [
         { id: 10, group: 'mail', key: 'mail_driver', value: 'smtp', raw_value: 'smtp', type: 'string', display_name: 'Mail Driver', description: 'The mail transport driver to use.', is_public: false, is_encrypted: false, options: [{ value: 'smtp', label: 'SMTP' }, { value: 'mailgun', label: 'Mailgun' }, { value: 'ses', label: 'Amazon SES' }], sort_order: 1, updated_at: '2026-03-01T10:00:00Z' },
-        { id: 11, group: 'mail', key: 'mail_from_address', value: 'noreply@flash.io', raw_value: 'noreply@flash.io', type: 'string', display_name: 'From Address', description: 'Default email sender address.', is_public: false, is_encrypted: false, options: null, sort_order: 2, updated_at: '2026-03-01T10:00:00Z' },
-        { id: 12, group: 'mail', key: 'mail_from_name', value: 'Flash AI', raw_value: 'Flash AI', type: 'string', display_name: 'From Name', description: 'Default sender name on outgoing emails.', is_public: false, is_encrypted: false, options: null, sort_order: 3, updated_at: '2026-03-01T10:00:00Z' },
+        { id: 11, group: 'mail', key: 'mail_from_address', value: 'noreply@klek.ai', raw_value: 'noreply@klek.ai', type: 'string', display_name: 'From Address', description: 'Default email sender address.', is_public: false, is_encrypted: false, options: null, sort_order: 2, updated_at: '2026-03-01T10:00:00Z' },
+        { id: 12, group: 'mail', key: 'mail_from_name', value: 'Klek AI', raw_value: 'Klek AI', type: 'string', display_name: 'From Name', description: 'Default sender name on outgoing emails.', is_public: false, is_encrypted: false, options: null, sort_order: 3, updated_at: '2026-03-01T10:00:00Z' },
         { id: 13, group: 'mail', key: 'smtp_password', value: '••••••••', raw_value: null, type: 'string', display_name: 'SMTP Password', description: 'Password for SMTP authentication.', is_public: false, is_encrypted: true, options: null, sort_order: 4, updated_at: '2026-03-01T10:00:00Z' },
       ],
     },
@@ -281,8 +284,8 @@ function loadMockSettings() {
 function loadMockAuditLog() {
   const actions = ['updated', 'created', 'deleted', 'reset_group', 'toggled_maintenance']
   const users = [
-    { id: 1, name: 'Admin User', email: 'admin@flash.io', avatar: null },
-    { id: 2, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null },
+    { id: 1, name: 'Admin User', email: 'admin@klek.ai', avatar: null },
+    { id: 2, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
   ]
   auditLog.value = Array.from({ length: 12 }, (_, i) => ({
     id: i + 1,
@@ -537,7 +540,7 @@ watch(search, () => {
           @click="showGroupDrawer = true"
           class="drawer-trigger"
         />
-        <h1 class="page-title">System Settings</h1>
+        <h1 class="page-title">{{ t('settings.title') }}</h1>
       </div>
       <div class="toolbar-actions">
         <Button
@@ -550,7 +553,7 @@ watch(search, () => {
         />
         <Button
           icon="pi pi-plus"
-          label="Add Setting"
+          :label="t('settings.addSetting')"
           size="small"
           severity="secondary"
           @click="openCreateDialog"
@@ -563,19 +566,19 @@ watch(search, () => {
       <TabList>
         <Tab value="settings">
           <i class="pi pi-cog" style="font-size: 0.72rem" />
-          <span>Settings</span>
+          <span>{{ t('settings.settingsTab') }}</span>
         </Tab>
         <Tab value="maintenance">
           <i class="pi pi-wrench" style="font-size: 0.72rem" />
-          <span>Maintenance</span>
+          <span>{{ t('settings.maintenanceTab') }}</span>
         </Tab>
         <Tab value="integrations">
           <i class="pi pi-link" style="font-size: 0.72rem" />
-          <span>Integrations</span>
+          <span>{{ t('settings.integrationsTab') }}</span>
         </Tab>
         <Tab value="audit">
           <i class="pi pi-history" style="font-size: 0.72rem" />
-          <span>Audit Log</span>
+          <span>{{ t('settings.auditLogTab') }}</span>
         </Tab>
       </TabList>
 
@@ -695,7 +698,7 @@ watch(search, () => {
               <div class="settings-search-bar">
                 <span class="filter-search">
                   <i class="pi pi-search" />
-                  <InputText v-model="search" placeholder="Search settings…" size="small" class="filter-input" />
+                  <InputText v-model="search" :placeholder="t('settings.searchPlaceholder')" size="small" class="filter-input" />
                 </span>
               </div>
 
@@ -828,8 +831,8 @@ watch(search, () => {
                   <i :class="maintenance?.is_enabled ? 'pi pi-lock' : 'pi pi-lock-open'" />
                 </div>
                 <div class="maint-info">
-                  <h3 class="maint-title">Maintenance Mode</h3>
-                  <p class="maint-sub">{{ maintenance?.is_enabled ? 'System is currently in maintenance mode. Users cannot access the application.' : 'System is running normally. All users can access the application.' }}</p>
+                  <h3 class="maint-title">{{ t('settings.maintenance') }}</h3>
+                  <p class="maint-sub">{{ maintenance?.is_enabled ? t('settings.maintenanceEnabled') : t('settings.maintenanceDisabled') }}</p>
                 </div>
               </div>
 
@@ -840,7 +843,7 @@ watch(search, () => {
                 </div>
                 <Button
                   :icon="maintenance?.is_enabled ? 'pi pi-play' : 'pi pi-pause'"
-                  :label="maintenance?.is_enabled ? 'Disable Maintenance' : 'Enable Maintenance'"
+                  :label="maintenance?.is_enabled ? t('settings.disableMaintenance') : t('settings.enableMaintenance')"
                   :severity="maintenance?.is_enabled ? 'success' : 'danger'"
                   size="small"
                   :loading="maintenanceLoading"
@@ -1008,74 +1011,74 @@ watch(search, () => {
     <!-- ════════ DIALOGS ════════ -->
 
     <!-- Create Setting -->
-    <Dialog v-model:visible="showCreateDialog" header="New Setting" :modal="true" :style="{ width: '420px' }" class="compact-dialog">
+    <Dialog v-model:visible="showCreateDialog" :header="t('settings.createSetting')" :modal="true" :style="{ width: '420px' }" class="compact-dialog">
       <div class="form-grid">
         <div class="form-field">
-          <label class="field-label">Key</label>
+          <label class="field-label">{{ t('settings.key') }}</label>
           <InputText v-model="newSetting.key" placeholder="e.g. app_name" size="small" class="field-input" />
         </div>
         <div class="form-field">
-          <label class="field-label">Display Name</label>
+          <label class="field-label">{{ t('settings.displayName') }}</label>
           <InputText v-model="newSetting.display_name" placeholder="Application Name" size="small" class="field-input" />
         </div>
         <div class="form-row-2">
           <div class="form-field">
-            <label class="field-label">Group</label>
+            <label class="field-label">{{ t('settings.group') }}</label>
             <InputText v-model="newSetting.group" placeholder="general" size="small" class="field-input" />
           </div>
           <div class="form-field">
-            <label class="field-label">Type</label>
+            <label class="field-label">{{ t('settings.type') }}</label>
             <Select v-model="newSetting.type" :options="settingTypeOptions" optionLabel="label" optionValue="value" size="small" class="field-input" />
           </div>
         </div>
         <div class="form-field">
-          <label class="field-label">Value</label>
+          <label class="field-label">{{ t('settings.value') }}</label>
           <InputText v-model="newSetting.value" size="small" class="field-input" />
         </div>
         <div class="form-field">
-          <label class="field-label">Description</label>
+          <label class="field-label">{{ t('common.description') }}</label>
           <Textarea v-model="newSetting.description" rows="2" class="field-input" autoResize />
         </div>
         <div class="form-checks">
           <label class="check-label">
             <Checkbox v-model="newSetting.is_public" :binary="true" />
-            <span>Public</span>
+            <span>{{ t('settings.public') }}</span>
           </label>
           <label class="check-label">
             <Checkbox v-model="newSetting.is_encrypted" :binary="true" />
-            <span>Encrypted</span>
+            <span>{{ t('settings.encrypted') }}</span>
           </label>
         </div>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showCreateDialog = false" />
-        <Button label="Create" size="small" :loading="actionLoading" @click="handleCreate" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showCreateDialog = false" />
+        <Button :label="t('settings.createSetting')" size="small" :loading="actionLoading" @click="handleCreate" />
       </template>
     </Dialog>
 
     <!-- Delete Confirm -->
-    <Dialog v-model:visible="showDeleteConfirm" header="Delete Setting" :modal="true" :style="{ width: '360px' }">
+    <Dialog v-model:visible="showDeleteConfirm" :header="t('common.delete')" :modal="true" :style="{ width: '360px' }">
       <div class="confirm-body">
         <i class="pi pi-exclamation-triangle confirm-icon" />
-        <p>Delete <strong>{{ deleteTarget?.display_name || deleteTarget?.key }}</strong>?</p>
-        <p class="confirm-sub">This action cannot be undone.</p>
+        <p>{{ t('settings.deleteConfirm', { key: deleteTarget?.display_name || deleteTarget?.key }) }}</p>
+        <p class="confirm-sub">{{ t('settings.noUndo') }}</p>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
+        <Button :label="t('common.delete')" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
       </template>
     </Dialog>
 
     <!-- Reset Confirm -->
-    <Dialog v-model:visible="showResetConfirm" header="Reset Group" :modal="true" :style="{ width: '360px' }">
+    <Dialog v-model:visible="showResetConfirm" :header="t('settings.resetGroup')" :modal="true" :style="{ width: '360px' }">
       <div class="confirm-body">
         <i class="pi pi-exclamation-triangle confirm-icon" style="color: #f59e0b" />
-        <p>Reset all <strong>{{ capitalize(resetTargetGroup) }}</strong> settings to defaults?</p>
-        <p class="confirm-sub">Current values will be overwritten.</p>
+        <p>{{ t('settings.resetConfirm', { group: capitalize(resetTargetGroup) }) }}</p>
+        <p class="confirm-sub">{{ t('settings.resetWarning') }}</p>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showResetConfirm = false" />
-        <Button label="Reset" severity="warn" size="small" :loading="actionLoading" @click="handleReset" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showResetConfirm = false" />
+        <Button :label="t('settings.resetGroup')" severity="warn" size="small" :loading="actionLoading" @click="handleReset" />
       </template>
     </Dialog>
   </div>

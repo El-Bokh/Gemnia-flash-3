@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { generateInvoiceFromPayment } from '@/services/invoiceService'
 import { deletePayment, getPayment, refundPayment, restorePayment, updatePayment } from '@/services/paymentService'
 import type { PaymentDetail, UpdatePaymentData } from '@/types/payments'
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   (e: 'updated'): void
 }>()
 
+const { t } = useI18n()
 const loading = ref(false)
 const saving = ref(false)
 const refunding = ref(false)
@@ -33,15 +35,15 @@ const generatingInvoice = ref(false)
 
 const detail = ref<PaymentDetail | null>(null)
 
-const statusOptions = [
-  { label: 'Pending', value: 'pending' },
-  { label: 'Completed', value: 'completed' },
-  { label: 'Failed', value: 'failed' },
-  { label: 'Refunded', value: 'refunded' },
-  { label: 'Partially Refunded', value: 'partially_refunded' },
-  { label: 'Cancelled', value: 'cancelled' },
-  { label: 'Disputed', value: 'disputed' },
-] as Array<{ label: string; value: string }>
+const statusOptions = computed(() => [
+  { label: t('common.pending'), value: 'pending' },
+  { label: t('aiRequests.completed'), value: 'completed' },
+  { label: t('aiRequests.failed'), value: 'failed' },
+  { label: t('paymentDetail.refunded'), value: 'refunded' },
+  { label: t('payments.partiallyRefunded'), value: 'partially_refunded' },
+  { label: t('payments.cancelled'), value: 'cancelled' },
+  { label: t('payments.disputed'), value: 'disputed' },
+] as Array<{ label: string; value: string }>)
 
 const form = ref({
   status: 'pending',
@@ -212,7 +214,7 @@ function buildMockPayment(id: number): PaymentDetail {
     refunded_at: null,
     refund_reason: null,
     billing_name: 'Sara Ahmed',
-    billing_email: 'sara@flash.io',
+    billing_email: 'sara@klek.ai',
     billing_address: '25 Nile Street',
     billing_city: 'Cairo',
     billing_state: 'Cairo',
@@ -224,7 +226,7 @@ function buildMockPayment(id: number): PaymentDetail {
     created_at: '2026-04-04T08:28:00Z',
     updated_at: '2026-04-04T08:30:00Z',
     deleted_at: null,
-    user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null, status: 'active' },
+    user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null, status: 'active' },
     subscription: {
       id: 21,
       status: 'active',
@@ -280,7 +282,7 @@ function canRefund(status: string) {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="Payment Detail"
+    :header="t('paymentDetail.title')"
     :modal="true"
     position="right"
     :style="{ width: '680px', maxWidth: '95vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -298,8 +300,8 @@ function canRefund(status: string) {
               <Tag :value="detail.status" :severity="paymentStatusSeverity(detail.status)" class="mini-tag" />
               <Tag :value="detail.payment_gateway" severity="info" class="mini-tag" />
             </div>
-            <p class="hero-sub">{{ detail.user.name }} · {{ detail.payment_method || 'No method' }}</p>
-            <p class="hero-desc">{{ detail.description || 'No description provided.' }}</p>
+            <p class="hero-sub">{{ detail.user.name }} · {{ detail.payment_method || t('paymentDetail.noMethod') }}</p>
+            <p class="hero-desc">{{ detail.description || t('paymentDetail.noDescription') }}</p>
           </div>
           <div class="hero-actions">
             <Button icon="pi pi-file-plus" severity="secondary" text rounded size="small" :loading="generatingInvoice" @click="handleGenerateInvoice" />
@@ -310,22 +312,22 @@ function canRefund(status: string) {
 
         <div class="stats-grid">
           <article class="stat-card">
-            <span class="stat-k">Gross</span>
+            <span class="stat-k">{{ t('paymentDetail.gross') }}</span>
             <strong>{{ formatMoney(detail.amount, detail.currency) }}</strong>
-            <small>{{ formatMoney(detail.discount_amount, detail.currency) }} discount</small>
+            <small>{{ formatMoney(detail.discount_amount, detail.currency) }} {{ t('common.discount') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Net</span>
+            <span class="stat-k">{{ t('paymentDetail.net') }}</span>
             <strong>{{ formatMoney(detail.net_amount, detail.currency) }}</strong>
-            <small>{{ formatMoney(detail.tax_amount, detail.currency) }} tax</small>
+            <small>{{ formatMoney(detail.tax_amount, detail.currency) }} {{ t('common.tax') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Refunded</span>
+            <span class="stat-k">{{ t('paymentDetail.refunded') }}</span>
             <strong>{{ formatMoney(detail.refunded_amount, detail.currency) }}</strong>
             <small>{{ formatDateTime(detail.refunded_at) }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Invoices</span>
+            <span class="stat-k">{{ t('paymentDetail.invoices') }}</span>
             <strong>{{ detail.invoices.length }}</strong>
             <small>{{ formatDateTime(detail.paid_at || detail.created_at) }}</small>
           </article>
@@ -334,16 +336,16 @@ function canRefund(status: string) {
 
       <Tabs value="overview" class="drawer-tabs">
         <TabList>
-          <Tab value="overview">Overview</Tab>
-          <Tab value="billing">Billing</Tab>
-          <Tab value="actions">Actions</Tab>
-          <Tab value="payloads">Payloads</Tab>
+          <Tab value="overview">{{ t('paymentDetail.overview') }}</Tab>
+          <Tab value="billing">{{ t('paymentDetail.billing') }}</Tab>
+          <Tab value="actions">{{ t('paymentDetail.actions') }}</Tab>
+          <Tab value="payloads">{{ t('paymentDetail.payloads') }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="overview">
             <div class="section-grid">
               <section class="info-card">
-                <h3 class="section-title">Customer</h3>
+                <h3 class="section-title">{{ t('paymentDetail.customer') }}</h3>
                 <div class="user-row">
                   <div class="user-avatar">
                     <img v-if="detail.user.avatar" :src="detail.user.avatar" :alt="detail.user.name" />
@@ -352,24 +354,24 @@ function canRefund(status: string) {
                   <div class="user-copy">
                     <span class="user-name">{{ detail.user.name }}</span>
                     <span class="user-sub">{{ detail.user.email }}</span>
-                    <span class="user-sub">Status: {{ detail.user.status }}</span>
+                    <span class="user-sub">{{ t('common.status') }}: {{ detail.user.status }}</span>
                   </div>
                 </div>
               </section>
 
               <section class="info-card">
-                <h3 class="section-title">Subscription</h3>
+                <h3 class="section-title">{{ t('paymentDetail.subscription') }}</h3>
                 <div class="meta-list">
-                  <div class="meta-row"><span>Plan</span><span>{{ detail.subscription?.plan.name || '—' }}</span></div>
-                  <div class="meta-row"><span>Cycle</span><span>{{ detail.subscription?.billing_cycle || '—' }}</span></div>
-                  <div class="meta-row"><span>Status</span><span>{{ detail.subscription?.status || '—' }}</span></div>
-                  <div class="meta-row"><span>Coupon</span><span>{{ detail.coupon?.code || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('paymentDetail.plan') }}</span><span>{{ detail.subscription?.plan.name || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('paymentDetail.cycle') }}</span><span>{{ detail.subscription?.billing_cycle || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('common.status') }}</span><span>{{ detail.subscription?.status || '—' }}</span></div>
+                  <div class="meta-row"><span>{{ t('paymentDetail.coupon') }}</span><span>{{ detail.coupon?.code || '—' }}</span></div>
                 </div>
               </section>
             </div>
 
             <section class="info-card">
-              <h3 class="section-title">Invoices</h3>
+              <h3 class="section-title">{{ t('paymentDetail.invoices') }}</h3>
               <div class="mini-list stack-list">
                 <div v-for="invoice in detail.invoices" :key="invoice.id" class="stack-row">
                   <div>
@@ -388,31 +390,31 @@ function canRefund(status: string) {
           <TabPanel value="billing">
             <div class="edit-grid">
               <div class="form-field">
-                <label>Billing Name</label>
+                <label>{{ t('paymentDetail.billingName') }}</label>
                 <InputText v-model="form.billing_name" size="small" class="w-full" />
               </div>
               <div class="form-field">
-                <label>Billing Email</label>
+                <label>{{ t('paymentDetail.billingEmail') }}</label>
                 <InputText v-model="form.billing_email" size="small" class="w-full" />
               </div>
               <div class="form-field form-field-full">
-                <label>Address</label>
+                <label>{{ t('paymentDetail.address') }}</label>
                 <InputText v-model="form.billing_address" size="small" class="w-full" />
               </div>
               <div class="form-field">
-                <label>City</label>
+                <label>{{ t('paymentDetail.city') }}</label>
                 <InputText v-model="form.billing_city" size="small" class="w-full" />
               </div>
               <div class="form-field">
-                <label>State</label>
+                <label>{{ t('paymentDetail.state') }}</label>
                 <InputText v-model="form.billing_state" size="small" class="w-full" />
               </div>
               <div class="form-field">
-                <label>ZIP</label>
+                <label>{{ t('paymentDetail.zip') }}</label>
                 <InputText v-model="form.billing_zip" size="small" class="w-full" />
               </div>
               <div class="form-field">
-                <label>Country</label>
+                <label>{{ t('paymentDetail.country') }}</label>
                 <InputText v-model="form.billing_country" size="small" class="w-full" />
               </div>
             </div>
@@ -421,33 +423,33 @@ function canRefund(status: string) {
           <TabPanel value="actions">
             <div class="edit-grid">
               <div class="form-field">
-                <label>Status</label>
+                <label>{{ t('paymentDetail.status') }}</label>
                 <Select v-model="form.status" :options="statusOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
               </div>
               <div class="form-field form-field-full">
-                <label>Description</label>
+                <label>{{ t('paymentDetail.description') }}</label>
                 <Textarea v-model="form.description" rows="3" autoResize class="w-full" />
               </div>
             </div>
 
             <div class="section-block">
               <div class="section-head-inline">
-                <h3 class="section-title">Refund</h3>
-                <Tag :value="canRefund(detail.status) ? 'Allowed' : 'Locked'" :severity="canRefund(detail.status) ? 'success' : 'secondary'" class="mini-tag" />
+                <h3 class="section-title">{{ t('paymentDetail.refund') }}</h3>
+                <Tag :value="canRefund(detail.status) ? t('paymentDetail.allowed') : t('paymentDetail.locked')" :severity="canRefund(detail.status) ? 'success' : 'secondary'" class="mini-tag" />
               </div>
               <div class="edit-grid">
                 <div class="form-field">
-                  <label>Refund Amount</label>
-                  <input v-model.number="refundForm.amount" type="number" min="0" :max="detail.net_amount" step="0.01" class="native-input" placeholder="Full refund if empty" />
+                  <label>{{ t('paymentDetail.refundAmount') }}</label>
+                  <input v-model.number="refundForm.amount" type="number" min="0" :max="detail.net_amount" step="0.01" class="native-input" :placeholder="t('paymentDetail.fullRefundIfEmpty')" />
                 </div>
                 <div class="form-field form-field-full">
-                  <label>Reason</label>
-                  <Textarea v-model="refundForm.reason" rows="3" autoResize class="w-full" placeholder="Refund reason" />
+                  <label>{{ t('paymentDetail.reason') }}</label>
+                  <Textarea v-model="refundForm.reason" rows="3" autoResize class="w-full" :placeholder="t('paymentDetail.refundReason')" />
                 </div>
               </div>
               <div class="edit-actions split-actions">
-                <Button label="Save Changes" size="small" :loading="saving" @click="saveChanges" />
-                <Button label="Refund Payment" size="small" severity="warn" :disabled="!canRefund(detail.status) || !refundForm.reason.trim()" :loading="refunding" @click="handleRefund" />
+                <Button :label="t('paymentDetail.saveChanges')" size="small" :loading="saving" @click="saveChanges" />
+                <Button :label="t('paymentDetail.refundPayment')" size="small" severity="warn" :disabled="!canRefund(detail.status) || !refundForm.reason.trim()" :loading="refunding" @click="handleRefund" />
               </div>
             </div>
           </TabPanel>

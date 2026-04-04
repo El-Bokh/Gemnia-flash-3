@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { deleteFeature, getFeatures, toggleFeatureActive } from '@/services/featureService'
 import { deletePlan, duplicatePlan, getPlans, togglePlanActive } from '@/services/planService'
 import type { Feature, ListFeaturesParams, ListPlansParams, Plan } from '@/types/plans'
@@ -22,6 +23,8 @@ import PlanDetailDrawer from '@/components/plans/PlanDetailDrawer.vue'
 import FeatureFormDialog from '@/components/plans/FeatureFormDialog.vue'
 import FeatureDetailDrawer from '@/components/plans/FeatureDetailDrawer.vue'
 import PlansComparisonView from '@/components/plans/PlansComparisonView.vue'
+
+const { t } = useI18n()
 
 const activeTab = ref('plans')
 
@@ -56,28 +59,28 @@ const actionLoading = ref(false)
 const deleteTarget = ref<{ kind: 'plan' | 'feature'; id: number; name: string } | null>(null)
 const showDeleteConfirm = ref(false)
 
-const planFilterOptions = [
-  { label: 'All Plans', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'Inactive', value: 'inactive' },
-  { label: 'Free', value: 'free' },
-  { label: 'Paid', value: 'paid' },
-] as Array<{ label: string; value: 'all' | 'active' | 'inactive' | 'free' | 'paid' }>
+const planFilterOptions = computed(() => [
+  { label: t('plans.allPlans'), value: 'all' },
+  { label: t('plans.active'), value: 'active' },
+  { label: t('common.inactive'), value: 'inactive' },
+  { label: t('plans.free'), value: 'free' },
+  { label: t('plans.paidPlans'), value: 'paid' },
+] as Array<{ label: string; value: 'all' | 'active' | 'inactive' | 'free' | 'paid' }>)
 
-const featureTypeOptions = [
-  { label: 'All Types', value: 'all' },
-  { label: 'Text to Image', value: 'text_to_image' },
-  { label: 'Image to Image', value: 'image_to_image' },
-  { label: 'Inpainting', value: 'inpainting' },
-  { label: 'Upscale', value: 'upscale' },
-  { label: 'Other', value: 'other' },
-] as Array<{ label: string; value: 'all' | NonNullable<ListFeaturesParams['type']> }>
+const featureTypeOptions = computed(() => [
+  { label: t('plans.allTypes'), value: 'all' },
+  { label: t('aiRequests.textToImage'), value: 'text_to_image' },
+  { label: t('aiRequests.imageToImage'), value: 'image_to_image' },
+  { label: t('aiRequests.inpainting'), value: 'inpainting' },
+  { label: t('aiRequests.upscale'), value: 'upscale' },
+  { label: t('aiRequests.other'), value: 'other' },
+] as Array<{ label: string; value: 'all' | NonNullable<ListFeaturesParams['type']> }>)
 
-const featureStatusOptions = [
-  { label: 'All Status', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'Inactive', value: 'inactive' },
-] as Array<{ label: string; value: 'all' | 'active' | 'inactive' }>
+const featureStatusOptions = computed(() => [
+  { label: t('plans.allStatus'), value: 'all' },
+  { label: t('plans.active'), value: 'active' },
+  { label: t('common.inactive'), value: 'inactive' },
+] as Array<{ label: string; value: 'all' | 'active' | 'inactive' }>)
 
 const planStats = computed(() => {
   const total = plans.value.length
@@ -85,10 +88,10 @@ const planStats = computed(() => {
   const featured = plans.value.filter(plan => plan.is_featured).length
   const free = plans.value.filter(plan => plan.is_free).length
   return [
-    { label: 'Plans', value: total, tone: '#3b82f6', icon: 'pi pi-box' },
-    { label: 'Active', value: active, tone: '#10b981', icon: 'pi pi-check-circle' },
-    { label: 'Featured', value: featured, tone: '#f59e0b', icon: 'pi pi-star-fill' },
-    { label: 'Free', value: free, tone: '#8b5cf6', icon: 'pi pi-gift' },
+    { label: t('plans.plans'), value: total, tone: '#3b82f6', icon: 'pi pi-box' },
+    { label: t('plans.active'), value: active, tone: '#10b981', icon: 'pi pi-check-circle' },
+    { label: t('plans.featured'), value: featured, tone: '#f59e0b', icon: 'pi pi-star-fill' },
+    { label: t('plans.free'), value: free, tone: '#8b5cf6', icon: 'pi pi-gift' },
   ]
 })
 
@@ -99,10 +102,10 @@ const featureStats = computed(() => {
   const sorted = [...features.value].sort((left, right) => left.sort_order - right.sort_order)
   const firstSort = sorted[0]?.sort_order ?? 0
   return [
-    { label: 'Features', value: total, tone: '#06b6d4', icon: 'pi pi-sliders-h' },
-    { label: 'Active', value: active, tone: '#10b981', icon: 'pi pi-bolt' },
-    { label: 'Linked Plans', value: linkedPlans, tone: '#f59e0b', icon: 'pi pi-sitemap' },
-    { label: 'Top Sort', value: firstSort, tone: '#6b7280', icon: 'pi pi-sort-numeric-down' },
+    { label: t('plans.features'), value: total, tone: '#06b6d4', icon: 'pi pi-sliders-h' },
+    { label: t('plans.active'), value: active, tone: '#10b981', icon: 'pi pi-bolt' },
+    { label: t('plans.linkedPlans'), value: linkedPlans, tone: '#f59e0b', icon: 'pi pi-sitemap' },
+    { label: t('plans.topSort'), value: firstSort, tone: '#6b7280', icon: 'pi pi-sort-numeric-down' },
   ]
 })
 
@@ -436,10 +439,10 @@ watch(featureStatusFilter, fetchFeatures)
 <template>
   <div class="plans-page">
     <div class="page-toolbar">
-      <h1 class="page-title">Plans & Features</h1>
+      <h1 class="page-title">{{ t('plans.title') }}</h1>
       <div class="toolbar-actions">
-        <Button v-if="activeTab === 'plans'" icon="pi pi-plus" label="Add Plan" size="small" @click="openCreatePlan" />
-        <Button v-if="activeTab === 'features'" icon="pi pi-plus" label="Add Feature" size="small" @click="openCreateFeature" />
+        <Button v-if="activeTab === 'plans'" icon="pi pi-plus" :label="t('plans.addPlan')" size="small" @click="openCreatePlan" />
+        <Button v-if="activeTab === 'features'" icon="pi pi-plus" :label="t('plans.addFeature')" size="small" @click="openCreateFeature" />
       </div>
     </div>
 
@@ -447,15 +450,15 @@ watch(featureStatusFilter, fetchFeatures)
       <TabList>
         <Tab value="plans">
           <i class="pi pi-box" style="font-size: 0.72rem" />
-          <span>Plans</span>
+          <span>{{ t('plans.plansTab') }}</span>
         </Tab>
         <Tab value="features">
           <i class="pi pi-sliders-h" style="font-size: 0.72rem" />
-          <span>Features</span>
+          <span>{{ t('plans.featuresTab') }}</span>
         </Tab>
         <Tab value="comparison">
           <i class="pi pi-table" style="font-size: 0.72rem" />
-          <span>Comparison</span>
+          <span>{{ t('plans.comparisonTab') }}</span>
         </Tab>
       </TabList>
 
@@ -476,10 +479,10 @@ watch(featureStatusFilter, fetchFeatures)
           <div class="filters-bar">
             <span class="filter-search">
               <i class="pi pi-search" />
-              <InputText v-model="planSearch" placeholder="Search plans…" size="small" class="filter-input" />
+              <InputText v-model="planSearch" :placeholder="t('plans.searchPlans')" size="small" class="filter-input" />
             </span>
             <Select v-model="planFilter" :options="planFilterOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
-            <span class="filter-count">{{ plans.length }} plans</span>
+            <span class="filter-count">{{ plans.length }} {{ t('plans.plans').toLowerCase() }}</span>
           </div>
 
           <div class="plan-grid d-mobile">
@@ -488,40 +491,40 @@ watch(featureStatusFilter, fetchFeatures)
                 <div>
                   <div class="pc-title-row">
                     <h3 class="pc-name">{{ plan.name }}</h3>
-                    <Tag :value="plan.is_active ? 'Active' : 'Inactive'" :severity="planStateSeverity(plan)" class="pc-tag" />
+                    <Tag :value="plan.is_active ? t('plans.active') : t('common.inactive')" :severity="planStateSeverity(plan)" class="pc-tag" />
                   </div>
                   <p class="pc-slug">{{ plan.slug }}</p>
                 </div>
-                <Tag v-if="plan.is_featured" value="Featured" severity="warn" class="pc-tag" />
+                <Tag v-if="plan.is_featured" :value="t('plans.featured')" severity="warn" class="pc-tag" />
               </div>
 
-              <p class="pc-desc">{{ plan.description || 'No description provided.' }}</p>
+              <p class="pc-desc">{{ plan.description || t('plans.noDescription') }}</p>
 
               <div class="pc-price-row">
                 <div>
-                  <span class="pc-k">Monthly</span>
+                  <span class="pc-k">{{ t('plans.monthly') }}</span>
                   <strong>{{ formatMoney(plan.price_monthly, plan.currency) }}</strong>
                 </div>
                 <div>
-                  <span class="pc-k">Yearly</span>
+                  <span class="pc-k">{{ t('plans.yearly') }}</span>
                   <strong>{{ formatMoney(plan.price_yearly, plan.currency) }}</strong>
                 </div>
                 <div>
-                  <span class="pc-k">Credits</span>
+                  <span class="pc-k">{{ t('plans.credits') }}</span>
                   <strong>{{ plan.credits_monthly }}</strong>
                 </div>
               </div>
 
               <div class="pc-progress-row">
                 <div class="pc-progress-copy">
-                  <span>Subscribers</span>
+                  <span>{{ t('plans.subscribers') }}</span>
                   <span>{{ plan.active_subscriptions_count ?? 0 }}/{{ plan.subscriptions_count ?? 0 }}</span>
                 </div>
                 <ProgressBar :value="Math.round(((plan.active_subscriptions_count ?? 0) / Math.max(plan.subscriptions_count ?? 1, 1)) * 100)" :showValue="false" style="height: 4px" />
               </div>
 
               <div class="pc-meta">
-                <span><i class="pi pi-bolt" /> {{ plan.features_count ?? 0 }} features</span>
+                <span><i class="pi pi-bolt" /> {{ plan.features_count ?? 0 }} {{ t('plans.features').toLowerCase() }}</span>
                 <span><i class="pi pi-calendar" /> {{ formatDate(plan.created_at) }}</span>
               </div>
 
@@ -559,7 +562,7 @@ watch(featureStatusFilter, fetchFeatures)
                       <span class="name-title">{{ data.name }}</span>
                       <span class="name-sub">{{ data.slug }}</span>
                     </div>
-                    <Tag v-if="data.is_featured" value="Featured" severity="warn" class="mini-tag" />
+                    <Tag v-if="data.is_featured" :value="t('plans.featured')" severity="warn" class="mini-tag" />
                   </div>
                 </template>
               </Column>
@@ -600,8 +603,8 @@ watch(featureStatusFilter, fetchFeatures)
               <Column header="State" style="min-width: 120px">
                 <template #body="{ data }">
                   <div class="state-stack">
-                    <Tag :value="data.is_active ? 'Active' : 'Inactive'" :severity="planStateSeverity(data)" class="mini-tag" />
-                    <Tag v-if="data.is_free" value="Free" severity="info" class="mini-tag" />
+                    <Tag :value="data.is_active ? t('plans.active') : t('common.inactive')" :severity="planStateSeverity(data)" class="mini-tag" />
+                    <Tag v-if="data.is_free" :value="t('plans.free')" severity="info" class="mini-tag" />
                   </div>
                 </template>
               </Column>
@@ -637,11 +640,11 @@ watch(featureStatusFilter, fetchFeatures)
           <div class="filters-bar">
             <span class="filter-search">
               <i class="pi pi-search" />
-              <InputText v-model="featureSearch" placeholder="Search features…" size="small" class="filter-input" />
+              <InputText v-model="featureSearch" :placeholder="t('plans.searchFeatures')" size="small" class="filter-input" />
             </span>
             <Select v-model="featureTypeFilter" :options="featureTypeOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="featureStatusFilter" :options="featureStatusOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
-            <span class="filter-count">{{ features.length }} features</span>
+            <span class="filter-count">{{ features.length }} {{ t('plans.features').toLowerCase() }}</span>
           </div>
 
           <div class="feature-grid d-mobile">
@@ -656,9 +659,9 @@ watch(featureStatusFilter, fetchFeatures)
                     <p class="fc-slug">{{ feature.slug }}</p>
                   </div>
                 </div>
-                <Tag :value="feature.is_active ? 'Active' : 'Inactive'" :severity="feature.is_active ? 'success' : 'secondary'" class="mini-tag" />
+                <Tag :value="feature.is_active ? t('plans.active') : t('common.inactive')" :severity="feature.is_active ? 'success' : 'secondary'" class="mini-tag" />
               </div>
-              <p class="fc-desc">{{ feature.description || 'No description provided.' }}</p>
+              <p class="fc-desc">{{ feature.description || t('plans.noDescription') }}</p>
               <div class="fc-meta-row">
                 <Tag :value="featureTypeLabel(feature.type)" severity="info" class="mini-tag" />
                 <span class="metric-chip"><i class="pi pi-box" /> {{ feature.plans_count ?? 0 }} plans</span>
@@ -721,7 +724,7 @@ watch(featureStatusFilter, fetchFeatures)
 
               <Column header="State" style="min-width: 100px">
                 <template #body="{ data }">
-                  <Tag :value="data.is_active ? 'Active' : 'Inactive'" :severity="data.is_active ? 'success' : 'secondary'" class="mini-tag" />
+                  <Tag :value="data.is_active ? t('plans.active') : t('common.inactive')" :severity="data.is_active ? 'success' : 'secondary'" class="mini-tag" />
                 </template>
               </Column>
 
@@ -757,15 +760,15 @@ watch(featureStatusFilter, fetchFeatures)
     <FeatureFormDialog v-model:visible="showFeatureForm" :feature="editFeature" @saved="onFeatureSaved" />
     <FeatureDetailDrawer v-model:visible="showFeatureDetail" :featureId="detailFeatureId" @updated="fetchFeatures" />
 
-    <Dialog v-model:visible="showDeleteConfirm" header="Delete Item" :modal="true" :style="{ width: '360px' }">
+    <Dialog v-model:visible="showDeleteConfirm" :header="t('common.delete')" :modal="true" :style="{ width: '360px' }">
       <div class="confirm-body">
         <i class="pi pi-exclamation-triangle confirm-icon" />
-        <p>Delete <strong>{{ deleteTarget?.name }}</strong>?</p>
-        <p class="confirm-sub">This will remove the selected {{ deleteTarget?.kind || 'item' }} from the system.</p>
+        <p>{{ t('plans.deleteConfirm', { name: deleteTarget?.name }) }}</p>
+        <p class="confirm-sub">{{ t('plans.noUndo') }}</p>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
+        <Button :label="t('common.delete')" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
       </template>
     </Dialog>
   </div>

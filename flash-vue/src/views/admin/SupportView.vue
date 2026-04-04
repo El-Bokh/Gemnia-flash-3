@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getCouponAggregations, getCoupons, toggleCoupon } from '@/services/couponService'
 import { getSupportTickets, getTicketAggregations } from '@/services/supportTicketService'
 import type { Coupon, CouponAggregations, ListCouponsParams } from '@/types/payments'
@@ -20,6 +21,8 @@ import TabPanel from 'primevue/tabpanel'
 import SupportTicketDetailDrawer from '@/components/support/SupportTicketDetailDrawer.vue'
 import CouponFormDialog from '@/components/support/CouponFormDialog.vue'
 import CouponDetailDrawer from '@/components/support/CouponDetailDrawer.vue'
+
+const { t } = useI18n()
 
 type TicketStatusFilter = 'all' | NonNullable<ListSupportTicketsParams['status']>
 type TicketPriorityFilter = 'all' | NonNullable<ListSupportTicketsParams['priority']>
@@ -69,47 +72,47 @@ const couponFormId = ref<number | null>(null)
 const showCouponDetail = ref(false)
 const couponDetailId = ref<number | null>(null)
 
-const ticketStatusOptions = [
-  { label: 'All Status', value: 'all' },
-  { label: 'Open', value: 'open' },
-  { label: 'In Progress', value: 'in_progress' },
-  { label: 'Waiting Reply', value: 'waiting_reply' },
-  { label: 'Resolved', value: 'resolved' },
-  { label: 'Closed', value: 'closed' },
-] as Array<{ label: string; value: TicketStatusFilter }>
+const ticketStatusOptions = computed(() => [
+  { label: t('support.allStatus'), value: 'all' },
+  { label: t('support.open'), value: 'open' },
+  { label: t('support.inProgress'), value: 'in_progress' },
+  { label: t('support.waitingReply'), value: 'waiting_reply' },
+  { label: t('support.resolved'), value: 'resolved' },
+  { label: t('support.closed'), value: 'closed' },
+] as Array<{ label: string; value: TicketStatusFilter }>)
 
-const ticketPriorityOptions = [
-  { label: 'All Priority', value: 'all' },
-  { label: 'Low', value: 'low' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'High', value: 'high' },
-  { label: 'Urgent', value: 'urgent' },
-] as Array<{ label: string; value: TicketPriorityFilter }>
+const ticketPriorityOptions = computed(() => [
+  { label: t('support.allPriority'), value: 'all' },
+  { label: t('support.low'), value: 'low' },
+  { label: t('support.medium'), value: 'medium' },
+  { label: t('support.high'), value: 'high' },
+  { label: t('support.urgent'), value: 'urgent' },
+] as Array<{ label: string; value: TicketPriorityFilter }>)
 
-const couponTypeOptions = [
-  { label: 'All Types', value: 'all' },
-  { label: 'Percentage', value: 'percentage' },
-  { label: 'Fixed Amount', value: 'fixed_amount' },
-  { label: 'Credits', value: 'credits' },
-] as Array<{ label: string; value: CouponTypeFilter }>
+const couponTypeOptions = computed(() => [
+  { label: t('support.allTypes'), value: 'all' },
+  { label: t('support.percentage'), value: 'percentage' },
+  { label: t('support.fixedAmount'), value: 'fixed_amount' },
+  { label: t('support.creditsCoupon'), value: 'credits' },
+] as Array<{ label: string; value: CouponTypeFilter }>)
 
-const couponStatusOptions = [
-  { label: 'All States', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'Inactive', value: 'inactive' },
-] as Array<{ label: string; value: CouponStatusFilter }>
+const couponStatusOptions = computed(() => [
+  { label: t('support.allStates'), value: 'all' },
+  { label: t('support.activeCoupons'), value: 'active' },
+  { label: t('support.inactiveCoupons'), value: 'inactive' },
+] as Array<{ label: string; value: CouponStatusFilter }>)
 
-const couponExpiryOptions = [
-  { label: 'All Validity', value: 'all' },
-  { label: 'Valid', value: 'valid' },
-  { label: 'Expired', value: 'expired' },
-] as Array<{ label: string; value: CouponExpiryFilter }>
+const couponExpiryOptions = computed(() => [
+  { label: t('support.allValidity'), value: 'all' },
+  { label: t('support.valid'), value: 'valid' },
+  { label: t('support.expired'), value: 'expired' },
+] as Array<{ label: string; value: CouponExpiryFilter }>)
 
-const trashOptions = [
-  { label: 'Active Only', value: 'without' },
-  { label: 'With Trashed', value: 'with' },
-  { label: 'Only Trashed', value: 'only' },
-] as Array<{ label: string; value: TrashFilter }>
+const trashOptions = computed(() => [
+  { label: t('payments.activeOnly'), value: 'without' },
+  { label: t('payments.withTrashed'), value: 'with' },
+  { label: t('payments.onlyTrashed'), value: 'only' },
+] as Array<{ label: string; value: TrashFilter }>)
 
 async function fetchTickets() {
   ticketsLoading.value = true
@@ -189,8 +192,8 @@ function loadMockTickets() {
       created_at: '2026-04-04T08:55:00Z',
       updated_at: '2026-04-04T09:38:00Z',
       deleted_at: null,
-      user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null },
-      assigned_agent: { id: 6, name: 'Nour Sayed', email: 'nour@flash.io', avatar: null },
+      user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
+      assigned_agent: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', avatar: null },
       user_subscription: { id: 21, status: 'active', billing_cycle: 'monthly', plan: { id: 3, name: 'Pro', slug: 'pro' } },
     },
     {
@@ -209,7 +212,7 @@ function loadMockTickets() {
       created_at: '2026-04-04T07:20:00Z',
       updated_at: '2026-04-04T10:12:00Z',
       deleted_at: null,
-      user: { id: 2, name: 'Omar Ali', email: 'omar@flash.io', avatar: null },
+      user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null },
       assigned_agent: null,
       user_subscription: { id: 22, status: 'active', billing_cycle: 'monthly', plan: { id: 2, name: 'Starter', slug: 'starter' } },
     },
@@ -229,8 +232,8 @@ function loadMockTickets() {
       created_at: '2026-04-03T15:32:00Z',
       updated_at: '2026-04-03T17:02:00Z',
       deleted_at: null,
-      user: { id: 3, name: 'Mona Khaled', email: 'mona@flash.io', avatar: null },
-      assigned_agent: { id: 3, name: 'Mona Khaled', email: 'mona@flash.io', avatar: null },
+      user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null },
+      assigned_agent: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null },
       user_subscription: { id: 23, status: 'cancelled', billing_cycle: 'yearly', plan: { id: 4, name: 'Enterprise', slug: 'enterprise' } },
     },
     {
@@ -249,7 +252,7 @@ function loadMockTickets() {
       created_at: '2026-04-04T10:05:00Z',
       updated_at: '2026-04-04T10:05:00Z',
       deleted_at: '2026-04-04T10:10:00Z',
-      user: { id: 4, name: 'Karim Mostafa', email: 'karim@flash.io', avatar: null },
+      user: { id: 4, name: 'Karim Mostafa', email: 'karim@klek.ai', avatar: null },
       assigned_agent: null,
       user_subscription: null,
     },
@@ -363,9 +366,9 @@ function loadMockAggregations() {
       { category: 'documents', count: 14 },
     ],
     agent_performance: [
-      { id: 6, name: 'Nour Sayed', email: 'nour@flash.io', total_assigned: 31, resolved_count: 19, active_count: 12, avg_resolution_hours: 5.4 },
-      { id: 3, name: 'Mona Khaled', email: 'mona@flash.io', total_assigned: 24, resolved_count: 17, active_count: 7, avg_resolution_hours: 4.2 },
-      { id: 2, name: 'Omar Ali', email: 'omar@flash.io', total_assigned: 17, resolved_count: 9, active_count: 8, avg_resolution_hours: 6.8 },
+      { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', total_assigned: 31, resolved_count: 19, active_count: 12, avg_resolution_hours: 5.4 },
+      { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', total_assigned: 24, resolved_count: 17, active_count: 7, avg_resolution_hours: 4.2 },
+      { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', total_assigned: 17, resolved_count: 9, active_count: 8, avg_resolution_hours: 6.8 },
     ],
     daily_trend: [
       { date: '2026-03-29', created: 14, resolved: 9 },
@@ -512,30 +515,30 @@ const overviewCards = computed(() => {
 
   return [
     {
-      label: 'Open Workload',
+      label: t('support.openWorkload'),
       value: (ticketSummary.open_count + ticketSummary.in_progress_count + ticketSummary.waiting_reply_count).toLocaleString(),
-      sub: `${ticketSummary.unassigned_active_count} unassigned`,
+      sub: t('support.unassignedCount', { count: ticketSummary.unassigned_active_count }),
       tone: '#0ea5e9',
       icon: 'pi pi-inbox',
     },
     {
-      label: 'Resolved Today',
+      label: t('support.resolvedToday'),
       value: ticketSummary.resolved_count.toLocaleString(),
-      sub: avgFirstResponse ? `${avgFirstResponse} min first response` : 'Response time pending',
+      sub: avgFirstResponse ? t('support.minFirstResponse', { min: avgFirstResponse }) : t('support.responseTimePending'),
       tone: '#10b981',
       icon: 'pi pi-check-circle',
     },
     {
-      label: 'Active Coupons',
+      label: t('support.activeCouponsLabel'),
       value: couponSummary.active_count.toLocaleString(),
-      sub: `${couponAggregations.value?.expired_count || 0} expired`,
+      sub: t('support.expiredCouponsCount', { count: couponAggregations.value?.expired_count || 0 }),
       tone: '#f59e0b',
       icon: 'pi pi-ticket',
     },
     {
-      label: 'Coupon Usage',
+      label: t('support.couponUsage'),
       value: couponSummary.total_uses.toLocaleString(),
-      sub: `${couponSummary.total_coupons} total codes`,
+      sub: t('support.totalCodesCount', { count: couponSummary.total_coupons }),
       tone: '#ef4444',
       icon: 'pi pi-bolt',
     },
@@ -556,7 +559,7 @@ const ticketTrendData = computed(() => {
     labels: items.map(item => formatShortDate(item.date)),
     datasets: [
       {
-        label: 'Created',
+        label: t('support.createdTrend'),
         data: items.map(item => item.created),
         borderColor: '#0ea5e9',
         backgroundColor: 'rgba(14, 165, 233, 0.08)',
@@ -566,7 +569,7 @@ const ticketTrendData = computed(() => {
         pointRadius: 2,
       },
       {
-        label: 'Resolved',
+        label: t('support.resolvedTrend'),
         data: items.map(item => item.resolved),
         borderColor: '#10b981',
         backgroundColor: 'rgba(16, 185, 129, 0.04)',
@@ -711,17 +714,17 @@ function capitalize(value: string) {
   <div class="support-page">
     <div class="page-toolbar">
       <div>
-        <h1 class="page-title">Support Operations</h1>
-        <p class="page-subtitle">Compact visibility for support queues, coupon recovery flows, and response workload.</p>
+        <h1 class="page-title">{{ t('support.supportOperations') }}</h1>
+        <p class="page-subtitle">{{ t('support.supportSubtitle') }}</p>
       </div>
-      <Button v-if="activeTab === 'coupons'" label="New Coupon" icon="pi pi-plus" size="small" @click="openCouponCreate" />
+      <Button v-if="activeTab === 'coupons'" :label="t('support.newCoupon')" icon="pi pi-plus" size="small" @click="openCouponCreate" />
     </div>
 
     <Tabs v-model:value="activeTab" class="support-tabs">
       <TabList>
-        <Tab value="overview"><i class="pi pi-chart-line" /> <span>Overview</span></Tab>
-        <Tab value="tickets"><i class="pi pi-inbox" /> <span>Tickets</span></Tab>
-        <Tab value="coupons"><i class="pi pi-ticket" /> <span>Coupons</span></Tab>
+        <Tab value="overview"><i class="pi pi-chart-line" /> <span>{{ t('support.overviewTab') }}</span></Tab>
+        <Tab value="tickets"><i class="pi pi-inbox" /> <span>{{ t('support.ticketsTab') }}</span></Tab>
+        <Tab value="coupons"><i class="pi pi-ticket" /> <span>{{ t('support.couponsTab') }}</span></Tab>
       </TabList>
 
       <TabPanels>
@@ -743,7 +746,7 @@ function capitalize(value: string) {
             <section class="chart-card chart-wide">
               <div class="card-head">
                 <div>
-                  <h3>Ticket Trend</h3>
+                  <h3>{{ t('support.ticketTrend') }}</h3>
                   <p>Daily creation volume versus resolved throughput.</p>
                 </div>
               </div>
@@ -755,7 +758,7 @@ function capitalize(value: string) {
             <section class="chart-card">
               <div class="card-head">
                 <div>
-                  <h3>Priority Mix</h3>
+                  <h3>{{ t('support.priorityMix') }}</h3>
                   <p>Distribution of ticket urgency.</p>
                 </div>
               </div>
@@ -767,7 +770,7 @@ function capitalize(value: string) {
             <section class="chart-card">
               <div class="card-head">
                 <div>
-                  <h3>Coupon Usage by Type</h3>
+                  <h3>{{ t('support.couponUsageByType') }}</h3>
                   <p>Operational lift generated by each discount model.</p>
                 </div>
               </div>
@@ -779,7 +782,7 @@ function capitalize(value: string) {
             <section class="insight-card">
               <div class="insight-block">
                 <div class="card-head compact-head">
-                  <h3>Agent Performance</h3>
+                  <h3>{{ t('support.agentPerformance') }}</h3>
                 </div>
                 <div class="mini-list">
                   <div v-for="agent in ticketAggregations.agent_performance.slice(0, 4)" :key="agent.id" class="mini-row">
@@ -795,7 +798,7 @@ function capitalize(value: string) {
 
               <div class="insight-block">
                 <div class="card-head compact-head">
-                  <h3>Top Coupons</h3>
+                  <h3>{{ t('support.topCoupons') }}</h3>
                 </div>
                 <div class="health-list">
                   <div v-for="coupon in couponAggregations.top_coupons.slice(0, 4)" :key="coupon.id" class="health-row">
@@ -812,12 +815,12 @@ function capitalize(value: string) {
           <div class="filters-bar">
             <span class="filter-search">
               <i class="pi pi-search" />
-              <InputText v-model="ticketSearch" placeholder="Search ticket, user, category..." size="small" class="filter-input" />
+              <InputText v-model="ticketSearch" :placeholder="t('support.searchTickets')" size="small" class="filter-input" />
             </span>
             <Select v-model="ticketStatusFilter" :options="ticketStatusOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="ticketPriorityFilter" :options="ticketPriorityOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="ticketTrashFilter" :options="trashOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
-            <span class="filter-count">{{ ticketTotalRecords }} tickets</span>
+            <span class="filter-count">{{ ticketTotalRecords }} {{ t('support.ticketsTab').toLowerCase() }}</span>
           </div>
 
           <div class="cards-list d-mobile">
@@ -915,13 +918,13 @@ function capitalize(value: string) {
           <div class="filters-bar">
             <span class="filter-search">
               <i class="pi pi-search" />
-              <InputText v-model="couponSearch" placeholder="Search code, name, plan..." size="small" class="filter-input" />
+              <InputText v-model="couponSearch" :placeholder="t('support.searchCoupons')" size="small" class="filter-input" />
             </span>
             <Select v-model="couponTypeFilter" :options="couponTypeOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="couponStatusFilter" :options="couponStatusOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="couponExpiryFilter" :options="couponExpiryOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
             <Select v-model="couponTrashFilter" :options="trashOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
-            <span class="filter-count">{{ couponTotalRecords }} coupons</span>
+            <span class="filter-count">{{ couponTotalRecords }} {{ t('support.couponsTab').toLowerCase() }}</span>
           </div>
 
           <div class="cards-list d-mobile">

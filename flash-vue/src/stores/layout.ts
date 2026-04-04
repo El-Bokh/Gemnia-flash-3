@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import i18n from '@/i18n'
 
 export const useLayoutStore = defineStore('layout', () => {
   const sidebarCollapsed = ref(false)
@@ -26,6 +27,7 @@ export const useLayoutStore = defineStore('layout', () => {
     localStorage.setItem('flash-locale', val)
     document.documentElement.dir = val === 'ar' ? 'rtl' : 'ltr'
     document.documentElement.lang = val
+    i18n.global.locale.value = val
   })
 
   function toggleSidebar() {

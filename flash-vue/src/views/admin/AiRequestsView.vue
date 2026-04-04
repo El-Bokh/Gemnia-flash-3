@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   bulkDeleteAiRequests,
   bulkRetryAiRequests,
@@ -28,6 +29,8 @@ import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
 import AiRequestDetailDrawer from '@/components/ai/AiRequestDetailDrawer.vue'
 
+const { t } = useI18n()
+
 const loading = ref(true)
 const aggregationsLoading = ref(true)
 
@@ -55,31 +58,31 @@ const showDeleteConfirm = ref(false)
 const deleteMode = ref<'single' | 'bulk'>('single')
 const deleteTarget = ref<AiRequest | null>(null)
 
-const statusOptions = [
-  { label: 'All Status', value: 'all' },
-  { label: 'Pending', value: 'pending' },
-  { label: 'Processing', value: 'processing' },
-  { label: 'Completed', value: 'completed' },
-  { label: 'Failed', value: 'failed' },
-  { label: 'Cancelled', value: 'cancelled' },
-  { label: 'Timeout', value: 'timeout' },
-] as Array<{ label: string; value: 'all' | AiRequestStatus }>
+const statusOptions = computed(() => [
+  { label: t('aiRequests.allStatus'), value: 'all' },
+  { label: t('aiRequests.pending'), value: 'pending' },
+  { label: t('aiRequests.processing'), value: 'processing' },
+  { label: t('aiRequests.completed'), value: 'completed' },
+  { label: t('aiRequests.failed'), value: 'failed' },
+  { label: t('aiRequests.cancelled'), value: 'cancelled' },
+  { label: t('aiRequests.timeout'), value: 'timeout' },
+] as Array<{ label: string; value: 'all' | AiRequestStatus }>)
 
-const typeOptions = [
-  { label: 'All Types', value: 'all' },
-  { label: 'Text to Image', value: 'text_to_image' },
-  { label: 'Image to Image', value: 'image_to_image' },
-  { label: 'Inpainting', value: 'inpainting' },
-  { label: 'Upscale', value: 'upscale' },
-  { label: 'Other', value: 'other' },
-] as Array<{ label: string; value: 'all' | AiRequestType }>
+const typeOptions = computed(() => [
+  { label: t('aiRequests.allTypes'), value: 'all' },
+  { label: t('aiRequests.textToImage'), value: 'text_to_image' },
+  { label: t('aiRequests.imageToImage'), value: 'image_to_image' },
+  { label: t('aiRequests.inpainting'), value: 'inpainting' },
+  { label: t('aiRequests.upscale'), value: 'upscale' },
+  { label: t('aiRequests.other'), value: 'other' },
+] as Array<{ label: string; value: 'all' | AiRequestType }>)
 
 const providerOptions = computed(() => {
   const fromAgg = Object.keys(aggregations.value?.by_engine || {})
   const fromList = requests.value.map(item => item.engine_provider).filter(Boolean) as string[]
   const unique = Array.from(new Set([...fromAgg, ...fromList]))
   return [
-    { label: 'All Providers', value: '' },
+    { label: t('aiRequests.allProviders'), value: '' },
     ...unique.map(item => ({ label: item, value: item })),
   ]
 })
@@ -125,12 +128,12 @@ async function fetchAggregations() {
 
 function loadMockRequests() {
   requests.value = [
-    { id: 101, uuid: 'req_001', type: 'text_to_image', status: 'completed', user_prompt: 'Luxury perfume bottle on stone podium with soft shadows', model_used: 'flux-pro', engine_provider: 'fal', width: 1024, height: 1024, num_images: 4, credits_consumed: 12, retry_count: 0, processing_time_ms: 4200, error_message: null, error_code: null, started_at: '2026-04-04T08:30:00Z', completed_at: '2026-04-04T08:30:04Z', created_at: '2026-04-04T08:30:00Z', updated_at: '2026-04-04T08:30:04Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null }, visual_style: { id: 3, name: 'Editorial Luxe', slug: 'editorial-luxe', thumbnail: null }, generated_images_count: 4 },
-    { id: 102, uuid: 'req_002', type: 'image_to_image', status: 'processing', user_prompt: 'Convert this room photo into Nordic interior style', model_used: 'sdxl-img2img', engine_provider: 'replicate', width: 1344, height: 768, num_images: 2, credits_consumed: 8, retry_count: 1, processing_time_ms: null, error_message: null, error_code: null, started_at: '2026-04-04T08:42:00Z', completed_at: null, created_at: '2026-04-04T08:42:00Z', updated_at: '2026-04-04T08:42:15Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@flash.io', avatar: null }, visual_style: { id: 4, name: 'Nordic Clean', slug: 'nordic-clean', thumbnail: null }, generated_images_count: 0 },
-    { id: 103, uuid: 'req_003', type: 'inpainting', status: 'failed', user_prompt: 'Remove the background crowd and extend jacket texture naturally', model_used: 'sdxl-inpaint', engine_provider: 'fal', width: 1024, height: 1536, num_images: 1, credits_consumed: 5, retry_count: 2, processing_time_ms: 1900, error_message: 'Worker timeout during inpaint stage', error_code: 'WORKER_TIMEOUT', started_at: '2026-04-04T07:58:00Z', completed_at: '2026-04-04T07:58:02Z', created_at: '2026-04-04T07:58:00Z', updated_at: '2026-04-04T07:58:02Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@flash.io', avatar: null }, visual_style: null, generated_images_count: 0 },
-    { id: 104, uuid: 'req_004', type: 'upscale', status: 'pending', user_prompt: 'Upscale product thumbnail for homepage hero banner', model_used: 'real-esrgan', engine_provider: 'internal', width: 800, height: 800, num_images: 1, credits_consumed: 2, retry_count: 0, processing_time_ms: null, error_message: null, error_code: null, started_at: null, completed_at: null, created_at: '2026-04-04T08:48:00Z', updated_at: '2026-04-04T08:48:00Z', deleted_at: null, user: { id: 4, name: 'Karim Mostafa', email: 'karim@flash.io', avatar: null }, visual_style: null, generated_images_count: 0 },
-    { id: 105, uuid: 'req_005', type: 'text_to_image', status: 'cancelled', user_prompt: 'Fashion campaign shot with reflective floor and blue backlight', model_used: 'flux-pro', engine_provider: 'fal', width: 1024, height: 1280, num_images: 3, credits_consumed: 0, retry_count: 1, processing_time_ms: 800, error_message: 'Cancelled by admin', error_code: 'ADMIN_CANCELLED', started_at: '2026-04-04T06:40:00Z', completed_at: '2026-04-04T06:40:01Z', created_at: '2026-04-04T06:40:00Z', updated_at: '2026-04-04T06:40:01Z', deleted_at: null, user: { id: 5, name: 'Layla Hassan', email: 'layla@flash.io', avatar: null }, visual_style: { id: 5, name: 'Studio Blue', slug: 'studio-blue', thumbnail: null }, generated_images_count: 0 },
-    { id: 106, uuid: 'req_006', type: 'text_to_image', status: 'completed', user_prompt: 'Minimal UI dashboard illustration in black and gray', model_used: 'dall-e-3', engine_provider: 'openai', width: 1792, height: 1024, num_images: 1, credits_consumed: 10, retry_count: 0, processing_time_ms: 6100, error_message: null, error_code: null, started_at: '2026-04-03T19:20:00Z', completed_at: '2026-04-03T19:20:06Z', created_at: '2026-04-03T19:20:00Z', updated_at: '2026-04-03T19:20:06Z', deleted_at: '2026-04-04T00:30:00Z', user: { id: 6, name: 'Nour Sayed', email: 'nour@flash.io', avatar: null }, visual_style: { id: 2, name: 'Minimal Noir', slug: 'minimal-noir', thumbnail: null }, generated_images_count: 1 },
+    { id: 101, uuid: 'req_001', type: 'text_to_image', status: 'completed', user_prompt: 'Luxury perfume bottle on stone podium with soft shadows', model_used: 'flux-pro', engine_provider: 'fal', width: 1024, height: 1024, num_images: 4, credits_consumed: 12, retry_count: 0, processing_time_ms: 4200, error_message: null, error_code: null, started_at: '2026-04-04T08:30:00Z', completed_at: '2026-04-04T08:30:04Z', created_at: '2026-04-04T08:30:00Z', updated_at: '2026-04-04T08:30:04Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null }, visual_style: { id: 3, name: 'Editorial Luxe', slug: 'editorial-luxe', thumbnail: null }, generated_images_count: 4 },
+    { id: 102, uuid: 'req_002', type: 'image_to_image', status: 'processing', user_prompt: 'Convert this room photo into Nordic interior style', model_used: 'sdxl-img2img', engine_provider: 'replicate', width: 1344, height: 768, num_images: 2, credits_consumed: 8, retry_count: 1, processing_time_ms: null, error_message: null, error_code: null, started_at: '2026-04-04T08:42:00Z', completed_at: null, created_at: '2026-04-04T08:42:00Z', updated_at: '2026-04-04T08:42:15Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null }, visual_style: { id: 4, name: 'Nordic Clean', slug: 'nordic-clean', thumbnail: null }, generated_images_count: 0 },
+    { id: 103, uuid: 'req_003', type: 'inpainting', status: 'failed', user_prompt: 'Remove the background crowd and extend jacket texture naturally', model_used: 'sdxl-inpaint', engine_provider: 'fal', width: 1024, height: 1536, num_images: 1, credits_consumed: 5, retry_count: 2, processing_time_ms: 1900, error_message: 'Worker timeout during inpaint stage', error_code: 'WORKER_TIMEOUT', started_at: '2026-04-04T07:58:00Z', completed_at: '2026-04-04T07:58:02Z', created_at: '2026-04-04T07:58:00Z', updated_at: '2026-04-04T07:58:02Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null }, visual_style: null, generated_images_count: 0 },
+    { id: 104, uuid: 'req_004', type: 'upscale', status: 'pending', user_prompt: 'Upscale product thumbnail for homepage hero banner', model_used: 'real-esrgan', engine_provider: 'internal', width: 800, height: 800, num_images: 1, credits_consumed: 2, retry_count: 0, processing_time_ms: null, error_message: null, error_code: null, started_at: null, completed_at: null, created_at: '2026-04-04T08:48:00Z', updated_at: '2026-04-04T08:48:00Z', deleted_at: null, user: { id: 4, name: 'Karim Mostafa', email: 'karim@klek.ai', avatar: null }, visual_style: null, generated_images_count: 0 },
+    { id: 105, uuid: 'req_005', type: 'text_to_image', status: 'cancelled', user_prompt: 'Fashion campaign shot with reflective floor and blue backlight', model_used: 'flux-pro', engine_provider: 'fal', width: 1024, height: 1280, num_images: 3, credits_consumed: 0, retry_count: 1, processing_time_ms: 800, error_message: 'Cancelled by admin', error_code: 'ADMIN_CANCELLED', started_at: '2026-04-04T06:40:00Z', completed_at: '2026-04-04T06:40:01Z', created_at: '2026-04-04T06:40:00Z', updated_at: '2026-04-04T06:40:01Z', deleted_at: null, user: { id: 5, name: 'Layla Hassan', email: 'layla@klek.ai', avatar: null }, visual_style: { id: 5, name: 'Studio Blue', slug: 'studio-blue', thumbnail: null }, generated_images_count: 0 },
+    { id: 106, uuid: 'req_006', type: 'text_to_image', status: 'completed', user_prompt: 'Minimal UI dashboard illustration in black and gray', model_used: 'dall-e-3', engine_provider: 'openai', width: 1792, height: 1024, num_images: 1, credits_consumed: 10, retry_count: 0, processing_time_ms: 6100, error_message: null, error_code: null, started_at: '2026-04-03T19:20:00Z', completed_at: '2026-04-03T19:20:06Z', created_at: '2026-04-03T19:20:00Z', updated_at: '2026-04-03T19:20:06Z', deleted_at: '2026-04-04T00:30:00Z', user: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', avatar: null }, visual_style: { id: 2, name: 'Minimal Noir', slug: 'minimal-noir', thumbnail: null }, generated_images_count: 1 },
   ]
   totalRecords.value = 126
 }
@@ -164,9 +167,9 @@ function loadMockAggregations() {
       { date: '2026-04-04', total: 1892, completed: 1711, failed: 140, credits: 10110 },
     ],
     top_users: [
-      { user: { id: 1, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null }, request_count: 382, total_credits: 2190, completed_count: 358 },
-      { user: { id: 2, name: 'Omar Ali', email: 'omar@flash.io', avatar: null }, request_count: 341, total_credits: 1844, completed_count: 327 },
-      { user: { id: 3, name: 'Mona Khaled', email: 'mona@flash.io', avatar: null }, request_count: 298, total_credits: 1652, completed_count: 276 },
+      { user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null }, request_count: 382, total_credits: 2190, completed_count: 358 },
+      { user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null }, request_count: 341, total_credits: 1844, completed_count: 327 },
+      { user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null }, request_count: 298, total_credits: 1652, completed_count: 276 },
     ],
     top_visual_styles: [
       { style: { id: 1, name: 'Minimal Noir', slug: 'minimal-noir', thumbnail: null }, usage_count: 1220 },
@@ -325,10 +328,10 @@ const statCards = computed(() => {
   const overview = aggregations.value?.overview
   if (!overview) return []
   return [
-    { label: 'Requests', value: overview.total_requests.toLocaleString(), sub: `${overview.success_rate.toFixed(1)}% success`, tone: '#3b82f6', icon: 'pi pi-sparkles' },
-    { label: 'Credits', value: overview.total_credits_consumed.toLocaleString(), sub: `${overview.avg_credits_per_request.toFixed(1)} avg/request`, tone: '#8b5cf6', icon: 'pi pi-bolt' },
-    { label: 'Images', value: overview.total_images_requested.toLocaleString(), sub: `${overview.requests_with_retries} retried`, tone: '#10b981', icon: 'pi pi-image' },
-    { label: 'Avg Time', value: formatDuration(overview.avg_processing_time_ms), sub: `${formatDuration(overview.max_processing_time_ms)} max`, tone: '#f59e0b', icon: 'pi pi-stopwatch' },
+    { label: t('aiRequests.requests'), value: overview.total_requests.toLocaleString(), sub: t('aiRequests.successRate', { rate: overview.success_rate.toFixed(1) }), tone: '#3b82f6', icon: 'pi pi-sparkles' },
+    { label: t('aiRequests.credits'), value: overview.total_credits_consumed.toLocaleString(), sub: t('aiRequests.avgPerRequest', { avg: overview.avg_credits_per_request.toFixed(1) }), tone: '#8b5cf6', icon: 'pi pi-bolt' },
+    { label: t('aiRequests.images'), value: overview.total_images_requested.toLocaleString(), sub: t('aiRequests.retried', { count: overview.requests_with_retries }), tone: '#10b981', icon: 'pi pi-image' },
+    { label: t('aiRequests.avgTime'), value: formatDuration(overview.avg_processing_time_ms), sub: t('aiRequests.max', { time: formatDuration(overview.max_processing_time_ms) }), tone: '#f59e0b', icon: 'pi pi-stopwatch' },
   ]
 })
 
@@ -346,7 +349,7 @@ const trendChartData = computed(() => {
     labels: items.map(item => formatShortDate(item.date)),
     datasets: [
       {
-        label: 'Requests',
+        label: t('aiRequests.requests'),
         data: items.map(item => item.total),
         borderColor: '#0ea5e9',
         backgroundColor: 'rgba(14, 165, 233, 0.08)',
@@ -356,7 +359,7 @@ const trendChartData = computed(() => {
         pointRadius: 2,
       },
       {
-        label: 'Failed',
+        label: t('aiRequests.failed'),
         data: items.map(item => item.failed),
         borderColor: '#ef4444',
         backgroundColor: 'rgba(239, 68, 68, 0.04)',
@@ -478,10 +481,10 @@ function canCancel(item: AiRequest) {
 <template>
   <div class="ai-page">
     <div class="page-toolbar">
-      <h1 class="page-title">AI Requests</h1>
+      <h1 class="page-title">{{ t('aiRequests.title') }}</h1>
       <div class="toolbar-actions" v-if="selectedIds.length">
-        <Button icon="pi pi-refresh" label="Retry Selected" size="small" severity="secondary" :loading="actionLoading" @click="handleBulkRetry" />
-        <Button icon="pi pi-trash" label="Delete Selected" size="small" severity="danger" :loading="actionLoading" @click="confirmDeleteBulk" />
+        <Button icon="pi pi-refresh" :label="t('aiRequests.retrySelected')" size="small" severity="secondary" :loading="actionLoading" @click="handleBulkRetry" />
+        <Button icon="pi pi-trash" :label="t('aiRequests.deleteSelected')" size="small" severity="danger" :loading="actionLoading" @click="confirmDeleteBulk" />
       </div>
     </div>
 
@@ -502,8 +505,8 @@ function canCancel(item: AiRequest) {
       <section class="chart-card chart-wide">
         <div class="card-head">
           <div>
-            <h3>Daily Trend</h3>
-            <p>Volume, failures, and operational consistency over the last 7 days.</p>
+            <h3>{{ t('aiRequests.trendTitle') }}</h3>
+            <p>{{ t('aiRequests.trendTitle') }}</p>
           </div>
         </div>
         <div class="chart-shell tall">
@@ -514,7 +517,7 @@ function canCancel(item: AiRequest) {
       <section class="chart-card">
         <div class="card-head">
           <div>
-            <h3>Status Mix</h3>
+            <h3>{{ t('aiRequests.requestsByStatus') }}</h3>
             <p>Current lifecycle distribution.</p>
           </div>
         </div>
@@ -526,7 +529,7 @@ function canCancel(item: AiRequest) {
       <section class="chart-card">
         <div class="card-head">
           <div>
-            <h3>Request Types</h3>
+            <h3>{{ t('aiRequests.requestsByType') }}</h3>
             <p>Load distribution by generation workflow.</p>
           </div>
         </div>
@@ -568,16 +571,16 @@ function canCancel(item: AiRequest) {
     <div class="filters-bar">
       <span class="filter-search">
         <i class="pi pi-search" />
-        <InputText v-model="search" placeholder="Search prompt, uuid, user..." size="small" class="filter-input" />
+        <InputText v-model="search" :placeholder="t('aiRequests.searchPlaceholder')" size="small" class="filter-input" />
       </span>
       <Select v-model="statusFilter" :options="statusOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
       <Select v-model="typeFilter" :options="typeOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
       <Select v-model="providerFilter" :options="providerOptions" optionLabel="label" optionValue="value" class="filter-select" size="small" />
       <label class="with-trashed-toggle">
         <Checkbox v-model="withTrashed" :binary="true" />
-        <span>With Trashed</span>
+        <span>{{ t('aiRequests.showTrashed') }}</span>
       </label>
-      <span class="filter-count">{{ totalRecords }} requests</span>
+      <span class="filter-count">{{ totalRecords }} {{ t('common.requests') }}</span>
     </div>
 
     <div class="cards-list d-mobile">
@@ -722,23 +725,23 @@ function canCancel(item: AiRequest) {
 
     <AiRequestDetailDrawer v-model:visible="showDetail" :requestId="detailRequestId" @updated="onDrawerUpdated" />
 
-    <Dialog v-model:visible="showDeleteConfirm" header="Delete AI Request" :modal="true" :style="{ width: '360px' }">
+    <Dialog v-model:visible="showDeleteConfirm" :header="t('aiRequests.title')" :modal="true" :style="{ width: '360px' }">
       <div class="confirm-body">
         <i class="pi pi-exclamation-triangle confirm-icon" />
-        <p v-if="deleteMode === 'single'">Delete <strong>{{ deleteTarget?.uuid }}</strong>?</p>
-        <p v-else>Delete <strong>{{ selectedIds.length }}</strong> selected requests?</p>
+        <p v-if="deleteMode === 'single'">{{ t('aiRequests.deleteConfirm') }} <strong>{{ deleteTarget?.uuid }}</strong></p>
+        <p v-else>{{ t('aiRequests.deleteConfirmBulk', { count: selectedIds.length }) }}</p>
         <p class="confirm-sub">This performs a soft delete so records can still be restored later.</p>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
+        <Button :label="t('common.delete')" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
       </template>
     </Dialog>
   </div>
 </template>
 
 <style scoped>
-.ai-page { display: flex; flex-direction: column; gap: 10px; }
+.ai-page { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden; }
 .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .page-title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
 .toolbar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -793,6 +796,8 @@ function canCancel(item: AiRequest) {
   border-radius: 10px;
   background: var(--card-bg);
   padding: 10px 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 .card-head {
   display: flex;
@@ -804,7 +809,7 @@ function canCancel(item: AiRequest) {
 .card-head h3 { margin: 0; font-size: 0.8rem; color: var(--text-primary); }
 .card-head p { margin: 2px 0 0; font-size: 0.64rem; color: var(--text-muted); }
 .compact-head { margin-bottom: 6px; }
-.chart-shell { height: 220px; }
+.chart-shell { height: 220px; overflow: hidden; min-width: 0; position: relative; }
 .chart-shell.tall { height: 240px; }
 .insight-card { display: flex; flex-direction: column; gap: 10px; }
 .mini-list { display: flex; flex-direction: column; gap: 8px; }
@@ -906,6 +911,7 @@ function canCancel(item: AiRequest) {
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   overflow: hidden;
+  min-width: 0;
 }
 .requests-table { font-size: 0.75rem; }
 :deep(.requests-table .p-datatable-table-container) {

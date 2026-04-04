@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getCoupon, storeCoupon, updateCoupon } from '@/services/couponService'
 import { getPlans } from '@/services/planService'
 import type { FeatureType } from '@/types/plans'
@@ -23,17 +24,18 @@ const emit = defineEmits<{
   (e: 'saved'): void
 }>()
 
+const { t } = useI18n()
 const isEdit = computed(() => props.couponId !== null)
 const loading = ref(false)
 const saving = ref(false)
 const errors = ref<Record<string, string>>({})
 const planOptions = ref<Array<{ label: string; value: number }>>([])
 
-const discountTypeOptions = [
-  { label: 'Percentage', value: 'percentage' },
-  { label: 'Fixed Amount', value: 'fixed_amount' },
-  { label: 'Credits', value: 'credits' },
-] as Array<{ label: string; value: CouponDiscountType }>
+const discountTypeOptions = computed(() => [
+  { label: t('couponForm.percentage'), value: 'percentage' },
+  { label: t('couponForm.fixedAmount'), value: 'fixed_amount' },
+  { label: t('couponForm.creditsCoupon'), value: 'credits' },
+] as Array<{ label: string; value: CouponDiscountType }>)
 
 const form = ref<{
   code: string
@@ -157,15 +159,15 @@ async function save() {
   errors.value = {}
 
   if (!form.value.code.trim()) {
-    errors.value.code = 'Code is required'
+    errors.value.code = t('couponForm.codeRequired')
     return
   }
   if (!form.value.name.trim()) {
-    errors.value.name = 'Name is required'
+    errors.value.name = t('couponForm.nameRequired')
     return
   }
   if (!form.value.discount_value || form.value.discount_value <= 0) {
-    errors.value.discount_value = 'Discount value must be greater than zero'
+    errors.value.discount_value = t('couponForm.discountRequired')
     return
   }
 
@@ -254,7 +256,7 @@ function buildMockCoupon(id: number): CouponDetail {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    :header="isEdit ? 'Edit Coupon' : 'Create Coupon'"
+    :header="isEdit ? t('couponForm.editCoupon') : t('couponForm.createCoupon')"
     :modal="true"
     :style="{ width: '760px', maxWidth: '96vw' }"
     :draggable="false"
@@ -263,74 +265,74 @@ function buildMockCoupon(id: number): CouponDetail {
     <div v-if="loading" class="dialog-loading"><i class="pi pi-spin pi-spinner" /></div>
     <div v-else class="form-grid">
       <div class="form-field">
-        <label>Code <span class="req">*</span></label>
+        <label>{{ t('couponForm.code') }} <span class="req">*</span></label>
         <InputText v-model="form.code" size="small" class="w-full" placeholder="SPRING10" :class="{ 'p-invalid': errors.code }" />
         <small v-if="errors.code" class="field-error">{{ errors.code }}</small>
       </div>
 
       <div class="form-field">
-        <label>Name <span class="req">*</span></label>
+        <label>{{ t('couponForm.name') }} <span class="req">*</span></label>
         <InputText v-model="form.name" size="small" class="w-full" placeholder="Spring Promo" :class="{ 'p-invalid': errors.name }" />
         <small v-if="errors.name" class="field-error">{{ errors.name }}</small>
       </div>
 
       <div class="form-field form-field-full">
-        <label>Description</label>
-        <Textarea v-model="form.description" rows="3" autoResize class="w-full" placeholder="Internal context and coupon positioning" />
+        <label>{{ t('couponForm.description') }}</label>
+        <Textarea v-model="form.description" rows="3" autoResize class="w-full" :placeholder="t('couponForm.descriptionPlaceholder')" />
       </div>
 
       <div class="form-field">
-        <label>Discount Type</label>
+        <label>{{ t('couponForm.discountType') }}</label>
         <Select v-model="form.discount_type" :options="discountTypeOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
       </div>
 
       <div class="form-field">
-        <label>Discount Value</label>
+        <label>{{ t('couponForm.discountValue') }}</label>
         <input v-model.number="form.discount_value" type="number" min="0" step="0.01" class="native-input" />
         <small v-if="errors.discount_value" class="field-error">{{ errors.discount_value }}</small>
       </div>
 
       <div class="form-field">
-        <label>Currency</label>
+        <label>{{ t('couponForm.currency') }}</label>
         <InputText v-model="form.currency" size="small" class="w-full" placeholder="USD" />
       </div>
 
       <div class="form-field">
-        <label>Applicable Plan</label>
+        <label>{{ t('couponForm.applicablePlan') }}</label>
         <Select v-model="form.applicable_plan_id" :options="planOptions" optionLabel="label" optionValue="value" size="small" class="w-full" showClear />
       </div>
 
       <div class="form-field">
-        <label>Max Uses</label>
-        <input v-model.number="form.max_uses" type="number" min="0" class="native-input" placeholder="Unlimited" />
+        <label>{{ t('couponForm.maxUses') }}</label>
+        <input v-model.number="form.max_uses" type="number" min="0" class="native-input" :placeholder="t('couponForm.unlimitedPlaceholder')" />
       </div>
 
       <div class="form-field">
-        <label>Max Uses / User</label>
-        <input v-model.number="form.max_uses_per_user" type="number" min="0" class="native-input" placeholder="No cap" />
+        <label>{{ t('couponForm.maxUsesPerUser') }}</label>
+        <input v-model.number="form.max_uses_per_user" type="number" min="0" class="native-input" :placeholder="t('couponForm.noCapPlaceholder')" />
       </div>
 
       <div class="form-field">
-        <label>Minimum Order</label>
-        <input v-model.number="form.min_order_amount" type="number" min="0" step="0.01" class="native-input" placeholder="No minimum" />
+        <label>{{ t('couponForm.minimumOrder') }}</label>
+        <input v-model.number="form.min_order_amount" type="number" min="0" step="0.01" class="native-input" :placeholder="t('couponForm.noMinimumPlaceholder')" />
       </div>
 
       <div class="form-field">
-        <label>Starts At</label>
+        <label>{{ t('couponForm.startsAt') }}</label>
         <input v-model="form.starts_at" type="datetime-local" class="native-input" />
       </div>
 
       <div class="form-field">
-        <label>Expires At</label>
+        <label>{{ t('couponForm.expiresAt') }}</label>
         <input v-model="form.expires_at" type="datetime-local" class="native-input" />
       </div>
 
-      <label class="toggle-item form-field-full"><Checkbox v-model="form.is_active" :binary="true" /> <span>Coupon is active</span></label>
+      <label class="toggle-item form-field-full"><Checkbox v-model="form.is_active" :binary="true" /> <span>{{ t('couponForm.couponIsActive') }}</span></label>
     </div>
 
     <template #footer>
-      <Button label="Cancel" severity="secondary" text size="small" @click="close" />
-      <Button :label="isEdit ? 'Update Coupon' : 'Create Coupon'" size="small" :loading="saving" @click="save" />
+      <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="close" />
+      <Button :label="isEdit ? t('couponForm.updateCoupon') : t('couponForm.createCoupon')" size="small" :loading="saving" @click="save" />
     </template>
   </Dialog>
 </template>

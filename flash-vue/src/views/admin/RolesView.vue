@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getRoles, deleteRole } from '@/services/roleService'
 import type { Role, ListRolesParams } from '@/types/roles'
 import DataTable from 'primevue/datatable'
@@ -33,6 +34,8 @@ const detailRoleId = ref<number | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<Role | null>(null)
 const actionLoading = ref(false)
+
+const { t } = useI18n()
 
 // ── Fetch ───────────────────────────────────────────────────
 async function fetchRoles() {
@@ -137,8 +140,8 @@ function roleColor(slug: string) {
   <div class="roles-page">
     <!-- Toolbar -->
     <div class="page-toolbar">
-      <h1 class="page-title">Roles & Permissions</h1>
-      <Button icon="pi pi-plus" label="Add Role" size="small" @click="openCreate" />
+      <h1 class="page-title">{{ t('roles.title') }}</h1>
+      <Button icon="pi pi-plus" :label="t('roles.addRole')" size="small" @click="openCreate" />
     </div>
 
     <!-- Main Tabs -->
@@ -146,11 +149,11 @@ function roleColor(slug: string) {
       <TabList>
         <Tab value="roles">
           <i class="pi pi-users" style="font-size: 0.72rem" />
-          <span>Roles</span>
+          <span>{{ t('roles.rolesTab') }}</span>
         </Tab>
         <Tab value="matrix">
           <i class="pi pi-th-large" style="font-size: 0.72rem" />
-          <span>Permission Matrix</span>
+          <span>{{ t('roles.permissionMatrix') }}</span>
         </Tab>
       </TabList>
 
@@ -161,9 +164,9 @@ function roleColor(slug: string) {
           <div class="filters-bar">
             <span class="filter-search">
               <i class="pi pi-search" />
-              <InputText v-model="search" placeholder="Search roles…" size="small" class="filter-input" />
+              <InputText v-model="search" :placeholder="t('roles.searchPlaceholder')" size="small" class="filter-input" />
             </span>
-            <span class="filter-count">{{ roles.length }} roles</span>
+            <span class="filter-count">{{ t('roles.rolesCount', { count: roles.length }) }}</span>
           </div>
 
           <!-- Cards Grid (mobile-first) -->
@@ -182,19 +185,19 @@ function roleColor(slug: string) {
                   <span class="rc-name">{{ role.name }}</span>
                   <span class="rc-slug">{{ role.slug }}</span>
                 </div>
-                <Tag v-if="role.is_default" value="Default" severity="info" class="rc-default" />
+                <Tag v-if="role.is_default" :value="t('roles.default')" severity="info" class="rc-default" />
               </div>
-              <p class="rc-desc">{{ role.description || 'No description' }}</p>
+              <p class="rc-desc">{{ role.description || t('roles.noDescription') }}</p>
               <div class="rc-stats">
                 <div class="rc-stat">
                   <i class="pi pi-lock" />
                   <span>{{ role.permissions_count ?? 0 }}</span>
-                  <span class="rc-stat-label">permissions</span>
+                  <span class="rc-stat-label">{{ t('roles.permissions') }}</span>
                 </div>
                 <div class="rc-stat">
                   <i class="pi pi-users" />
                   <span>{{ role.users_count ?? 0 }}</span>
-                  <span class="rc-stat-label">users</span>
+                  <span class="rc-stat-label">{{ t('roles.users') }}</span>
                 </div>
               </div>
               <div class="rc-actions" @click.stop>
@@ -221,7 +224,7 @@ function roleColor(slug: string) {
               dataKey="id"
             >
               <!-- Role -->
-              <Column field="name" header="Role" sortable style="min-width: 200px">
+              <Column field="name" :header="t('common.role')" sortable style="min-width: 200px">
                 <template #body="{ data }">
                   <div class="role-cell" @click="openDetail(data)" style="cursor: pointer">
                     <div class="r-icon" :style="{ background: roleColor(data.slug) }">
@@ -231,20 +234,20 @@ function roleColor(slug: string) {
                       <span class="r-name">{{ data.name }}</span>
                       <span class="r-slug">{{ data.slug }}</span>
                     </div>
-                    <Tag v-if="data.is_default" value="Default" severity="info" class="r-default" />
+                    <Tag v-if="data.is_default" :value="t('roles.default')" severity="info" class="r-default" />
                   </div>
                 </template>
               </Column>
 
               <!-- Description -->
-              <Column field="description" header="Description" style="min-width: 180px">
+              <Column field="description" :header="t('roles.description')" style="min-width: 180px">
                 <template #body="{ data }">
                   <span class="r-desc">{{ data.description || '—' }}</span>
                 </template>
               </Column>
 
               <!-- Permissions -->
-              <Column field="permissions_count" header="Permissions" sortable style="min-width: 100px">
+              <Column field="permissions_count" :header="t('roles.permissions')" sortable style="min-width: 100px">
                 <template #body="{ data }">
                   <div class="r-metric">
                     <i class="pi pi-lock" />
@@ -254,7 +257,7 @@ function roleColor(slug: string) {
               </Column>
 
               <!-- Users -->
-              <Column field="users_count" header="Users" sortable style="min-width: 80px">
+              <Column field="users_count" :header="t('roles.users')" sortable style="min-width: 80px">
                 <template #body="{ data }">
                   <div class="r-metric">
                     <i class="pi pi-users" />
@@ -264,7 +267,7 @@ function roleColor(slug: string) {
               </Column>
 
               <!-- Created -->
-              <Column field="created_at" header="Created" sortable style="min-width: 100px">
+              <Column field="created_at" :header="t('roles.created')" sortable style="min-width: 100px">
                 <template #body="{ data }">
                   <span class="r-date">{{ formatDate(data.created_at) }}</span>
                 </template>
@@ -305,18 +308,18 @@ function roleColor(slug: string) {
     />
 
     <!-- Delete Confirm -->
-    <Dialog v-model:visible="showDeleteConfirm" header="Delete Role" :modal="true" :style="{ width: '360px' }">
+    <Dialog v-model:visible="showDeleteConfirm" :header="t('roles.deleteRole')" :modal="true" :style="{ width: '360px' }">
       <div class="confirm-body">
         <i class="pi pi-exclamation-triangle confirm-icon" />
-        <p>Delete <strong>{{ deleteTarget?.name }}</strong> role?</p>
+        <p>{{ t('roles.deleteConfirm', { name: deleteTarget?.name }) }}</p>
         <p class="confirm-sub" v-if="deleteTarget && (deleteTarget.users_count ?? 0) > 0">
-          This role has {{ deleteTarget.users_count }} users assigned. They will lose this role.
+          {{ t('roles.deleteConfirmHasUsers', { count: deleteTarget.users_count }) }}
         </p>
-        <p class="confirm-sub" v-else>This action cannot be undone.</p>
+        <p class="confirm-sub" v-else>{{ t('roles.deleteConfirmNoUndo') }}</p>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
+        <Button :label="t('common.delete')" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
       </template>
     </Dialog>
   </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getPermissionMatrix, assignPermissions } from '@/services/roleService'
 import type { PermissionMatrix, MatrixRow, MatrixPermissionRef } from '@/types/roles'
 import Checkbox from 'primevue/checkbox'
@@ -7,6 +8,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 
 const emit = defineEmits<{ (e: 'role-updated'): void }>()
+const { t } = useI18n()
 
 const loading = ref(true)
 const saving = ref<number | null>(null)
@@ -136,7 +138,7 @@ function roleColor(slug: string) {
 <template>
   <div class="matrix-container">
     <div v-if="loading" class="matrix-loading">
-      <i class="pi pi-spin pi-spinner" /> Loading permission matrix…
+      <i class="pi pi-spin pi-spinner" /> {{ t('permissionMatrix.loading') }}
     </div>
 
     <div v-else class="matrix-scroll">
@@ -144,7 +146,7 @@ function roleColor(slug: string) {
         <thead>
           <tr>
             <th class="th-corner">
-              <span class="corner-label">Permissions</span>
+              <span class="corner-label">{{ t('permissionMatrix.permissions') }}</span>
             </th>
             <th v-for="row in matrix" :key="row.role.id" class="th-role">
               <div class="role-head">
@@ -155,7 +157,7 @@ function roleColor(slug: string) {
               <Button
                 v-if="dirty.has(row.role.id)"
                 icon="pi pi-save"
-                label="Save"
+                :label="t('permissionMatrix.save')"
                 size="small"
                 severity="success"
                 class="rh-save"
@@ -201,7 +203,7 @@ function roleColor(slug: string) {
 
     <!-- Mobile hint -->
     <p class="scroll-hint d-mobile-only">
-      <i class="pi pi-arrows-h" /> Scroll horizontally to see all roles
+      <i class="pi pi-arrows-h" /> {{ t('permissionMatrix.scrollHint') }}
     </p>
   </div>
 </template>

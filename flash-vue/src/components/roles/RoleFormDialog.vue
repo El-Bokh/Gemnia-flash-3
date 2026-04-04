@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 const isEdit = ref(false)
 const saving = ref(false)
 const errors = ref<Record<string, string>>({})
+const { t } = useI18n()
 
 // Form
 const form = ref({
@@ -134,8 +136,8 @@ function isGroupPartial(group: PermGroup) {
 // Save
 async function save() {
   errors.value = {}
-  if (!form.value.name.trim()) { errors.value.name = 'Name is required'; return }
-  if (!form.value.slug.trim()) { errors.value.slug = 'Slug is required'; return }
+  if (!form.value.name.trim()) { errors.value.name = t('roleForm.nameRequired'); return }
+  if (!form.value.slug.trim()) { errors.value.slug = t('roleForm.slugRequired'); return }
 
   saving.value = true
   try {
@@ -176,7 +178,7 @@ function close() { emit('update:visible', false) }
   <Dialog
     :visible="visible"
     @update:visible="close"
-    :header="isEdit ? 'Edit Role' : 'Create Role'"
+    :header="isEdit ? t('roleForm.editRole') : t('roleForm.createRole')"
     :modal="true"
     :style="{ width: '560px', maxWidth: '95vw' }"
     :draggable="false"
@@ -185,37 +187,37 @@ function close() { emit('update:visible', false) }
     <div class="form-section">
       <div class="form-row">
         <div class="form-field">
-          <label>Name <span class="req">*</span></label>
-          <InputText v-model="form.name" placeholder="e.g. Content Editor" size="small" :class="{ 'p-invalid': errors.name }" class="w-full" />
+          <label>{{ t('common.name') }} <span class="req">*</span></label>
+          <InputText v-model="form.name" :placeholder="t('roleForm.namePlaceholder')" size="small" :class="{ 'p-invalid': errors.name }" class="w-full" />
           <small v-if="errors.name" class="field-error">{{ errors.name }}</small>
         </div>
         <div class="form-field">
-          <label>Slug <span class="req">*</span></label>
-          <InputText v-model="form.slug" placeholder="content-editor" size="small" :class="{ 'p-invalid': errors.slug }" class="w-full" />
+          <label>{{ t('common.name') }} <span class="req">*</span></label>
+          <InputText v-model="form.slug" :placeholder="t('roleForm.slugPlaceholder')" size="small" :class="{ 'p-invalid': errors.slug }" class="w-full" />
           <small v-if="errors.slug" class="field-error">{{ errors.slug }}</small>
         </div>
       </div>
 
       <div class="form-field">
-        <label>Description</label>
-        <Textarea v-model="form.description" placeholder="What can this role do?" rows="2" size="small" class="w-full" autoResize />
+        <label>{{ t('common.description') }}</label>
+        <Textarea v-model="form.description" :placeholder="t('roleForm.descriptionPlaceholder')" rows="2" size="small" class="w-full" autoResize />
       </div>
 
       <div class="form-field-inline">
         <Checkbox v-model="form.is_default" :binary="true" inputId="isDefault" />
-        <label for="isDefault" class="inline-label">Default role for new users</label>
+        <label for="isDefault" class="inline-label">{{ t('roleForm.defaultRole') }}</label>
       </div>
     </div>
 
     <!-- Permissions -->
     <div class="perm-section">
       <div class="perm-header">
-        <span class="perm-title">Permissions</span>
-        <span class="perm-count">{{ form.permissions.length }} selected</span>
+        <span class="perm-title">{{ t('roleForm.permissions') }}</span>
+        <span class="perm-count">{{ form.permissions.length }} {{ t('roleForm.selected', { count: form.permissions.length }) }}</span>
       </div>
 
       <div v-if="permLoading" class="perm-loading">
-        <i class="pi pi-spin pi-spinner" /> Loading…
+        <i class="pi pi-spin pi-spinner" /> {{ t('roleForm.loadingPermissions') }}
       </div>
 
       <div v-else class="perm-groups">
@@ -247,8 +249,8 @@ function close() { emit('update:visible', false) }
     </div>
 
     <template #footer>
-      <Button label="Cancel" severity="secondary" text size="small" @click="close" />
-      <Button :label="isEdit ? 'Update' : 'Create'" size="small" :loading="saving" @click="save" />
+      <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="close" />
+      <Button :label="isEdit ? t('common.save') : t('common.add')" size="small" :loading="saving" @click="save" />
     </template>
   </Dialog>
 </template>

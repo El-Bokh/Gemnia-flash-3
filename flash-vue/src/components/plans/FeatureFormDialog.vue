@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { createFeature, updateFeature } from '@/services/featureService'
 import type { Feature, FeatureType, StoreFeaturePayload, UpdateFeaturePayload } from '@/types/plans'
 import Dialog from 'primevue/dialog'
@@ -19,17 +20,18 @@ const emit = defineEmits<{
   (e: 'saved'): void
 }>()
 
+const { t } = useI18n()
 const isEdit = computed(() => !!props.feature)
 const saving = ref(false)
 const errors = ref<Record<string, string>>({})
 
-const typeOptions = [
-  { label: 'Text to Image', value: 'text_to_image' },
-  { label: 'Image to Image', value: 'image_to_image' },
-  { label: 'Inpainting', value: 'inpainting' },
-  { label: 'Upscale', value: 'upscale' },
-  { label: 'Other', value: 'other' },
-] as Array<{ label: string; value: FeatureType }>
+const typeOptions = computed(() => [
+  { label: t('featureForm.textToImage'), value: 'text_to_image' },
+  { label: t('featureForm.imageToImage'), value: 'image_to_image' },
+  { label: t('featureForm.inpainting'), value: 'inpainting' },
+  { label: t('featureForm.upscale'), value: 'upscale' },
+  { label: t('featureForm.other'), value: 'other' },
+] as Array<{ label: string; value: FeatureType }>)
 
 const form = ref<{
   name: string
@@ -88,11 +90,11 @@ watch(
 async function save() {
   errors.value = {}
   if (!form.value.name.trim()) {
-    errors.value.name = 'Name is required'
+    errors.value.name = t('featureForm.nameRequired')
     return
   }
   if (!form.value.slug.trim()) {
-    errors.value.slug = 'Slug is required'
+    errors.value.slug = t('featureForm.slugRequired')
     return
   }
 
@@ -137,41 +139,41 @@ function close() {
 </script>
 
 <template>
-  <Dialog :visible="visible" @update:visible="close" :header="isEdit ? 'Edit Feature' : 'Create Feature'" :modal="true" :style="{ width: '520px', maxWidth: '95vw' }" :draggable="false" class="feature-form-dialog">
+  <Dialog :visible="visible" @update:visible="close" :header="isEdit ? t('featureForm.editFeature') : t('featureForm.createFeature')" :modal="true" :style="{ width: '520px', maxWidth: '95vw' }" :draggable="false" class="feature-form-dialog">
     <div class="form-grid">
       <div class="form-field">
-        <label>Name <span class="req">*</span></label>
-        <InputText v-model="form.name" size="small" placeholder="Feature name" class="w-full" :class="{ 'p-invalid': errors.name }" />
+        <label>{{ t('common.name') }} <span class="req">*</span></label>
+        <InputText v-model="form.name" size="small" :placeholder="t('featureForm.featureName')" class="w-full" :class="{ 'p-invalid': errors.name }" />
         <small v-if="errors.name" class="field-error">{{ errors.name }}</small>
       </div>
 
       <div class="form-field">
-        <label>Slug <span class="req">*</span></label>
-        <InputText v-model="form.slug" size="small" placeholder="feature-slug" class="w-full" :class="{ 'p-invalid': errors.slug }" />
+        <label>{{ t('featureForm.slug') }} <span class="req">*</span></label>
+        <InputText v-model="form.slug" size="small" :placeholder="t('featureForm.featureSlug')" class="w-full" :class="{ 'p-invalid': errors.slug }" />
         <small v-if="errors.slug" class="field-error">{{ errors.slug }}</small>
       </div>
 
       <div class="form-field form-field-full">
-        <label>Description</label>
-        <Textarea v-model="form.description" rows="3" autoResize class="w-full" placeholder="Short operational description" />
+        <label>{{ t('featureForm.description') }}</label>
+        <Textarea v-model="form.description" rows="3" autoResize class="w-full" :placeholder="t('featureForm.descriptionPlaceholder')" />
       </div>
 
       <div class="form-field">
-        <label>Type</label>
+        <label>{{ t('featureForm.type') }}</label>
         <Select v-model="form.type" :options="typeOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
       </div>
 
       <div class="form-field">
-        <label>Sort Order</label>
+        <label>{{ t('featureForm.sortOrder') }}</label>
         <input v-model.number="form.sort_order" type="number" min="0" class="native-input" />
       </div>
 
-      <label class="toggle-item form-field-full"><Checkbox v-model="form.is_active" :binary="true" /> <span>Feature is active</span></label>
+      <label class="toggle-item form-field-full"><Checkbox v-model="form.is_active" :binary="true" /> <span>{{ t('featureForm.featureIsActive') }}</span></label>
     </div>
 
     <template #footer>
-      <Button label="Cancel" severity="secondary" text size="small" @click="close" />
-      <Button :label="isEdit ? 'Update Feature' : 'Create Feature'" size="small" :loading="saving" @click="save" />
+      <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="close" />
+      <Button :label="isEdit ? t('featureForm.updateFeature') : t('featureForm.createFeature')" size="small" :loading="saving" @click="save" />
     </template>
   </Dialog>
 </template>

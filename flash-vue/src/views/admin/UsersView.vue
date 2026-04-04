@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getUsers, deleteUser, restoreUser } from '@/services/userService'
 import type { User, ListUsersParams } from '@/types/users'
 import DataTable from 'primevue/datatable'
@@ -33,13 +34,15 @@ const showDeleteConfirm = ref(false)
 const deleteTarget = ref<User | null>(null)
 const actionLoading = ref(false)
 
-const statusOptions = [
-  { label: 'All Status', value: undefined },
-  { label: 'Active', value: 'active' },
-  { label: 'Suspended', value: 'suspended' },
-  { label: 'Banned', value: 'banned' },
-  { label: 'Pending', value: 'pending' },
-]
+const { t } = useI18n()
+
+const statusOptions = computed(() => [
+  { label: t('users.allStatus'), value: undefined },
+  { label: t('users.active'), value: 'active' },
+  { label: t('users.suspended'), value: 'suspended' },
+  { label: t('users.banned'), value: 'banned' },
+  { label: t('users.pending'), value: 'pending' },
+])
 
 // ── Fetch ───────────────────────────────────────────────────
 async function fetchUsers() {
@@ -80,7 +83,7 @@ function loadMockUsers() {
     return {
       id: i + 1,
       name,
-      email: `${name.toLowerCase().replace(' ', '.')}@flash.io`,
+      email: `${name.toLowerCase().replace(' ', '.')}@klek.ai`,
       phone: i % 3 === 0 ? '+20 10' + String(i).padStart(8, '0') : null,
       avatar: null,
       status: mockStatus,
@@ -199,15 +202,15 @@ function initials(name: string) {
   <div class="users-page">
     <!-- Toolbar -->
     <div class="page-toolbar">
-      <h1 class="page-title">Users</h1>
-      <Button icon="pi pi-plus" label="Add User" size="small" @click="openCreate" />
+      <h1 class="page-title">{{ t('users.title') }}</h1>
+      <Button icon="pi pi-plus" :label="t('users.addUser')" size="small" @click="openCreate" />
     </div>
 
     <!-- Filters -->
     <div class="filters-bar">
       <span class="p-input-icon-left filter-search">
         <i class="pi pi-search" />
-        <InputText v-model="search" placeholder="Search name or email…" size="small" class="filter-input" />
+        <InputText v-model="search" :placeholder="t('users.searchPlaceholder')" size="small" class="filter-input" />
       </span>
       <Select
         v-model="statusFilter"
@@ -218,7 +221,7 @@ function initials(name: string) {
         size="small"
         class="filter-select"
       />
-      <span class="filter-count">{{ totalRecords }} users</span>
+      <span class="filter-count">{{ t('users.userCount', { count: totalRecords }) }}</span>
     </div>
 
     <!-- Table -->
@@ -245,7 +248,7 @@ function initials(name: string) {
         dataKey="id"
       >
         <!-- User -->
-        <Column field="name" header="User" sortable style="min-width: 200px">
+        <Column field="name" :header="t('common.user')" sortable style="min-width: 200px">
           <template #body="{ data }">
             <div class="user-cell" @click="openDetail(data)" style="cursor: pointer">
               <div class="u-avatar">
@@ -261,14 +264,14 @@ function initials(name: string) {
         </Column>
 
         <!-- Status -->
-        <Column field="status" header="Status" sortable style="min-width: 100px">
+        <Column field="status" :header="t('common.status')" sortable style="min-width: 100px">
           <template #body="{ data }">
             <Tag :value="data.status" :severity="statusSeverity(data.status)" class="u-tag" />
           </template>
         </Column>
 
         <!-- Roles -->
-        <Column field="roles" header="Role" style="min-width: 90px">
+        <Column field="roles" :header="t('users.role')" style="min-width: 90px">
           <template #body="{ data }">
             <span class="u-role" v-if="data.roles?.length">{{ data.roles[0].name }}</span>
             <span class="u-muted" v-else>—</span>
@@ -276,15 +279,15 @@ function initials(name: string) {
         </Column>
 
         <!-- Plan -->
-        <Column header="Plan" style="min-width: 90px">
+        <Column :header="t('users.plan')" style="min-width: 90px">
           <template #body="{ data }">
             <span class="u-plan" v-if="data.active_subscription?.plan">{{ data.active_subscription.plan.name }}</span>
-            <span class="u-muted" v-else>None</span>
+            <span class="u-muted" v-else>{{ t('users.none') }}</span>
           </template>
         </Column>
 
         <!-- Credits -->
-        <Column header="Credits" style="min-width: 70px">
+        <Column :header="t('users.credits')" style="min-width: 70px">
           <template #body="{ data }">
             <span class="u-num" v-if="data.active_subscription">
               {{ data.active_subscription.credits_remaining }}/{{ data.active_subscription.credits_total }}
@@ -294,21 +297,21 @@ function initials(name: string) {
         </Column>
 
         <!-- AI Requests -->
-        <Column header="Requests" style="min-width: 70px">
+        <Column :header="t('users.requests')" style="min-width: 70px">
           <template #body="{ data }">
             <span class="u-num">{{ data.stats?.ai_requests_count ?? 0 }}</span>
           </template>
         </Column>
 
         <!-- Last Login -->
-        <Column field="last_login_at" header="Last Login" sortable style="min-width: 110px">
+        <Column field="last_login_at" :header="t('users.lastLogin')" sortable style="min-width: 110px">
           <template #body="{ data }">
             <span class="u-date">{{ formatDate(data.last_login_at) }}</span>
           </template>
         </Column>
 
         <!-- Joined -->
-        <Column field="created_at" header="Joined" sortable style="min-width: 100px">
+        <Column field="created_at" :header="t('users.joined')" sortable style="min-width: 100px">
           <template #body="{ data }">
             <span class="u-date">{{ formatDate(data.created_at) }}</span>
           </template>
@@ -341,15 +344,15 @@ function initials(name: string) {
     />
 
     <!-- Delete Confirm -->
-    <Dialog v-model:visible="showDeleteConfirm" header="Delete User" :modal="true" :style="{ width: '360px' }">
+    <Dialog v-model:visible="showDeleteConfirm" :header="t('users.deleteUser')" :modal="true" :style="{ width: '360px' }">
       <div class="confirm-body">
         <i class="pi pi-exclamation-triangle confirm-icon" />
-        <p>Are you sure you want to delete <strong>{{ deleteTarget?.name }}</strong>?</p>
-        <p class="confirm-sub">This will soft-delete the user, cancel subscriptions, and revoke tokens.</p>
+        <p>{{ t('users.deleteConfirm', { name: deleteTarget?.name }) }}</p>
+        <p class="confirm-sub">{{ t('users.deleteConfirmSub') }}</p>
       </div>
       <template #footer>
-        <Button label="Cancel" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
+        <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="showDeleteConfirm = false" />
+        <Button :label="t('common.delete')" severity="danger" size="small" :loading="actionLoading" @click="handleDelete" />
       </template>
     </Dialog>
   </div>

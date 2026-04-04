@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
 import Tooltip from 'primevue/tooltip'
 
@@ -8,50 +9,51 @@ const vTooltip = Tooltip
 
 const route = useRoute()
 const layout = useLayoutStore()
+const { t } = useI18n()
 
 interface NavItem {
-  label: string
+  labelKey: string
   icon: string
   to: string
 }
 
 interface NavGroup {
-  title: string
+  titleKey: string
   items: NavItem[]
 }
 
 const navigation: NavGroup[] = [
   {
-    title: 'Main',
+    titleKey: 'sidebar.main',
     items: [
-      { label: 'Dashboard', icon: 'pi pi-objects-column', to: '/admin' },
+      { labelKey: 'sidebar.dashboard', icon: 'pi pi-objects-column', to: '/admin' },
     ],
   },
   {
-    title: 'Management',
+    titleKey: 'sidebar.management',
     items: [
-      { label: 'Users', icon: 'pi pi-users', to: '/admin/users' },
-      { label: 'Roles & Permissions', icon: 'pi pi-shield', to: '/admin/roles' },
+      { labelKey: 'sidebar.users', icon: 'pi pi-users', to: '/admin/users' },
+      { labelKey: 'sidebar.rolesPermissions', icon: 'pi pi-shield', to: '/admin/roles' },
     ],
   },
   {
-    title: 'AI System',
+    titleKey: 'sidebar.aiSystem',
     items: [
-      { label: 'AI Requests', icon: 'pi pi-microchip-ai', to: '/admin/ai-requests' },
-      { label: 'Plans & Features', icon: 'pi pi-box', to: '/admin/plans' },
+      { labelKey: 'sidebar.aiRequests', icon: 'pi pi-microchip-ai', to: '/admin/ai-requests' },
+      { labelKey: 'sidebar.plansFeatures', icon: 'pi pi-box', to: '/admin/plans' },
     ],
   },
   {
-    title: 'Finance',
+    titleKey: 'sidebar.finance',
     items: [
-      { label: 'Payments & Billing', icon: 'pi pi-credit-card', to: '/admin/payments' },
+      { labelKey: 'sidebar.paymentsBilling', icon: 'pi pi-credit-card', to: '/admin/payments' },
     ],
   },
   {
-    title: 'Support',
+    titleKey: 'sidebar.support',
     items: [
-      { label: 'Support Tickets', icon: 'pi pi-ticket', to: '/admin/support' },
-      { label: 'System Settings', icon: 'pi pi-cog', to: '/admin/settings' },
+      { labelKey: 'sidebar.supportTickets', icon: 'pi pi-ticket', to: '/admin/support' },
+      { labelKey: 'sidebar.systemSettings', icon: 'pi pi-cog', to: '/admin/settings' },
     ],
   },
 ]
@@ -84,7 +86,7 @@ const collapsed = computed(() => layout.sidebarCollapsed)
     <nav class="sidebar-nav">
       <div v-for="(group, gi) in navigation" :key="gi" class="nav-group">
         <div class="nav-group-title" v-show="!collapsed">
-          {{ group.title }}
+          {{ t(group.titleKey) }}
         </div>
         <div v-show="collapsed" class="nav-group-divider" v-if="gi > 0" />
 
@@ -94,19 +96,19 @@ const collapsed = computed(() => layout.sidebarCollapsed)
           :to="item.to"
           class="nav-item"
           :class="{ 'nav-item-active': isActive(item.to) }"
-          v-tooltip.right="collapsed ? item.label : undefined"
+          v-tooltip.right="collapsed ? t(item.labelKey) : undefined"
           @click="layout.closeMobileSidebar()"
         >
           <i :class="item.icon" class="nav-icon" />
-          <span class="nav-label" v-show="!collapsed">{{ item.label }}</span>
+          <span class="nav-label" v-show="!collapsed">{{ t(item.labelKey) }}</span>
         </router-link>
       </div>
     </nav>
 
     <div class="sidebar-footer" v-show="!collapsed">
       <div class="footer-version">
-        <i class="pi pi-bolt" style="font-size: 0.7rem" />
-        <span>Flash v1.0</span>
+        <img class="footer-logo" src="/klek-ai-mark.svg" alt="Klek AI" />
+        <span>Klek AI v1.0</span>
       </div>
     </div>
   </aside>
@@ -116,11 +118,11 @@ const collapsed = computed(() => layout.sidebarCollapsed)
 .sidebar {
   position: fixed;
   top: 52px;
-  left: 0;
+  inset-inline-start: 0;
   bottom: 0;
   width: 230px;
   background: var(--sidebar-bg, #ffffff);
-  border-right: 1px solid var(--sidebar-border, #e2e8f0);
+  border-inline-end: 1px solid var(--sidebar-border, #e2e8f0);
   display: flex;
   flex-direction: column;
   z-index: 90;
@@ -139,8 +141,11 @@ const collapsed = computed(() => layout.sidebarCollapsed)
     width: 250px;
     box-shadow: none;
   }
+  [dir="rtl"] .sidebar {
+    transform: translateX(100%);
+  }
   .sidebar-mobile-open {
-    transform: translateX(0);
+    transform: translateX(0) !important;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
   }
   .sidebar-collapsed {
@@ -276,6 +281,14 @@ const collapsed = computed(() => layout.sidebarCollapsed)
   font-size: 0.68rem;
   color: var(--text-muted, #94a3b8);
   font-weight: 500;
+}
+
+.footer-logo {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.4));
 }
 
 /* Fade transition for overlay */

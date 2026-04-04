@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getPlan, togglePlanActive, updateFeatureLimit } from '@/services/planService'
 import type { PlanDetail, PlanDetailFeatureItem } from '@/types/plans'
 import Dialog from 'primevue/dialog'
@@ -41,14 +42,15 @@ const actionLoading = ref(false)
 const savingFeatureId = ref<number | null>(null)
 const detail = ref<PlanDetail | null>(null)
 const featureDrafts = ref<FeatureDraft[]>([])
+const { t } = useI18n()
 
-const periodOptions = [
-  { label: 'Lifetime', value: 'lifetime' },
-  { label: 'Day', value: 'day' },
-  { label: 'Week', value: 'week' },
-  { label: 'Month', value: 'month' },
-  { label: 'Year', value: 'year' },
-] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>
+const periodOptions = computed(() => [
+  { label: t('planForm.lifetime'), value: 'lifetime' },
+  { label: t('planForm.day'), value: 'day' },
+  { label: t('planForm.week'), value: 'week' },
+  { label: t('planForm.month'), value: 'month' },
+  { label: t('planForm.year'), value: 'year' },
+] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>)
 
 watch(
   () => props.visible,
@@ -207,7 +209,7 @@ function buildMockPlan(planId: number): PlanDetail {
     recent_subscribers: [
       {
         id: 1,
-        user: { id: 11, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null },
+        user: { id: 11, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
         billing_cycle: 'monthly',
         status: 'active',
         price: 19,
@@ -217,7 +219,7 @@ function buildMockPlan(planId: number): PlanDetail {
       },
       {
         id: 2,
-        user: { id: 12, name: 'Omar Ali', email: 'omar@flash.io', avatar: null },
+        user: { id: 12, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null },
         billing_cycle: 'yearly',
         status: 'active',
         price: 190,
@@ -227,7 +229,7 @@ function buildMockPlan(planId: number): PlanDetail {
       },
       {
         id: 3,
-        user: { id: 13, name: 'Mona Khaled', email: 'mona@flash.io', avatar: null },
+        user: { id: 13, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null },
         billing_cycle: 'monthly',
         status: 'trialing',
         price: 0,
@@ -281,7 +283,7 @@ function subscriberStatusSeverity(status: string) {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="Plan Detail"
+    :header="t('planDetail.title')"
     :modal="true"
     position="right"
     :style="{ width: '620px', maxWidth: '95vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -298,12 +300,12 @@ function subscriberStatusSeverity(status: string) {
           <div>
             <div class="hero-title-row">
               <h2>{{ detail.name }}</h2>
-              <Tag :value="detail.is_active ? 'Active' : 'Inactive'" :severity="detail.is_active ? 'success' : 'secondary'" class="mini-tag" />
-              <Tag v-if="detail.is_featured" value="Featured" severity="warn" class="mini-tag" />
-              <Tag v-if="detail.is_free" value="Free" severity="info" class="mini-tag" />
+              <Tag :value="detail.is_active ? t('planDetail.active') : t('planDetail.inactive')" :severity="detail.is_active ? 'success' : 'secondary'" class="mini-tag" />
+              <Tag v-if="detail.is_featured" :value="t('planDetail.featured')" severity="warn" class="mini-tag" />
+              <Tag v-if="detail.is_free" :value="t('planDetail.free')" severity="info" class="mini-tag" />
             </div>
             <p class="hero-slug">{{ detail.slug }}</p>
-            <p class="hero-desc">{{ detail.description || 'No description provided.' }}</p>
+            <p class="hero-desc">{{ detail.description || t('planDetail.noDescription') }}</p>
           </div>
           <Button
             :icon="detail.is_active ? 'pi pi-pause' : 'pi pi-play'"
@@ -318,30 +320,30 @@ function subscriberStatusSeverity(status: string) {
 
         <div class="stat-grid">
           <article class="stat-card">
-            <span class="stat-k">Features</span>
+            <span class="stat-k">{{ t('planDetail.features') }}</span>
             <strong>{{ detail.stats.total_features }}</strong>
-            <small>{{ detail.stats.enabled_features }} enabled</small>
+            <small>{{ t('planDetail.enabledCount', { count: detail.stats.enabled_features }) }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Subscribers</span>
+            <span class="stat-k">{{ t('planDetail.subscribers') }}</span>
             <strong>{{ detail.stats.total_subscriptions }}</strong>
-            <small>{{ detail.stats.active_subscriptions }} active</small>
+            <small>{{ t('planDetail.activeCount', { count: detail.stats.active_subscriptions }) }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Monthly</span>
+            <span class="stat-k">{{ t('planDetail.monthly') }}</span>
             <strong>{{ formatMoney(detail.price_monthly, detail.currency) }}</strong>
-            <small>{{ detail.credits_monthly }} credits</small>
+            <small>{{ detail.credits_monthly }} {{ t('planDetail.credits') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Yearly</span>
+            <span class="stat-k">{{ t('planDetail.yearly') }}</span>
             <strong>{{ formatMoney(detail.price_yearly, detail.currency) }}</strong>
-            <small>{{ detail.credits_yearly }} credits</small>
+            <small>{{ detail.credits_yearly }} {{ t('planDetail.credits') }}</small>
           </article>
         </div>
 
         <div class="progress-block">
           <div class="progress-copy">
-            <span>Subscription Activity</span>
+            <span>{{ t('planDetail.subscriptionActivity') }}</span>
             <span>{{ detail.stats.active_subscriptions }}/{{ detail.stats.total_subscriptions }}</span>
           </div>
           <ProgressBar :value="Math.round((detail.stats.active_subscriptions / Math.max(detail.stats.total_subscriptions, 1)) * 100)" :showValue="false" style="height: 5px" />
@@ -350,14 +352,14 @@ function subscriberStatusSeverity(status: string) {
 
       <Tabs value="overview" class="drawer-tabs">
         <TabList>
-          <Tab value="overview">Overview</Tab>
-          <Tab value="features">Features</Tab>
-          <Tab value="subscribers">Subscribers</Tab>
+          <Tab value="overview">{{ t('planDetail.overview') }}</Tab>
+          <Tab value="features">{{ t('planDetail.featuresTab') }}</Tab>
+          <Tab value="subscribers">{{ t('planDetail.subscribersTab') }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="overview">
             <div class="section">
-              <h3 class="section-title">Feature Coverage</h3>
+              <h3 class="section-title">{{ t('planDetail.featureCoverage') }}</h3>
               <div class="type-grid">
                 <article v-for="group in detail.features_by_type" :key="group.type" class="type-card">
                   <div class="type-head">
@@ -368,7 +370,7 @@ function subscriberStatusSeverity(status: string) {
                     <div v-for="feature in group.features" :key="feature.id" class="type-item">
                       <span class="type-item-name">{{ feature.name }}</span>
                       <span class="type-item-meta">
-                        {{ feature.is_enabled ? 'Enabled' : 'Disabled' }}
+                        {{ feature.is_enabled ? t('planDetail.enabled') : t('planDetail.disabled') }}
                         <template v-if="feature.usage_limit !== null"> · {{ feature.usage_limit }}/{{ feature.limit_period || 'lifetime' }}</template>
                       </span>
                     </div>
@@ -378,10 +380,10 @@ function subscriberStatusSeverity(status: string) {
             </div>
 
             <div class="meta-section">
-              <div class="meta-row"><span>Trial Days</span><span>{{ detail.trial_days }}</span></div>
-              <div class="meta-row"><span>Sort Order</span><span>{{ detail.sort_order }}</span></div>
-              <div class="meta-row"><span>Created</span><span>{{ formatDate(detail.created_at) }}</span></div>
-              <div class="meta-row"><span>Updated</span><span>{{ formatDate(detail.updated_at) }}</span></div>
+              <div class="meta-row"><span>{{ t('planDetail.trialDays') }}</span><span>{{ detail.trial_days }}</span></div>
+              <div class="meta-row"><span>{{ t('planDetail.sortOrder') }}</span><span>{{ detail.sort_order }}</span></div>
+              <div class="meta-row"><span>{{ t('planDetail.created') }}</span><span>{{ formatDate(detail.created_at) }}</span></div>
+              <div class="meta-row"><span>{{ t('planDetail.updated') }}</span><span>{{ formatDate(detail.updated_at) }}</span></div>
             </div>
           </TabPanel>
 
@@ -395,27 +397,27 @@ function subscriberStatusSeverity(status: string) {
                   </div>
                   <label class="inline-toggle">
                     <Checkbox v-model="draft.is_enabled" :binary="true" />
-                    <span>Enabled</span>
+                    <span>{{ t('planDetail.enabled') }}</span>
                   </label>
                 </div>
 
                 <div class="edit-grid">
                   <div>
-                    <span class="mini-label">Usage Limit</span>
-                    <input v-model.number="draft.usage_limit" type="number" min="0" class="native-input" placeholder="Unlimited" />
+                    <span class="mini-label">{{ t('planDetail.usageLimit') }}</span>
+                    <input v-model.number="draft.usage_limit" type="number" min="0" class="native-input" :placeholder="t('planDetail.unlimitedPlaceholder')" />
                   </div>
                   <div>
-                    <span class="mini-label">Period</span>
+                    <span class="mini-label">{{ t('planDetail.period') }}</span>
                     <Select v-model="draft.limit_period" :options="periodOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
                   </div>
                   <div>
-                    <span class="mini-label">Credits / Use</span>
+                    <span class="mini-label">{{ t('planDetail.creditsPerUse') }}</span>
                     <input v-model.number="draft.credits_per_use" type="number" min="0" class="native-input" />
                   </div>
                 </div>
 
                 <div class="edit-footer">
-                  <Button label="Save Limit" size="small" :loading="savingFeatureId === draft.feature_id" @click="saveFeatureDraft(draft)" />
+                  <Button :label="t('planDetail.saveLimit')" size="small" :loading="savingFeatureId === draft.feature_id" @click="saveFeatureDraft(draft)" />
                 </div>
               </article>
             </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
@@ -11,6 +12,7 @@ const props = defineProps<{
   roleId: number | null
 }>()
 const emit = defineEmits<{ (e: 'update:visible', val: boolean): void }>()
+const { t } = useI18n()
 
 const loading = ref(false)
 const role = ref<RoleDetail | null>(null)
@@ -62,11 +64,11 @@ function loadMock() {
     permissions_count: 12,
     users_count: 5,
     recent_users: [
-      { id: 1, name: 'Omar Ali', email: 'omar@flash.io', avatar: null, status: 'active' },
-      { id: 2, name: 'Sara Ahmed', email: 'sara@flash.io', avatar: null, status: 'active' },
-      { id: 3, name: 'Karim Mostafa', email: 'karim@flash.io', avatar: null, status: 'suspended' },
-      { id: 4, name: 'Mona Khaled', email: 'mona@flash.io', avatar: null, status: 'active' },
-      { id: 5, name: 'Youssef Nabil', email: 'youssef@flash.io', avatar: null, status: 'active' },
+      { id: 1, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null, status: 'active' },
+      { id: 2, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null, status: 'active' },
+      { id: 3, name: 'Karim Mostafa', email: 'karim@klek.ai', avatar: null, status: 'suspended' },
+      { id: 4, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null, status: 'active' },
+      { id: 5, name: 'Youssef Nabil', email: 'youssef@klek.ai', avatar: null, status: 'active' },
     ],
   }
 }
@@ -99,7 +101,7 @@ function groupColor(group: string) {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="Role Detail"
+    :header="t('roleDetail.title')"
     :modal="true"
     position="right"
     :style="{ width: '520px', maxWidth: '95vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -120,7 +122,7 @@ function groupColor(group: string) {
           <h2>{{ role.name }}</h2>
           <span class="rh-slug">{{ role.slug }}</span>
         </div>
-        <Tag v-if="role.is_default" value="Default" severity="info" />
+        <Tag v-if="role.is_default" :value="t('common.default')" severity="info" />
       </div>
 
       <p class="rh-desc" v-if="role.description">{{ role.description }}</p>
@@ -130,23 +132,23 @@ function groupColor(group: string) {
         <div class="stat-box">
           <i class="pi pi-lock" />
           <span class="stat-num">{{ role.permissions_count }}</span>
-          <span class="stat-lbl">Permissions</span>
+          <span class="stat-lbl">{{ t('roleDetail.permissions') }}</span>
         </div>
         <div class="stat-box">
           <i class="pi pi-users" />
           <span class="stat-num">{{ role.users_count }}</span>
-          <span class="stat-lbl">Users</span>
+          <span class="stat-lbl">{{ t('roleDetail.users') }}</span>
         </div>
         <div class="stat-box">
           <i class="pi pi-calendar" />
           <span class="stat-num" style="font-size: 0.68rem">{{ fmtDate(role.created_at) }}</span>
-          <span class="stat-lbl">Created</span>
+          <span class="stat-lbl">{{ t('roleDetail.created') }}</span>
         </div>
       </div>
 
       <!-- Permissions Grouped -->
       <div class="section">
-        <h3 class="section-title">Permissions by Group</h3>
+        <h3 class="section-title">{{ t('roleDetail.permissionsByGroup') }}</h3>
         <div class="perm-groups">
           <div v-for="g in role.permissions_grouped" :key="g.group" class="pg-block">
             <div class="pg-head">
@@ -166,7 +168,7 @@ function groupColor(group: string) {
 
       <!-- Recent Users -->
       <div class="section">
-        <h3 class="section-title">Recent Users ({{ role.users_count }})</h3>
+        <h3 class="section-title">{{ t('roleDetail.recentUsers', { count: role.users_count }) }}</h3>
         <div class="user-list">
           <div v-for="u in role.recent_users" :key="u.id" class="user-row">
             <div class="ur-avatar">
@@ -184,9 +186,9 @@ function groupColor(group: string) {
 
       <!-- Meta -->
       <div class="meta-section">
-        <div class="meta-row"><span>ID</span><span>#{{ role.id }}</span></div>
-        <div class="meta-row"><span>Created</span><span>{{ fmtDate(role.created_at) }}</span></div>
-        <div class="meta-row"><span>Updated</span><span>{{ fmtDate(role.updated_at) }}</span></div>
+        <div class="meta-row"><span>{{ t('roleDetail.id') }}</span><span>#{{ role.id }}</span></div>
+        <div class="meta-row"><span>{{ t('common.created') }}</span><span>{{ fmtDate(role.created_at) }}</span></div>
+        <div class="meta-row"><span>{{ t('roleDetail.updated') }}</span><span>{{ fmtDate(role.updated_at) }}</span></div>
       </div>
     </div>
   </Dialog>

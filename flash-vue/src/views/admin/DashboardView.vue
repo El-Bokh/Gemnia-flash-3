@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getFullOverview } from '@/services/dashboardService'
 import type {
   DashboardOverview,
@@ -15,6 +16,8 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Skeleton from 'primevue/skeleton'
 import ProgressBar from 'primevue/progressbar'
+
+const { t } = useI18n()
 
 const loading = ref(true)
 const kpis = ref<DashboardKpis | null>(null)
@@ -109,14 +112,14 @@ const kpiCards = computed(() => {
   const k = kpis.value
   if (!k) return []
   return [
-    { label: 'Total Users', value: k.users.total, sub: `+${k.users.new_today} today`, icon: 'pi pi-users', color: '#6366f1' },
-    { label: 'Active Users', value: k.users.active, sub: `${k.users.suspended} suspended`, icon: 'pi pi-user-plus', color: '#10b981' },
-    { label: 'AI Completed', value: k.ai_requests_completed, sub: `${k.ai_requests_pending} pending`, icon: 'pi pi-microchip-ai', color: '#8b5cf6' },
-    { label: 'AI Failed', value: k.ai_requests_failed, sub: 'requests', icon: 'pi pi-exclamation-triangle', color: '#ef4444' },
-    { label: 'Images Today', value: k.images_generated_today, sub: `${k.images_generated_week} this week`, icon: 'pi pi-image', color: '#f59e0b' },
-    { label: 'Revenue Today', value: `$${k.revenue_today.total.toLocaleString()}`, sub: `${k.revenue_today.count} txns`, icon: 'pi pi-dollar', color: '#10b981' },
-    { label: 'Revenue Week', value: `$${k.revenue_week.total.toLocaleString()}`, sub: `${k.revenue_week.count} txns`, icon: 'pi pi-chart-line', color: '#06b6d4' },
-    { label: 'Pending Users', value: k.users.pending, sub: 'awaiting approval', icon: 'pi pi-clock', color: '#f97316' },
+    { label: t('dashboard.totalUsers'), value: k.users.total, sub: `+${k.users.new_today} ${t('common.today')}`, icon: 'pi pi-users', color: '#6366f1' },
+    { label: t('dashboard.activeUsers'), value: k.users.active, sub: `${k.users.suspended} ${t('common.suspended')}`, icon: 'pi pi-user-plus', color: '#10b981' },
+    { label: t('dashboard.aiCompleted'), value: k.ai_requests_completed, sub: `${k.ai_requests_pending} ${t('common.pending')}`, icon: 'pi pi-microchip-ai', color: '#8b5cf6' },
+    { label: t('dashboard.aiFailed'), value: k.ai_requests_failed, sub: t('common.requests'), icon: 'pi pi-exclamation-triangle', color: '#ef4444' },
+    { label: t('dashboard.imagesToday'), value: k.images_generated_today, sub: `${k.images_generated_week} ${t('common.thisWeek')}`, icon: 'pi pi-image', color: '#f59e0b' },
+    { label: t('dashboard.revenueToday'), value: `$${k.revenue_today.total.toLocaleString()}`, sub: `${k.revenue_today.count} ${t('common.txns')}`, icon: 'pi pi-dollar', color: '#10b981' },
+    { label: t('dashboard.revenueWeek'), value: `$${k.revenue_week.total.toLocaleString()}`, sub: `${k.revenue_week.count} ${t('common.txns')}`, icon: 'pi pi-chart-line', color: '#06b6d4' },
+    { label: t('dashboard.pendingUsers'), value: k.users.pending, sub: t('common.awaitingApproval'), icon: 'pi pi-clock', color: '#f97316' },
   ]
 })
 
@@ -131,7 +134,7 @@ const lineChartData = computed(() => {
   return {
     labels: items.map(i => i.date),
     datasets: [{
-      label: 'Images Generated',
+      label: t('dashboard.imagesGenerated'),
       data: items.map(i => i.count),
       fill: true,
       borderColor: '#8b5cf6',
@@ -182,7 +185,7 @@ const aiStatusData = computed(() => {
   if (!charts.value) return null
   const s = charts.value.ai_requests_by_status
   return {
-    labels: ['Pending', 'Processing', 'Completed', 'Failed'],
+    labels: [t('common.pending'), t('aiRequests.processing'), t('aiRequests.completed'), t('aiRequests.failed')],
     datasets: [{
       data: [s.pending || 0, s.processing || 0, s.completed || 0, s.failed || 0],
       backgroundColor: ['#f59e0b', '#06b6d4', '#10b981', '#ef4444'],
@@ -224,10 +227,10 @@ const alertBadges = computed(() => {
   if (!alerts.value) return []
   const a = alerts.value
   return [
-    { label: 'Failed Requests Today', value: a.failed_requests.count_today, icon: 'pi pi-times-circle', color: '#ef4444' },
-    { label: 'Pending Payments', value: a.pending_payments.count, icon: 'pi pi-clock', color: '#f59e0b' },
-    { label: 'Low Credit Users', value: a.system.low_credit_users, icon: 'pi pi-wallet', color: '#f97316' },
-    { label: 'Expiring Subscriptions', value: a.system.subscriptions_expiring, icon: 'pi pi-calendar-clock', color: '#8b5cf6' },
+    { label: t('dashboard.failedRequestsToday'), value: a.failed_requests.count_today, icon: 'pi pi-times-circle', color: '#ef4444' },
+    { label: t('dashboard.pendingPayments'), value: a.pending_payments.count, icon: 'pi pi-clock', color: '#f59e0b' },
+    { label: t('dashboard.lowCreditUsers'), value: a.system.low_credit_users, icon: 'pi pi-wallet', color: '#f97316' },
+    { label: t('dashboard.expiringSubscriptions'), value: a.system.subscriptions_expiring, icon: 'pi pi-calendar-clock', color: '#8b5cf6' },
   ]
 })
 
@@ -240,7 +243,7 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
   <div class="dash">
     <!-- Header -->
     <div class="dash-header">
-      <h1 class="dash-title">Dashboard</h1>
+      <h1 class="dash-title">{{ t('dashboard.title') }}</h1>
     </div>
 
     <!-- Skeleton loader -->
@@ -278,7 +281,7 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
         <div class="chart-card chart-wide">
           <div class="card-head">
             <i class="pi pi-chart-line card-head-icon" />
-            <span>Images — Last 7 Days</span>
+            <span>{{ t('dashboard.imagesLast7Days') }}</span>
           </div>
           <div class="chart-wrap chart-h-sm">
             <Chart v-if="lineChartData" type="line" :data="lineChartData" :options="lineChartOpts" />
@@ -289,7 +292,7 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
         <div class="chart-card">
           <div class="card-head">
             <i class="pi pi-chart-pie card-head-icon" />
-            <span>Subscriptions by Plan</span>
+            <span>{{ t('dashboard.subscriptionsByPlan') }}</span>
           </div>
           <div class="chart-wrap chart-h-sm">
             <Chart v-if="doughnutData" type="doughnut" :data="doughnutData" :options="doughnutOpts" />
@@ -303,7 +306,7 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
         <div class="chart-card">
           <div class="card-head">
             <i class="pi pi-microchip-ai card-head-icon" />
-            <span>AI Requests by Status</span>
+            <span>{{ t('dashboard.aiRequestsByStatus') }}</span>
           </div>
           <div class="chart-wrap chart-h-xs">
             <Chart v-if="aiStatusData" type="bar" :data="aiStatusData" :options="barChartOpts" />
@@ -314,7 +317,7 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
         <div class="chart-card chart-wide">
           <div class="card-head">
             <i class="pi pi-box card-head-icon" />
-            <span>Subscriptions per Plan</span>
+            <span>{{ t('dashboard.subscriptionsPerPlan') }}</span>
           </div>
           <div class="plan-table">
             <div v-for="plan in subPlans" :key="plan.id" class="plan-row">
@@ -327,8 +330,8 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
                 />
               </div>
               <div class="plan-counts">
-                <Tag :value="`${plan.active_count} active`" severity="success" class="plan-tag" />
-                <Tag v-if="plan.trial_count" :value="`${plan.trial_count} trial`" severity="warn" class="plan-tag" />
+                <Tag :value="`${plan.active_count} ${t('common.active')}`" severity="success" class="plan-tag" />
+                <Tag v-if="plan.trial_count" :value="`${plan.trial_count} ${t('common.trial')}`" severity="warn" class="plan-tag" />
                 <span class="plan-total">{{ plan.total_count }}</span>
               </div>
             </div>
@@ -351,10 +354,10 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
         <div class="table-card">
           <div class="card-head">
             <i class="pi pi-microchip-ai card-head-icon" />
-            <span>Recent AI Requests</span>
+            <span>{{ t('dashboard.recentAiRequests') }}</span>
           </div>
           <DataTable :value="recentAi" :rows="6" stripedRows size="small" scrollable scrollHeight="320px" class="dash-table">
-            <Column field="user" header="User" style="min-width: 120px">
+            <Column field="user" :header="t('common.user')" style="min-width: 120px">
               <template #body="{ data }">
                 <div class="user-cell">
                   <div class="user-avatar-sm" v-if="data.user">
@@ -364,27 +367,27 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
                 </div>
               </template>
             </Column>
-            <Column field="type" header="Type" style="min-width: 70px">
+            <Column field="type" :header="t('common.type')" style="min-width: 70px">
               <template #body="{ data }">
                 <span class="cell-mono">{{ data.type }}</span>
               </template>
             </Column>
-            <Column field="model" header="Model" style="min-width: 80px">
+            <Column field="model" :header="t('common.model')" style="min-width: 80px">
               <template #body="{ data }">
                 <span class="cell-mono">{{ data.model }}</span>
               </template>
             </Column>
-            <Column field="credits" header="Credits" style="min-width: 60px">
+            <Column field="credits" :header="t('common.credits')" style="min-width: 60px">
               <template #body="{ data }">
                 <span class="cell-num">{{ data.credits }}</span>
               </template>
             </Column>
-            <Column field="status" header="Status" style="min-width: 90px">
+            <Column field="status" :header="t('common.status')" style="min-width: 90px">
               <template #body="{ data }">
                 <Tag :value="data.status" :severity="statusSeverity(data.status)" class="cell-tag" />
               </template>
             </Column>
-            <Column field="date" header="Date" style="min-width: 130px">
+            <Column field="date" :header="t('common.date')" style="min-width: 130px">
               <template #body="{ data }">
                 <span class="cell-date">{{ formatDate(data.date) }}</span>
               </template>
@@ -396,10 +399,10 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
         <div class="table-card">
           <div class="card-head">
             <i class="pi pi-credit-card card-head-icon" />
-            <span>Recent Payments</span>
+            <span>{{ t('dashboard.recentPayments') }}</span>
           </div>
           <DataTable :value="recentPayments" :rows="6" stripedRows size="small" scrollable scrollHeight="320px" class="dash-table">
-            <Column field="user" header="User" style="min-width: 120px">
+            <Column field="user" :header="t('common.user')" style="min-width: 120px">
               <template #body="{ data }">
                 <div class="user-cell">
                   <div class="user-avatar-sm" v-if="data.user">
@@ -409,27 +412,27 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
                 </div>
               </template>
             </Column>
-            <Column field="plan" header="Plan" style="min-width: 80px">
+            <Column field="plan" :header="t('common.plan')" style="min-width: 80px">
               <template #body="{ data }">
                 <span class="cell-mono">{{ data.plan || '—' }}</span>
               </template>
             </Column>
-            <Column field="amount" header="Amount" style="min-width: 80px">
+            <Column field="amount" :header="t('common.amount')" style="min-width: 80px">
               <template #body="{ data }">
                 <span class="cell-num">${{ data.amount.toLocaleString() }}</span>
               </template>
             </Column>
-            <Column field="payment_method" header="Method" style="min-width: 80px">
+            <Column field="payment_method" :header="t('common.method')" style="min-width: 80px">
               <template #body="{ data }">
                 <span class="cell-mono">{{ data.payment_method }}</span>
               </template>
             </Column>
-            <Column field="status" header="Status" style="min-width: 90px">
+            <Column field="status" :header="t('common.status')" style="min-width: 90px">
               <template #body="{ data }">
                 <Tag :value="data.status" :severity="statusSeverity(data.status)" class="cell-tag" />
               </template>
             </Column>
-            <Column field="date" header="Date" style="min-width: 130px">
+            <Column field="date" :header="t('common.date')" style="min-width: 130px">
               <template #body="{ data }">
                 <span class="cell-date">{{ formatDate(data.date) }}</span>
               </template>
@@ -447,6 +450,8 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Header */
@@ -537,6 +542,8 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
   padding: 14px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .card-head {
@@ -556,6 +563,8 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
 .chart-wrap {
   flex: 1;
   position: relative;
+  min-width: 0;
+  overflow: hidden;
 }
 .chart-h-sm { height: 220px; }
 .chart-h-xs { height: 170px; }
@@ -659,6 +668,7 @@ const maxSubCount = computed(() => Math.max(...subPlans.value.map(p => p.total_c
   background: var(--card-bg);
   padding: 12px;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* DataTable overrides */

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
@@ -19,6 +20,7 @@ const props = defineProps<{
   userId: number | null
 }>()
 const emit = defineEmits<{ (e: 'update:visible', val: boolean): void }>()
+const { t } = useI18n()
 
 const loading = ref(false)
 const user = ref<UserDetail | null>(null)
@@ -46,7 +48,7 @@ function loadMockDetail() {
   user.value = {
     id: props.userId!,
     name: 'Sara Ahmed',
-    email: 'sara.ahmed@flash.io',
+    email: 'sara.ahmed@klek.ai',
     phone: '+20 1000000000',
     avatar: null,
     status: 'active',
@@ -131,7 +133,7 @@ function initials(name: string) {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="User Detail"
+    :header="t('userDetail.title')"
     :modal="true"
     position="right"
     :style="{ width: '580px', maxWidth: '95vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -158,46 +160,46 @@ function initials(name: string) {
             <Tag v-for="r in user.roles" :key="r.id" :value="r.name" severity="info" />
           </div>
         </div>
-        <Button icon="pi pi-key" severity="warn" text rounded size="small" @click="showResetPw = !showResetPw" v-tooltip.left="'Reset Password'" />
+        <Button icon="pi pi-key" severity="warn" text rounded size="small" @click="showResetPw = !showResetPw" v-tooltip.left="t('userDetail.resetPassword')" />
       </div>
 
       <!-- Reset Password Mini-form -->
       <div v-if="showResetPw" class="reset-pw-box">
         <div style="display: flex; gap: 6px">
-          <input v-model="rpForm.password" type="password" placeholder="New password" class="mini-input" />
-          <input v-model="rpForm.confirm" type="password" placeholder="Confirm" class="mini-input" />
+          <input v-model="rpForm.password" type="password" :placeholder="t('userDetail.newPassword')" class="mini-input" />
+          <input v-model="rpForm.confirm" type="password" :placeholder="t('userDetail.confirmPassword')" class="mini-input" />
         </div>
         <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px">
           <label style="font-size: 0.66rem; color: var(--text-muted)">
-            <input type="checkbox" v-model="rpForm.revoke" /> Revoke tokens
+            <input type="checkbox" v-model="rpForm.revoke" /> {{ t('userDetail.revokeTokens') }}
           </label>
-          <Button label="Reset" size="small" severity="warn" :loading="rpSaving" @click="handleResetPassword" style="margin-left: auto" />
+          <Button :label="t('userDetail.reset')" size="small" severity="warn" :loading="rpSaving" @click="handleResetPassword" style="margin-left: auto" />
         </div>
       </div>
 
       <!-- Quick Stats -->
       <div class="stats-bar">
         <div class="stat-item">
-          <span class="stat-label">AI Requests</span>
+          <span class="stat-label">{{ t('userDetail.aiRequests') }}</span>
           <span class="stat-val">{{ user.stats.ai_requests_total }}</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">Images</span>
+          <span class="stat-label">{{ t('userDetail.images') }}</span>
           <span class="stat-val">{{ user.stats.generated_images }}</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">Payments</span>
+          <span class="stat-label">{{ t('userDetail.payments') }}</span>
           <span class="stat-val">${{ user.stats.total_payments }}</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">Credits</span>
+          <span class="stat-label">{{ t('userDetail.credits') }}</span>
           <span class="stat-val">{{ user.stats.credit_balance }}</span>
         </div>
       </div>
 
       <!-- Subscription -->
       <div v-if="user.subscriptions.length" class="section">
-        <h3 class="section-title">Active Subscription</h3>
+        <h3 class="section-title">{{ t('userDetail.activeSubscription') }}</h3>
         <div class="sub-card" v-for="sub in user.subscriptions.slice(0, 2)" :key="sub.id">
           <div class="sub-row">
             <span class="sub-plan">{{ sub.plan?.name || 'Unknown' }}</span>
@@ -218,32 +220,32 @@ function initials(name: string) {
       <!-- Tabs: AI Requests, Images, Payments, Credits -->
       <Tabs value="ai" class="detail-tabs">
         <TabList>
-          <Tab value="ai">AI Requests</Tab>
-          <Tab value="images">Images</Tab>
-          <Tab value="payments">Payments</Tab>
-          <Tab value="credits">Credits</Tab>
+          <Tab value="ai">{{ t('userDetail.aiRequests') }}</Tab>
+          <Tab value="images">{{ t('userDetail.images') }}</Tab>
+          <Tab value="payments">{{ t('userDetail.payments') }}</Tab>
+          <Tab value="credits">{{ t('userDetail.credits') }}</Tab>
         </TabList>
         <TabPanels>
         <!-- AI Requests -->
         <TabPanel value="ai">
           <DataTable :value="user.recent_ai_requests" size="small" stripedRows class="detail-table">
-            <Column field="type" header="Type" style="min-width: 80px">
+            <Column field="type" :header="t('common.type')" style="min-width: 80px">
               <template #body="{ data }">
                 <span class="dt-text">{{ data.type }}</span>
               </template>
             </Column>
-            <Column field="status" header="Status" style="min-width: 60px">
+            <Column field="status" :header="t('common.status')" style="min-width: 60px">
               <template #body="{ data }">
                 <Tag :value="data.status" :severity="statusSev(data.status)" style="font-size: 0.58rem" />
               </template>
             </Column>
-            <Column field="model" header="Model" style="min-width: 70px">
+            <Column field="model" :header="t('common.model')" style="min-width: 70px">
               <template #body="{ data }"><span class="dt-text">{{ data.model }}</span></template>
             </Column>
-            <Column field="credits" header="Cr" style="min-width: 30px">
+            <Column field="credits" :header="t('userDetail.cr')" style="min-width: 30px">
               <template #body="{ data }"><span class="dt-num">{{ data.credits }}</span></template>
             </Column>
-            <Column field="created_at" header="Date" style="min-width: 80px">
+            <Column field="created_at" :header="t('common.date')" style="min-width: 80px">
               <template #body="{ data }"><span class="dt-date">{{ fmtDate(data.created_at) }}</span></template>
             </Column>
           </DataTable>
@@ -252,16 +254,16 @@ function initials(name: string) {
         <!-- Images -->
         <TabPanel value="images">
           <DataTable :value="user.recent_generated_images" size="small" stripedRows class="detail-table">
-            <Column field="file_name" header="File" style="min-width: 100px">
+            <Column field="file_name" :header="t('userDetail.file')" style="min-width: 100px">
               <template #body="{ data }"><span class="dt-text">{{ data.file_name }}</span></template>
             </Column>
-            <Column header="Size" style="min-width: 60px">
+            <Column :header="t('userDetail.size')" style="min-width: 60px">
               <template #body="{ data }"><span class="dt-text">{{ data.width }}×{{ data.height }}</span></template>
             </Column>
-            <Column header="Weight" style="min-width: 50px">
+            <Column :header="t('userDetail.weight')" style="min-width: 50px">
               <template #body="{ data }"><span class="dt-num">{{ fmtBytes(data.file_size) }}</span></template>
             </Column>
-            <Column field="created_at" header="Date" style="min-width: 80px">
+            <Column field="created_at" :header="t('common.date')" style="min-width: 80px">
               <template #body="{ data }"><span class="dt-date">{{ fmtDate(data.created_at) }}</span></template>
             </Column>
           </DataTable>
@@ -270,16 +272,16 @@ function initials(name: string) {
         <!-- Payments -->
         <TabPanel value="payments">
           <DataTable :value="user.recent_payments" size="small" stripedRows class="detail-table">
-            <Column field="amount" header="Amount" style="min-width: 60px">
+            <Column field="amount" :header="t('common.amount')" style="min-width: 60px">
               <template #body="{ data }"><span class="dt-num">${{ data.amount }}</span></template>
             </Column>
-            <Column field="status" header="Status" style="min-width: 60px">
+            <Column field="status" :header="t('common.status')" style="min-width: 60px">
               <template #body="{ data }"><Tag :value="data.status" :severity="statusSev(data.status)" style="font-size: 0.58rem" /></template>
             </Column>
-            <Column field="method" header="Method" style="min-width: 50px">
+            <Column field="method" :header="t('common.method')" style="min-width: 50px">
               <template #body="{ data }"><span class="dt-text">{{ data.method }}</span></template>
             </Column>
-            <Column field="paid_at" header="Date" style="min-width: 80px">
+            <Column field="paid_at" :header="t('common.date')" style="min-width: 80px">
               <template #body="{ data }"><span class="dt-date">{{ fmtDate(data.paid_at) }}</span></template>
             </Column>
           </DataTable>
@@ -287,22 +289,22 @@ function initials(name: string) {
 
         <!-- Credits -->
         <TabPanel value="credits">
-          <div class="credit-balance">Balance: <strong>{{ user.credit_ledger.balance }}</strong></div>
+          <div class="credit-balance">{{ t('userDetail.balance') }}: <strong>{{ user.credit_ledger.balance }}</strong></div>
           <DataTable :value="user.credit_ledger.recent" size="small" stripedRows class="detail-table">
-            <Column field="type" header="Type" style="min-width: 50px">
+            <Column field="type" :header="t('common.type')" style="min-width: 50px">
               <template #body="{ data }">
                 <Tag :value="data.type" :severity="data.type === 'credit' ? 'success' : 'danger'" style="font-size: 0.58rem" />
               </template>
             </Column>
-            <Column field="amount" header="Amount" style="min-width: 50px">
+            <Column field="amount" :header="t('common.amount')" style="min-width: 50px">
               <template #body="{ data }">
                 <span :class="data.amount > 0 ? 'dt-credit' : 'dt-debit'">{{ data.amount > 0 ? '+' : '' }}{{ data.amount }}</span>
               </template>
             </Column>
-            <Column field="source" header="Source" style="min-width: 70px">
+            <Column field="source" :header="t('userDetail.source')" style="min-width: 70px">
               <template #body="{ data }"><span class="dt-text">{{ data.source }}</span></template>
             </Column>
-            <Column field="created_at" header="Date" style="min-width: 80px">
+            <Column field="created_at" :header="t('common.date')" style="min-width: 80px">
               <template #body="{ data }"><span class="dt-date">{{ fmtDate(data.created_at) }}</span></template>
             </Column>
           </DataTable>
@@ -312,13 +314,13 @@ function initials(name: string) {
 
       <!-- Meta -->
       <div class="meta-section">
-        <div class="meta-row"><span>Phone</span><span>{{ user.phone || '—' }}</span></div>
-        <div class="meta-row"><span>Locale</span><span>{{ user.locale || '—' }}</span></div>
-        <div class="meta-row"><span>Timezone</span><span>{{ user.timezone || '—' }}</span></div>
-        <div class="meta-row"><span>Email Verified</span><span>{{ fmtDate(user.email_verified_at) }}</span></div>
-        <div class="meta-row"><span>Last Login</span><span>{{ fmtDate(user.last_login_at) }}</span></div>
-        <div class="meta-row"><span>Last IP</span><span>{{ user.last_login_ip || '—' }}</span></div>
-        <div class="meta-row"><span>Joined</span><span>{{ fmtDate(user.created_at) }}</span></div>
+        <div class="meta-row"><span>{{ t('userDetail.phone') }}</span><span>{{ user.phone || '—' }}</span></div>
+        <div class="meta-row"><span>{{ t('userDetail.locale') }}</span><span>{{ user.locale || '—' }}</span></div>
+        <div class="meta-row"><span>{{ t('userDetail.timezone') }}</span><span>{{ user.timezone || '—' }}</span></div>
+        <div class="meta-row"><span>{{ t('userDetail.emailVerified') }}</span><span>{{ fmtDate(user.email_verified_at) }}</span></div>
+        <div class="meta-row"><span>{{ t('userDetail.lastLogin') }}</span><span>{{ fmtDate(user.last_login_at) }}</span></div>
+        <div class="meta-row"><span>{{ t('userDetail.lastIp') }}</span><span>{{ user.last_login_ip || '—' }}</span></div>
+        <div class="meta-row"><span>{{ t('userDetail.joined') }}</span><span>{{ fmtDate(user.created_at) }}</span></div>
       </div>
     </div>
   </Dialog>

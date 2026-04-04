@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { assignFeatureToPlans, getFeature, toggleFeatureActive } from '@/services/featureService'
 import { getPlans } from '@/services/planService'
 import type { Feature, FeaturePlanItem, Plan } from '@/types/plans'
@@ -39,6 +40,7 @@ const emit = defineEmits<{
   (e: 'updated'): void
 }>()
 
+const { t } = useI18n()
 const loading = ref(false)
 const savingAssignments = ref(false)
 const actionLoading = ref(false)
@@ -46,13 +48,13 @@ const detail = ref<Feature | null>(null)
 const availablePlans = ref<Plan[]>([])
 const assignments = ref<PlanDraft[]>([])
 
-const periodOptions = [
-  { label: 'Lifetime', value: 'lifetime' },
-  { label: 'Day', value: 'day' },
-  { label: 'Week', value: 'week' },
-  { label: 'Month', value: 'month' },
-  { label: 'Year', value: 'year' },
-] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>
+const periodOptions = computed(() => [
+  { label: t('planDetail.lifetime'), value: 'lifetime' },
+  { label: t('planDetail.day'), value: 'day' },
+  { label: t('planDetail.week'), value: 'week' },
+  { label: t('planDetail.month'), value: 'month' },
+  { label: t('planDetail.year'), value: 'year' },
+] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>)
 
 watch(
   () => props.visible,
@@ -218,7 +220,7 @@ function formatMoney(amount: number) {
   <Dialog
     :visible="visible"
     @update:visible="close"
-    header="Feature Detail"
+    :header="t('featureDetail.featureDetail')"
     :modal="true"
     position="right"
     :style="{ width: '620px', maxWidth: '95vw', height: '100vh', margin: 0, borderRadius: 0 }"
@@ -235,11 +237,11 @@ function formatMoney(amount: number) {
           <div>
             <div class="hero-title-row">
               <h2>{{ detail.name }}</h2>
-              <Tag :value="detail.is_active ? 'Active' : 'Inactive'" :severity="detail.is_active ? 'success' : 'secondary'" class="mini-tag" />
+              <Tag :value="detail.is_active ? t('common.active') : t('common.inactive')" :severity="detail.is_active ? 'success' : 'secondary'" class="mini-tag" />
               <Tag :value="featureTypeLabel(detail.type)" class="mini-tag" :style="{ background: `${featureTypeColor(detail.type)}16`, color: featureTypeColor(detail.type), borderColor: `${featureTypeColor(detail.type)}24` }" />
             </div>
             <p class="hero-slug">{{ detail.slug }}</p>
-            <p class="hero-desc">{{ detail.description || 'No description provided.' }}</p>
+            <p class="hero-desc">{{ detail.description || t('featureDetail.noDescription') }}</p>
           </div>
           <Button
             :icon="detail.is_active ? 'pi pi-pause' : 'pi pi-play'"
@@ -254,32 +256,32 @@ function formatMoney(amount: number) {
 
         <div class="stat-grid">
           <article class="stat-card">
-            <span class="stat-k">Plans</span>
+            <span class="stat-k">{{ t('featureDetail.plans') }}</span>
             <strong>{{ detail.plans_count ?? detail.plans?.length ?? 0 }}</strong>
-            <small>Assigned plans</small>
+            <small>{{ t('featureDetail.assignedPlans') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Active Plans</span>
+            <span class="stat-k">{{ t('featureDetail.activePlans') }}</span>
             <strong>{{ assignments.filter(item => item.selected && item.is_active).length }}</strong>
-            <small>Current active coverage</small>
+            <small>{{ t('featureDetail.currentActiveCoverage') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Sort</span>
+            <span class="stat-k">{{ t('featureDetail.sort') }}</span>
             <strong>{{ detail.sort_order }}</strong>
-            <small>Order index</small>
+            <small>{{ t('featureDetail.orderIndex') }}</small>
           </article>
           <article class="stat-card">
-            <span class="stat-k">Updated</span>
+            <span class="stat-k">{{ t('featureDetail.updated') }}</span>
             <strong>{{ formatDate(detail.updated_at) }}</strong>
-            <small>Last change</small>
+            <small>{{ t('featureDetail.lastChange') }}</small>
           </article>
         </div>
       </div>
 
       <Tabs value="overview" class="drawer-tabs">
         <TabList>
-          <Tab value="overview">Overview</Tab>
-          <Tab value="assignments">Assignments</Tab>
+          <Tab value="overview">{{ t('featureDetail.overview') }}</Tab>
+          <Tab value="assignments">{{ t('featureDetail.assignments') }}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel value="overview">
@@ -290,10 +292,10 @@ function formatMoney(amount: number) {
                   <span class="plan-slug">{{ plan.slug }}</span>
                 </div>
                 <div class="plan-meta">
-                  <Tag :value="plan.is_enabled ? 'Enabled' : 'Disabled'" :severity="plan.is_enabled ? 'success' : 'secondary'" class="mini-tag" />
+                  <Tag :value="plan.is_enabled ? t('featureDetail.enabled') : t('featureDetail.disabled')" :severity="plan.is_enabled ? 'success' : 'secondary'" class="mini-tag" />
                   <span class="plan-note">
-                    <template v-if="plan.usage_limit !== null">{{ plan.usage_limit }}/{{ plan.limit_period || 'lifetime' }}</template>
-                    <template v-else>Unlimited</template>
+                    <template v-if="plan.usage_limit !== null">{{ plan.usage_limit }}/{{ plan.limit_period || t('planDetail.lifetime') }}</template>
+                    <template v-else>{{ t('featureDetail.unlimited') }}</template>
                     <template v-if="plan.credits_per_use"> · {{ plan.credits_per_use }} cr/use</template>
                   </span>
                 </div>
@@ -304,10 +306,10 @@ function formatMoney(amount: number) {
           <TabPanel value="assignments">
             <div class="assign-head">
               <div>
-                <h3 class="section-title">Plan Assignments</h3>
-                <p class="section-copy">Link this feature to plans and control its usage rules.</p>
+                <h3 class="section-title">{{ t('featureDetail.planAssignments') }}</h3>
+                <p class="section-copy">{{ t('featureDetail.planAssignmentsDesc') }}</p>
               </div>
-              <Button label="Save All" size="small" :loading="savingAssignments" @click="saveAssignments" />
+              <Button :label="t('featureDetail.saveAll')" size="small" :loading="savingAssignments" @click="saveAssignments" />
             </div>
 
             <div class="assignment-grid">
@@ -325,20 +327,20 @@ function formatMoney(amount: number) {
                 <div v-if="draft.selected" class="assignment-body">
                   <label class="inline-toggle compact">
                     <Checkbox v-model="draft.is_enabled" :binary="true" />
-                    <span>Enabled in plan</span>
+                    <span>{{ t('featureDetail.enabledInPlan') }}</span>
                   </label>
 
                   <div class="edit-grid">
                     <div>
-                      <span class="mini-label">Usage Limit</span>
-                      <input v-model.number="draft.usage_limit" type="number" min="0" class="native-input" placeholder="Unlimited" />
+                      <span class="mini-label">{{ t('planDetail.usageLimit') }}</span>
+                      <input v-model.number="draft.usage_limit" type="number" min="0" class="native-input" :placeholder="t('featureDetail.unlimited')" />
                     </div>
                     <div>
-                      <span class="mini-label">Period</span>
+                      <span class="mini-label">{{ t('planDetail.period') }}</span>
                       <Select v-model="draft.limit_period" :options="periodOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
                     </div>
                     <div>
-                      <span class="mini-label">Credits / Use</span>
+                      <span class="mini-label">{{ t('planDetail.creditsPerUse') }}</span>
                       <input v-model.number="draft.credits_per_use" type="number" min="0" class="native-input" />
                     </div>
                   </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getFeatures } from '@/services/featureService'
 import { createPlan, getPlan, syncFeatures, updatePlan } from '@/services/planService'
 import type { Feature, Plan, StorePlanFeaturePayload, StorePlanPayload, UpdatePlanPayload } from '@/types/plans'
@@ -40,14 +41,15 @@ const loadingDetail = ref(false)
 const errors = ref<Record<string, string>>({})
 const availableFeatures = ref<Feature[]>([])
 const featureDrafts = ref<EditableFeatureDraft[]>([])
+const { t } = useI18n()
 
-const periodOptions = [
-  { label: 'Lifetime', value: 'lifetime' },
-  { label: 'Day', value: 'day' },
-  { label: 'Week', value: 'week' },
-  { label: 'Month', value: 'month' },
-  { label: 'Year', value: 'year' },
-] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>
+const periodOptions = computed(() => [
+  { label: t('planForm.lifetime'), value: 'lifetime' },
+  { label: t('planForm.day'), value: 'day' },
+  { label: t('planForm.week'), value: 'week' },
+  { label: t('planForm.month'), value: 'month' },
+  { label: t('planForm.year'), value: 'year' },
+] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>)
 
 const form = ref({
   name: '',
@@ -212,12 +214,12 @@ async function save() {
   errors.value = {}
 
   if (!form.value.name.trim()) {
-    errors.value.name = 'Name is required'
+    errors.value.name = t('planForm.nameRequired')
     return
   }
 
   if (!form.value.slug.trim()) {
-    errors.value.slug = 'Slug is required'
+    errors.value.slug = t('planForm.slugRequired')
     return
   }
 
@@ -275,78 +277,78 @@ function close() {
 </script>
 
 <template>
-  <Dialog :visible="visible" @update:visible="close" :header="isEdit ? 'Edit Plan' : 'Create Plan'" :modal="true" :style="{ width: '760px', maxWidth: '95vw' }" :draggable="false" class="plan-form-dialog">
+  <Dialog :visible="visible" @update:visible="close" :header="isEdit ? t('planForm.editPlan') : t('planForm.createPlan')" :modal="true" :style="{ width: '760px', maxWidth: '95vw' }" :draggable="false" class="plan-form-dialog">
     <div class="form-grid">
       <div class="form-field">
-        <label>Name <span class="req">*</span></label>
-        <InputText v-model="form.name" size="small" placeholder="Plan name" class="w-full" :class="{ 'p-invalid': errors.name }" />
+        <label>{{ t('common.name') }} <span class="req">*</span></label>
+        <InputText v-model="form.name" size="small" :placeholder="t('planForm.planName')" class="w-full" :class="{ 'p-invalid': errors.name }" />
         <small v-if="errors.name" class="field-error">{{ errors.name }}</small>
       </div>
 
       <div class="form-field">
         <label>Slug <span class="req">*</span></label>
-        <InputText v-model="form.slug" size="small" placeholder="plan-slug" class="w-full" :class="{ 'p-invalid': errors.slug }" />
+        <InputText v-model="form.slug" size="small" :placeholder="t('planForm.planSlug')" class="w-full" :class="{ 'p-invalid': errors.slug }" />
         <small v-if="errors.slug" class="field-error">{{ errors.slug }}</small>
       </div>
 
       <div class="form-field form-field-full">
-        <label>Description</label>
-        <Textarea v-model="form.description" rows="2" autoResize class="w-full" placeholder="Compact plan description" />
+        <label>{{ t('common.description') }}</label>
+        <Textarea v-model="form.description" rows="2" autoResize class="w-full" :placeholder="t('planForm.descriptionPlaceholder')" />
       </div>
 
       <div class="form-field">
-        <label>Monthly Price</label>
+        <label>{{ t('planForm.monthlyPrice') }}</label>
         <input v-model.number="form.price_monthly" type="number" min="0" step="0.01" class="native-input" />
       </div>
 
       <div class="form-field">
-        <label>Yearly Price</label>
+        <label>{{ t('planForm.yearlyPrice') }}</label>
         <input v-model.number="form.price_yearly" type="number" min="0" step="0.01" class="native-input" />
       </div>
 
       <div class="form-field">
-        <label>Monthly Credits</label>
+        <label>{{ t('planForm.monthlyCredits') }}</label>
         <input v-model.number="form.credits_monthly" type="number" min="0" class="native-input" />
       </div>
 
       <div class="form-field">
-        <label>Yearly Credits</label>
+        <label>{{ t('planForm.yearlyCredits') }}</label>
         <input v-model.number="form.credits_yearly" type="number" min="0" class="native-input" />
       </div>
 
       <div class="form-field">
-        <label>Currency</label>
+        <label>{{ t('planForm.currency') }}</label>
         <InputText v-model="form.currency" size="small" placeholder="USD" class="w-full" />
       </div>
 
       <div class="form-field">
-        <label>Trial Days</label>
+        <label>{{ t('planForm.trialDays') }}</label>
         <input v-model.number="form.trial_days" type="number" min="0" class="native-input" />
       </div>
 
       <div class="form-field">
-        <label>Sort Order</label>
+        <label>{{ t('planForm.sortOrder') }}</label>
         <input v-model.number="form.sort_order" type="number" min="0" class="native-input" />
       </div>
 
       <div class="toggles-row form-field-full">
-        <label class="toggle-item"><Checkbox v-model="form.is_free" :binary="true" /> <span>Free plan</span></label>
-        <label class="toggle-item"><Checkbox v-model="form.is_active" :binary="true" /> <span>Active</span></label>
-        <label class="toggle-item"><Checkbox v-model="form.is_featured" :binary="true" /> <span>Featured</span></label>
+        <label class="toggle-item"><Checkbox v-model="form.is_free" :binary="true" /> <span>{{ t('planForm.freePlan') }}</span></label>
+        <label class="toggle-item"><Checkbox v-model="form.is_active" :binary="true" /> <span>{{ t('planForm.activePlan') }}</span></label>
+        <label class="toggle-item"><Checkbox v-model="form.is_featured" :binary="true" /> <span>{{ t('planForm.featuredPlan') }}</span></label>
       </div>
     </div>
 
     <div class="feature-section">
       <div class="section-head">
         <div>
-          <h3>Feature Access</h3>
-          <p>Assign enabled features and usage limits per plan.</p>
+          <h3>{{ t('planForm.featureAccess') }}</h3>
+          <p>{{ t('planForm.featureAccessDesc') }}</p>
         </div>
-        <Tag :value="`${featureDrafts.filter(feature => feature.selected).length} selected`" severity="info" />
+        <Tag :value="t('planForm.selectedCount', { count: featureDrafts.filter(feature => feature.selected).length })" severity="info" />
       </div>
 
       <div v-if="loadingDetail" class="section-loading">
-        <i class="pi pi-spin pi-spinner" /> Loading plan details…
+        <i class="pi pi-spin pi-spinner" /> {{ t('planForm.loadingDetails') }}
       </div>
 
       <div v-else class="feature-grid">
@@ -360,18 +362,18 @@ function close() {
           </div>
 
           <div class="feature-config" v-if="draft.selected">
-            <label class="toggle-item compact"><Checkbox v-model="draft.is_enabled" :binary="true" /> <span>Enabled in plan</span></label>
+            <label class="toggle-item compact"><Checkbox v-model="draft.is_enabled" :binary="true" /> <span>{{ t('planForm.enabledInPlan') }}</span></label>
             <div class="feature-config-grid">
               <div>
-                <span class="mini-label">Usage Limit</span>
-                <input v-model.number="draft.usage_limit" type="number" min="0" class="native-input small" placeholder="Unlimited" />
+                <span class="mini-label">{{ t('planForm.usageLimit') }}</span>
+                <input v-model.number="draft.usage_limit" type="number" min="0" class="native-input small" :placeholder="t('planForm.unlimitedPlaceholder')" />
               </div>
               <div>
-                <span class="mini-label">Period</span>
+                <span class="mini-label">{{ t('planForm.period') }}</span>
                 <Select v-model="draft.limit_period" :options="periodOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
               </div>
               <div>
-                <span class="mini-label">Credits / Use</span>
+                <span class="mini-label">{{ t('planForm.creditsPerUse') }}</span>
                 <input v-model.number="draft.credits_per_use" type="number" min="0" class="native-input small" />
               </div>
             </div>
@@ -381,8 +383,8 @@ function close() {
     </div>
 
     <template #footer>
-      <Button label="Cancel" severity="secondary" text size="small" @click="close" />
-      <Button :label="isEdit ? 'Update Plan' : 'Create Plan'" size="small" :loading="saving" @click="save" />
+      <Button :label="t('common.cancel')" severity="secondary" text size="small" @click="close" />
+      <Button :label="isEdit ? t('planForm.updatePlan') : t('planForm.createPlan')" size="small" :loading="saving" @click="save" />
     </template>
   </Dialog>
 </template>

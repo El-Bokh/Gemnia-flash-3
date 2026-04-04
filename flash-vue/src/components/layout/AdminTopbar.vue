@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
 import Button from 'primevue/button'
@@ -9,24 +10,25 @@ import Popover from 'primevue/popover'
 
 const layout = useLayoutStore()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const profileMenu = ref()
 const notifPanel = ref()
 
-const profileItems = ref([
+const profileItems = computed(() => [
   {
-    label: 'Profile',
+    label: t('topbar.profile'),
     icon: 'pi pi-user',
     command: () => {},
   },
   {
-    label: 'Settings',
+    label: t('topbar.settings'),
     icon: 'pi pi-cog',
     command: () => {},
   },
   { separator: true },
   {
-    label: 'Logout',
+    label: t('topbar.logout'),
     icon: 'pi pi-sign-out',
     command: () => auth.logout(),
   },
@@ -76,8 +78,8 @@ function toggleNotifications(event: Event) {
       />
 
       <div class="topbar-brand">
-        <img class="brand-logo" src="/flash-ai-mark.svg" alt="Flash AI" />
-        <span class="brand-text">Flash AI</span>
+        <img class="brand-logo" src="/klek-ai-mark.svg" alt="Klek AI" />
+        <span class="brand-text">Klek AI</span>
       </div>
     </div>
 
@@ -85,7 +87,7 @@ function toggleNotifications(event: Event) {
       <!-- System Status -->
       <div class="status-indicator" :class="apiOnline ? 'status-online' : 'status-offline'">
         <span class="status-dot" />
-        <span class="status-label">{{ apiOnline ? 'API Online' : 'API Down' }}</span>
+        <span class="status-label">{{ apiOnline ? t('topbar.apiOnline') : t('topbar.apiDown') }}</span>
       </div>
 
       <!-- Language Switcher -->
@@ -113,7 +115,7 @@ function toggleNotifications(event: Event) {
         rounded
         class="topbar-btn"
         @click="layout.toggleDarkMode()"
-        v-tooltip.bottom="layout.darkMode ? 'Light Mode' : 'Dark Mode'"
+        v-tooltip.bottom="layout.darkMode ? t('topbar.lightMode') : t('topbar.darkMode')"
         aria-label="Toggle dark mode"
       />
 
@@ -135,8 +137,8 @@ function toggleNotifications(event: Event) {
 
       <Popover ref="notifPanel" class="notif-panel">
         <div class="notif-header">
-          <span class="notif-title">Notifications</span>
-          <span class="notif-count">{{ unreadCount }} new</span>
+          <span class="notif-title">{{ t('topbar.notifications') }}</span>
+          <span class="notif-count">{{ unreadCount }} {{ t('common.new') }}</span>
         </div>
         <ul class="notif-list">
           <li
@@ -168,7 +170,7 @@ function toggleNotifications(event: Event) {
         </div>
         <div class="profile-info">
           <span class="profile-name">{{ auth.user.name }}</span>
-          <span class="profile-role">{{ auth.user.role }}</span>
+          <span class="profile-role">{{ auth.user.roles?.[0] || 'Admin' }}</span>
         </div>
         <i class="pi pi-chevron-down profile-chevron" />
       </div>
@@ -223,11 +225,16 @@ function toggleNotifications(event: Event) {
 }
 
 .brand-logo {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: block;
   flex-shrink: 0;
-  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.22));
+  filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.45)) drop-shadow(0 0 4px rgba(167, 139, 250, 0.35));
+  animation: topbar-logo-glow 3s ease-in-out infinite;
+}
+@keyframes topbar-logo-glow {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.45)) drop-shadow(0 0 4px rgba(167, 139, 250, 0.35)); }
+  50% { filter: drop-shadow(0 0 18px rgba(129, 140, 248, 0.65)) drop-shadow(0 0 8px rgba(167, 139, 250, 0.5)); }
 }
 
 .brand-text {

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
+import router from '@/router'
 
 // ─── Base API Configuration ─────────────────────────────────
 
@@ -37,7 +38,10 @@ apiClient.interceptors.response.use(
 
       if (status === 401) {
         localStorage.removeItem('auth_token')
-        window.location.href = '/login'
+        // Only redirect if not already on the login page
+        if (router.currentRoute.value.name !== 'login') {
+          void router.replace({ name: 'login' })
+        }
       }
 
       if (status === 403) {
