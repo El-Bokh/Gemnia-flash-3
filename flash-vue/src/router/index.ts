@@ -1,11 +1,41 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import AdminLayout from '@/layouts/AdminLayout.vue'
+import ClientLayout from '@/layouts/ClientLayout.vue'
 
 const routes: RouteRecordRaw[] = [
+  // ── Client (public) ──────────────────────────
+  {
+    path: '/',
+    component: ClientLayout,
+    children: [
+      {
+        path: '',
+        name: 'home',
+        component: () => import('@/views/client/HomeView.vue'),
+      },
+      {
+        path: 'pricing',
+        name: 'pricing',
+        component: () => import('@/views/client/PricingView.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'profile',
+        component: () => import('@/views/client/ProfileView.vue'),
+        meta: { requiresAuth: true },
+      },
+    ],
+  },
   {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
+    meta: { guest: true },
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
     meta: { guest: true },
   },
   {
@@ -63,12 +93,8 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
-    path: '/',
-    redirect: '/admin',
-  },
-  {
     path: '/:pathMatch(.*)*',
-    redirect: '/admin',
+    redirect: '/',
   },
 ]
 

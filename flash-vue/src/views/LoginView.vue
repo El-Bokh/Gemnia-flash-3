@@ -135,7 +135,8 @@ async function handleLogin() {
 
         <!-- Footer -->
         <div class="login-footer">
-          <span>{{ t('login.adminAccessOnly') }}</span>
+          <span>{{ t('login.noAccount') }}</span>
+          <router-link :to="{ name: 'register' }" class="footer-link">{{ t('login.createAccount') }}</router-link>
         </div>
       </div>
 
@@ -344,11 +345,23 @@ async function handleLogin() {
   text-align: center;
   padding-top: 4px;
   border-top: 1px solid var(--card-border, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 .login-footer span {
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   color: var(--text-muted, #94a3b8);
-  letter-spacing: 0.02em;
+}
+.login-footer .footer-link {
+  font-size: 0.72rem;
+  color: var(--active-color);
+  font-weight: 600;
+  text-decoration: none;
+}
+.login-footer .footer-link:hover {
+  text-decoration: underline;
 }
 
 /* ── Info banner ────────────────────────────── */
