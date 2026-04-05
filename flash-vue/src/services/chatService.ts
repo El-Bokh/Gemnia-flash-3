@@ -53,11 +53,12 @@ export function deleteConversation(id: number) {
   return apiDelete<ApiResponse<null>>(`/conversations/${id}`)
 }
 
-export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File) {
+export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File, mode?: 'text' | 'image') {
   if (image) {
     const form = new FormData()
     form.append('content', content)
     if (imageStyle) form.append('image_style', imageStyle)
+    if (mode) form.append('mode', mode)
     form.append('image', image)
     return apiPost<ApiResponse<SendMessageResponse>>(
       `/conversations/${conversationId}/messages`,
@@ -67,7 +68,7 @@ export function sendMessage(conversationId: number, content: string, imageStyle?
   }
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,
-    { content, image_style: imageStyle },
+    { content, image_style: imageStyle, mode: mode ?? 'text' },
   )
 }
 

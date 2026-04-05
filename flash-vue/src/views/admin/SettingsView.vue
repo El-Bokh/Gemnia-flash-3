@@ -227,7 +227,8 @@ async function handleTestIntegration(type: AiIntegrationType) {
 function settingLabel(key: string): string {
   const map: Record<string, string> = {
     gemini_api_key: t('settings.apiKey'),
-    gemini_model: t('settings.model'),
+    gemini_text_model: t('settings.textModel'),
+    gemini_image_model: t('settings.imageModel'),
   }
   return map[key] || key
 }

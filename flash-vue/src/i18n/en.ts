@@ -881,6 +881,8 @@ export default {
     gemini: 'Google Gemini',
     apiKey: 'API Key',
     model: 'Model',
+    textModel: 'Text Model',
+    imageModel: 'Image Model',
     testConnection: 'Test Connection',
     testing: 'Testing...',
     connectionSuccess: 'Connection successful',
@@ -1078,6 +1080,10 @@ export default {
     imageStyles: 'Image Styles',
     selectStyle: 'Choose a Style',
     imageUploaded: 'Image uploaded',
+    modeText: 'Text',
+    modeImage: 'Image',
+    switchToImage: 'Switch to image generation mode',
+    switchToText: 'Switch to text chat mode',
   },
 
   // ── Quota / Subscription ─────────────────────────────────

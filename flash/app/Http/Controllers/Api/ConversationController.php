@@ -141,7 +141,10 @@ class ConversationController extends Controller
             'content'     => ['required', 'string', 'max:5000'],
             'image_style' => ['nullable', 'string', 'max:100'],
             'image'       => ['nullable', 'image', 'max:10240'], // 10MB
+            'mode'        => ['nullable', 'string', 'in:text,image'],
         ]);
+
+        $mode = $data['mode'] ?? 'text';
 
         // Handle uploaded image
         $imageUrl = null;
@@ -229,7 +232,7 @@ class ConversationController extends Controller
             ];
         }
 
-        $gemini = new GeminiService();
+        $gemini = new GeminiService($mode);
         $startedAt = now();
         $result = $gemini->chatWithParts($history, $currentParts);
         $completedAt = now();
@@ -240,7 +243,7 @@ class ConversationController extends Controller
             'user_id'          => $request->user()->id,
             'subscription_id'  => $consumption['subscription']?->id,
             'visual_style_id'  => isset($style) ? $style->id : null,
-            'type'             => $imageBase64 ? 'multimodal' : ($styleSlug ? 'styled_chat' : 'chat'),
+            'type'             => $imageBase64 ? 'multimodal' : ($mode === 'image' ? 'text_to_image' : ($styleSlug ? 'styled_chat' : 'chat')),
             'status'           => $result['success'] ? 'completed' : 'failed',
             'user_prompt'      => $userContent,
             'processed_prompt' => $geminiPrompt !== $userContent ? $geminiPrompt : null,

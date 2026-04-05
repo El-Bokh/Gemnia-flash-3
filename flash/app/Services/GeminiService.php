@@ -9,21 +9,30 @@ use Illuminate\Support\Facades\Log;
 class GeminiService
 {
     protected string $apiKey;
-    protected string $model;
+    protected string $textModel;
+    protected string $imageModel;
+    protected string $activeModel;
+    protected string $mode; // 'text' or 'image'
 
-    public function __construct()
+    public function __construct(string $mode = 'text')
     {
         $this->apiKey = Setting::getValue('gemini_api_key', '');
-        $configuredModel = Setting::getValue('gemini_model', 'gemini-3.1-flash-image-preview');
 
-        $this->model = empty($configuredModel)
-            ? 'gemini-3.1-flash-image-preview'
-            : $configuredModel;
+        $this->textModel = Setting::getValue('gemini_text_model', 'gemini-2.5-flash');
+        $this->imageModel = Setting::getValue('gemini_image_model', 'gemini-3.1-flash-image-preview');
+
+        $this->mode = in_array($mode, ['text', 'image']) ? $mode : 'text';
+        $this->activeModel = $this->mode === 'image' ? $this->imageModel : $this->textModel;
     }
 
     public function getModel(): string
     {
-        return $this->model;
+        return $this->activeModel;
+    }
+
+    public function getMode(): string
+    {
+        return $this->mode;
     }
 
     /**
@@ -68,16 +77,24 @@ class GeminiService
             'parts' => $currentParts,
         ];
 
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->activeModel}:generateContent?key={$this->apiKey}";
+
+        // Build generation config based on mode
+        $generationConfig = [
+            'temperature'     => 0.7,
+            'maxOutputTokens' => 8192,
+        ];
+
+        if ($this->mode === 'image') {
+            $generationConfig['responseModalities'] = ['Text', 'Image'];
+        }
+
+        $timeout = $this->mode === 'image' ? 120 : 60;
 
         try {
-            $response = Http::timeout(120)->post($url, [
+            $response = Http::timeout($timeout)->post($url, [
                 'contents'         => $contents,
-                'generationConfig' => [
-                    'temperature'      => 0.7,
-                    'maxOutputTokens'  => 8192,
-                    'responseModalities' => ['Text', 'Image'],
-                ],
+                'generationConfig' => $generationConfig,
             ]);
 
             if (! $response->successful()) {
@@ -85,7 +102,8 @@ class GeminiService
                 Log::error('Gemini API error', [
                     'status' => $response->status(),
                     'error'  => $errorMsg,
-                    'model'  => $this->model,
+                    'model'  => $this->activeModel,
+                    'mode'   => $this->mode,
                 ]);
                 return [
                     'success' => false,
@@ -153,7 +171,7 @@ class GeminiService
             return ['success' => false, 'message' => 'Gemini API key is not configured.'];
         }
 
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->textModel}:generateContent?key={$this->apiKey}";
 
         try {
             $response = Http::timeout(10)->post($url, [
@@ -164,7 +182,7 @@ class GeminiService
 
             if ($response->successful()) {
                 $text = $response->json('candidates.0.content.parts.0.text', '');
-                return ['success' => true, 'message' => "Connected successfully. Model: {$this->model}. Response: " . \Illuminate\Support\Str::limit($text, 60)];
+                return ['success' => true, 'message' => "Connected successfully. Text model: {$this->textModel}, Image model: {$this->imageModel}. Response: " . \Illuminate\Support\Str::limit($text, 60)];
             }
 
             return ['success' => false, 'message' => 'API error: ' . $response->json('error.message', 'Unknown error')];

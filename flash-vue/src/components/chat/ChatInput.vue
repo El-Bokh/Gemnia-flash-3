@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useChatStore } from '@/stores/chat'
 import Button from 'primevue/button'
 
 const { t } = useI18n()
+const chat = useChatStore()
 
 const props = defineProps<{
   disabled?: boolean
@@ -269,6 +271,17 @@ function formatSize(bytes: number): string {
           </Transition>
         </div>
 
+        <!-- Mode toggle -->
+        <button
+          class="mode-toggle"
+          :class="{ 'mode-image': chat.aiMode === 'image' }"
+          :title="chat.aiMode === 'text' ? t('chat.switchToImage') : t('chat.switchToText')"
+          @click="chat.aiMode = chat.aiMode === 'text' ? 'image' : 'text'"
+        >
+          <i :class="chat.aiMode === 'text' ? 'pi pi-comments' : 'pi pi-image'" />
+          <span class="mode-label">{{ chat.aiMode === 'text' ? t('chat.modeText') : t('chat.modeImage') }}</span>
+        </button>
+
         <!-- Textarea -->
         <textarea
           ref="textareaRef"
@@ -372,6 +385,49 @@ function formatSize(bytes: number): string {
 .tools-btn.active {
   transform: rotate(45deg);
   color: var(--active-color) !important;
+}
+
+/* Mode toggle */
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  height: 30px;
+}
+
+.mode-toggle:hover {
+  border-color: var(--active-color);
+  color: var(--active-color);
+  background: var(--active-bg);
+}
+
+.mode-toggle.mode-image {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.08);
+  color: #8b5cf6;
+}
+
+.mode-toggle.mode-image:hover {
+  background: rgba(139, 92, 246, 0.14);
+}
+
+.mode-toggle i {
+  font-size: 0.78rem;
+}
+
+.mode-label {
+  line-height: 1;
 }
 
 .tools-menu {

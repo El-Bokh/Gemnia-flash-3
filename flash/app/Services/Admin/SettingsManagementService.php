@@ -91,7 +91,8 @@ class SettingsManagementService
     {
         $keys = [
             'gemini_api_key',
-            'gemini_model',
+            'gemini_text_model',
+            'gemini_image_model',
         ];
 
         $settings = Setting::whereIn('key', $keys)->orderBy('sort_order')->get();
@@ -117,7 +118,8 @@ class SettingsManagementService
 
         $allowedKeys = [
             'gemini_api_key',
-            'gemini_model',
+            'gemini_text_model',
+            'gemini_image_model',
         ];
 
         DB::transaction(function () use ($items, $adminId, $allowedKeys, &$updated, &$errors) {
