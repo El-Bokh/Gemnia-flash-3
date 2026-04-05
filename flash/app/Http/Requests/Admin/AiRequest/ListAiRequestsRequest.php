@@ -16,7 +16,7 @@ class ListAiRequestsRequest extends FormRequest
         return [
             'search'          => ['sometimes', 'string', 'max:200'],
             'status'          => ['sometimes', 'string', 'in:pending,processing,completed,failed,cancelled,timeout'],
-            'type'            => ['sometimes', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,other'],
+            'type'            => ['sometimes', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,chat,styled_chat,multimodal,other'],
             'user_id'         => ['sometimes', 'integer', 'exists:users,id'],
             'visual_style_id' => ['sometimes', 'integer', 'exists:visual_styles,id'],
             'model_used'      => ['sometimes', 'string', 'max:100'],

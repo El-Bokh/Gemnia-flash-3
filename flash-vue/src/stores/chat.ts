@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { isAxiosError } from 'axios'
 import {
   getConversations as fetchConversationsApi,
   createConversation as createConversationApi,
@@ -60,6 +61,7 @@ export const useChatStore = defineStore('chat', () => {
   const editingConversationId = ref<string | null>(null)
   const searchQuery = ref('')
   const loaded = ref(false)
+  const quotaError = ref<{ code: string; message: string } | null>(null)
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeConversationId.value) ?? null,
@@ -187,13 +189,16 @@ export const useChatStore = defineStore('chat', () => {
     editingConversationId.value = null
   }
 
-  async function sendMessage(content: string, imageStyle?: string) {
+  async function sendMessage(content: string, imageStyle?: string, image?: File) {
     if (!activeConversationId.value) {
       await createConversation()
     }
 
     const conv = conversations.value.find(c => c.id === activeConversationId.value)
     if (!conv) return
+
+    // Build optimistic preview URL for attached image
+    const optimisticImageUrl = image ? URL.createObjectURL(image) : undefined
 
     // Optimistic user message
     const tempUserMsgId = 'tmp-' + Date.now()
@@ -202,6 +207,7 @@ export const useChatStore = defineStore('chat', () => {
       role: 'user',
       content,
       imageStyle,
+      imageUrl: optimisticImageUrl,
       timestamp: new Date(),
       status: 'sending',
     }
@@ -228,8 +234,9 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     isAiTyping.value = true
+    quotaError.value = null
     try {
-      const res = await sendMessageApi(conv.serverId!, content, imageStyle)
+      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image) as any
       if (res.success && res.data) {
         // Replace temp user message with real one
         const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
@@ -244,18 +251,45 @@ export const useChatStore = defineStore('chat', () => {
         if (res.data.conversation) {
           conv.title = res.data.conversation.title
         }
+
+        // Update quota from response
+        if (res.quota) {
+          const { useAuthStore } = await import('@/stores/auth')
+          const auth = useAuthStore()
+          auth.quota.credits_remaining = res.quota.remaining
+          if (res.quota.warning !== 'none') {
+            auth.quota.warning_level = res.quota.warning
+          }
+        }
       }
-    } catch {
-      userMsg.status = 'error'
+    } catch (err: unknown) {
+      // Handle 402 — quota exhausted
+      if (isAxiosError(err) && err.response?.status === 402) {
+        const body = err.response.data
+        quotaError.value = {
+          code: body.error_code ?? 'insufficient_credits',
+          message: body.message ?? 'Credits exhausted',
+        }
+        // Remove the optimistic message
+        const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+        if (idx !== -1) conv.messages.splice(idx, 1)
+      } else {
+        userMsg.status = 'error'
+      }
     } finally {
       isAiTyping.value = false
     }
+  }
+
+  function clearQuotaError() {
+    quotaError.value = null
   }
 
   function $reset() {
     conversations.value = []
     activeConversationId.value = null
     loaded.value = false
+    quotaError.value = null
   }
 
   return {
@@ -269,6 +303,7 @@ export const useChatStore = defineStore('chat', () => {
     editingConversationId,
     searchQuery,
     loaded,
+    quotaError,
     loadConversations,
     setActiveConversation,
     createConversation,
@@ -278,6 +313,7 @@ export const useChatStore = defineStore('chat', () => {
     startEditing,
     cancelEditing,
     sendMessage,
+    clearQuotaError,
     $reset,
   }
 })

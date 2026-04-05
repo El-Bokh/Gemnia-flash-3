@@ -90,11 +90,8 @@ class SettingsManagementService
     public function getAiIntegrations(): array
     {
         $keys = [
-            'openai_api_key',
-            'openai_model',
-            'openai_max_tokens',
-            'stability_ai_key',
-            'stability_ai_engine',
+            'gemini_api_key',
+            'gemini_model',
         ];
 
         $settings = Setting::whereIn('key', $keys)->orderBy('sort_order')->get();
@@ -119,11 +116,8 @@ class SettingsManagementService
         $errors  = [];
 
         $allowedKeys = [
-            'openai_api_key',
-            'openai_model',
-            'openai_max_tokens',
-            'stability_ai_key',
-            'stability_ai_engine',
+            'gemini_api_key',
+            'gemini_model',
         ];
 
         DB::transaction(function () use ($items, $adminId, $allowedKeys, &$updated, &$errors) {
@@ -169,8 +163,7 @@ class SettingsManagementService
     public function testIntegration(string $integration, int $adminId): array
     {
         $result = match ($integration) {
-            'openai'        => $this->testOpenAI(),
-            'stability_ai'  => $this->testStabilityAI(),
+            'gemini'        => $this->testGemini(),
             default         => ['success' => false, 'message' => "Unknown AI integration: {$integration}"],
         };
 
@@ -193,52 +186,10 @@ class SettingsManagementService
     //  PRIVATE: AI TEST METHODS
     // ──────────────────────────────────────────────
 
-    private function testOpenAI(): array
+    private function testGemini(): array
     {
-        $apiKey = Setting::getValue('openai_api_key');
-
-        if (empty($apiKey)) {
-            return ['success' => false, 'message' => 'OpenAI API key is not configured.'];
-        }
-
-        try {
-            $response = Http::timeout(10)
-                ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
-                ->get('https://api.openai.com/v1/models');
-
-            if ($response->successful()) {
-                $modelCount = count($response->json('data', []));
-                return ['success' => true, 'message' => "Connected successfully. {$modelCount} models available."];
-            }
-
-            return ['success' => false, 'message' => 'Authentication failed: ' . ($response->json('error.message') ?? 'Unknown error')];
-        } catch (\Exception $e) {
-            return ['success' => false, 'message' => 'Connection failed: ' . $e->getMessage()];
-        }
-    }
-
-    private function testStabilityAI(): array
-    {
-        $apiKey = Setting::getValue('stability_ai_key');
-
-        if (empty($apiKey)) {
-            return ['success' => false, 'message' => 'Stability AI key is not configured.'];
-        }
-
-        try {
-            $response = Http::timeout(10)
-                ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
-                ->get('https://api.stability.ai/v1/user/account');
-
-            if ($response->successful()) {
-                $credits = $response->json('credits', 'N/A');
-                return ['success' => true, 'message' => "Connected successfully. Credits remaining: {$credits}"];
-            }
-
-            return ['success' => false, 'message' => 'Authentication failed: ' . ($response->json('message') ?? 'Unknown error')];
-        } catch (\Exception $e) {
-            return ['success' => false, 'message' => 'Connection failed: ' . $e->getMessage()];
-        }
+        $geminiService = new \App\Services\GeminiService();
+        return $geminiService->testConnection();
     }
 
     // ──────────────────────────────────────────────

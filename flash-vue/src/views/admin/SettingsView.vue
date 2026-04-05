@@ -70,8 +70,7 @@ const testResult = ref<{ type: string; success: boolean; message: string } | nul
 const savingIntegrations = ref(false)
 
 // ── Computed ────────────────────────────────────────────────
-const openaiSettings = computed(() => integrations.value.filter(s => s.key.startsWith('openai_')))
-const stabilitySettings = computed(() => integrations.value.filter(s => s.key.startsWith('stability_')))
+const geminiSettings = computed(() => integrations.value.filter(s => s.key.startsWith('gemini_')))
 
 const auditActions = [
   { label: t('settings.allActions'), value: '' },
@@ -227,11 +226,8 @@ async function handleTestIntegration(type: AiIntegrationType) {
 
 function settingLabel(key: string): string {
   const map: Record<string, string> = {
-    openai_api_key: t('settings.apiKey'),
-    openai_model: t('settings.model'),
-    openai_max_tokens: t('settings.maxTokens'),
-    stability_ai_key: t('settings.apiKey'),
-    stability_ai_engine: t('settings.engine'),
+    gemini_api_key: t('settings.apiKey'),
+    gemini_model: t('settings.model'),
   }
   return map[key] || key
 }
@@ -421,24 +417,24 @@ onMounted(() => {
           </template>
 
           <template v-else-if="integrations.length">
-            <!-- OpenAI -->
+            <!-- Google Gemini -->
             <div class="integration-card">
               <div class="integration-header">
                 <div class="integration-title">
-                  <i class="pi pi-microchip-ai" />
-                  <h3>{{ t('settings.openai') }}</h3>
+                  <i class="pi pi-sparkles" />
+                  <h3>{{ t('settings.gemini') }}</h3>
                 </div>
                 <Button
-                  :label="testingIntegration === 'openai' ? t('settings.testing') : t('settings.testConnection')"
+                  :label="testingIntegration === 'gemini' ? t('settings.testing') : t('settings.testConnection')"
                   icon="pi pi-bolt"
                   severity="secondary"
                   size="small"
-                  :loading="testingIntegration === 'openai'"
-                  @click="handleTestIntegration('openai')"
+                  :loading="testingIntegration === 'gemini'"
+                  @click="handleTestIntegration('gemini')"
                 />
               </div>
               <div class="integration-fields">
-                <div v-for="s in openaiSettings" :key="s.key" class="field-row">
+                <div v-for="s in geminiSettings" :key="s.key" class="field-row">
                   <label>{{ settingLabel(s.key) }}</label>
                   <InputText
                     v-model="editValues[s.key]"
@@ -448,40 +444,7 @@ onMounted(() => {
                   />
                 </div>
               </div>
-              <div v-if="testResult && testResult.type === 'openai'" class="test-result" :class="{ success: testResult.success, error: !testResult.success }">
-                <i class="pi" :class="testResult.success ? 'pi-check-circle' : 'pi-times-circle'" />
-                <span>{{ testResult.message }}</span>
-              </div>
-            </div>
-
-            <!-- Stability AI -->
-            <div class="integration-card">
-              <div class="integration-header">
-                <div class="integration-title">
-                  <i class="pi pi-image" />
-                  <h3>{{ t('settings.stabilityAi') }}</h3>
-                </div>
-                <Button
-                  :label="testingIntegration === 'stability_ai' ? t('settings.testing') : t('settings.testConnection')"
-                  icon="pi pi-bolt"
-                  severity="secondary"
-                  size="small"
-                  :loading="testingIntegration === 'stability_ai'"
-                  @click="handleTestIntegration('stability_ai')"
-                />
-              </div>
-              <div class="integration-fields">
-                <div v-for="s in stabilitySettings" :key="s.key" class="field-row">
-                  <label>{{ settingLabel(s.key) }}</label>
-                  <InputText
-                    v-model="editValues[s.key]"
-                    :type="s.is_encrypted ? 'password' : 'text'"
-                    :placeholder="s.display_name || s.key"
-                    class="w-full"
-                  />
-                </div>
-              </div>
-              <div v-if="testResult && testResult.type === 'stability_ai'" class="test-result" :class="{ success: testResult.success, error: !testResult.success }">
+              <div v-if="testResult && testResult.type === 'gemini'" class="test-result" :class="{ success: testResult.success, error: !testResult.success }">
                 <i class="pi" :class="testResult.success ? 'pi-check-circle' : 'pi-times-circle'" />
                 <span>{{ testResult.message }}</span>
               </div>

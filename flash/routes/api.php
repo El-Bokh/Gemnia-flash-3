@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\VisualStyleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -58,6 +60,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('conversations', ConversationController::class);
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage'])
         ->name('conversations.messages');
+
+    // Visual Styles
+    Route::get('/styles', [VisualStyleController::class, 'index'])->name('styles.index');
+
+    // Subscription & Quota
+    Route::get('/subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
+    Route::get('/plans/public',  [SubscriptionController::class, 'plans'])->name('plans.public');
 
     // Notifications
     Route::prefix('notifications')->name('notifications.')->group(function () {

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getStyles } from '@/services/chatService'
+import type { StyleData } from '@/services/chatService'
 
 const { t } = useI18n()
 
@@ -10,23 +12,54 @@ const emit = defineEmits<{
 }>()
 
 const selectedStyle = ref<string | null>(null)
+const styles = ref<StyleData[]>([])
+const loading = ref(false)
 
-const styles = [
-  { key: 'modern', icon: 'pi pi-bolt', gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)' },
-  { key: 'classic', icon: 'pi pi-clock', gradient: 'linear-gradient(135deg, #d97706, #f59e0b)' },
-  { key: 'portrait', icon: 'pi pi-user', gradient: 'linear-gradient(135deg, #ec4899, #f43f5e)' },
-  { key: 'cinematic', icon: 'pi pi-video', gradient: 'linear-gradient(135deg, #0ea5e9, #06b6d4)' },
-  { key: 'anime', icon: 'pi pi-star', gradient: 'linear-gradient(135deg, #a855f7, #d946ef)' },
-  { key: 'realistic', icon: 'pi pi-eye', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
-]
+const categoryIcons: Record<string, string> = {
+  photography: 'pi pi-camera',
+  illustration: 'pi pi-star',
+  art: 'pi pi-palette',
+  digital: 'pi pi-bolt',
+  design: 'pi pi-objects-column',
+}
 
-function selectStyle(key: string) {
-  if (selectedStyle.value === key) {
+const categoryGradients: Record<string, string> = {
+  photography: 'linear-gradient(135deg, #10b981, #059669)',
+  illustration: 'linear-gradient(135deg, #a855f7, #d946ef)',
+  art: 'linear-gradient(135deg, #f59e0b, #d97706)',
+  digital: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+  design: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+}
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await getStyles()
+    if (res.success && res.data) {
+      styles.value = res.data
+    }
+  } catch {
+    // Fallback — keep empty
+  } finally {
+    loading.value = false
+  }
+})
+
+function getIcon(style: StyleData) {
+  return categoryIcons[style.category ?? ''] ?? 'pi pi-image'
+}
+
+function getGradient(style: StyleData) {
+  return categoryGradients[style.category ?? ''] ?? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+}
+
+function selectStyle(slug: string) {
+  if (selectedStyle.value === slug) {
     selectedStyle.value = null
     emit('select', '')
   } else {
-    selectedStyle.value = key
-    emit('select', key)
+    selectedStyle.value = slug
+    emit('select', slug)
   }
 }
 </script>
@@ -39,19 +72,25 @@ function selectStyle(key: string) {
         <i class="pi pi-times" />
       </button>
     </div>
-    <div class="style-grid">
+
+    <div v-if="loading" class="style-loading">
+      <i class="pi pi-spin pi-spinner" />
+    </div>
+
+    <div v-else class="style-grid">
       <button
         v-for="s in styles"
-        :key="s.key"
+        :key="s.slug"
         class="style-card"
-        :class="{ selected: selectedStyle === s.key }"
-        @click="selectStyle(s.key)"
+        :class="{ selected: selectedStyle === s.slug }"
+        @click="selectStyle(s.slug)"
       >
-        <div class="style-icon" :style="{ background: s.gradient }">
-          <i :class="s.icon" />
+        <div class="style-icon" :style="{ background: getGradient(s) }">
+          <i :class="getIcon(s)" />
         </div>
-        <span class="style-name">{{ t(`chat.style_${s.key}`) }}</span>
-        <div v-if="selectedStyle === s.key" class="style-check">
+        <span class="style-name">{{ s.name }}</span>
+        <span v-if="s.is_premium" class="style-premium">PRO</span>
+        <div v-if="selectedStyle === s.slug" class="style-check">
           <i class="pi pi-check" />
         </div>
       </button>
@@ -167,6 +206,28 @@ function selectStyle(key: string) {
   justify-content: center;
   font-size: 0.6rem;
   animation: checkPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.style-premium {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  font-size: 0.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.style-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 1.2rem;
 }
 
 @keyframes checkPop {

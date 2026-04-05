@@ -12,6 +12,7 @@ import {
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
+import ProgressBar from 'primevue/progressbar'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -166,6 +167,25 @@ onMounted(async () => {
   } finally {
     profileLoading.value = false
   }
+  // Load subscription/quota data
+  await auth.refreshQuota()
+})
+
+// ── Quota computed helpers ──
+const q = computed(() => auth.quota)
+const hasSubscription = computed(() => q.value.has_subscription)
+const creditsBarColor = computed(() => {
+  if (q.value.warning_level === 'depleted') return '#ef4444'
+  if (q.value.warning_level === 'critical') return '#f97316'
+  if (q.value.warning_level === 'low') return '#eab308'
+  return '#6366f1'
+})
+const statusSeverity = computed(() => {
+  const s = q.value.status
+  if (s === 'active') return 'success'
+  if (s === 'trialing') return 'info'
+  if (s === 'cancelled') return 'danger'
+  return 'warn'
 })
 
 onBeforeUnmount(() => {
@@ -409,22 +429,125 @@ async function changePassword() {
         <!-- ═══ SUBSCRIPTION TAB ═══ -->
         <TabPanel value="subscription">
           <div class="tab-content">
-            <section class="section-card" style="text-align: center; padding: 40px 20px;">
-              <i class="pi pi-credit-card" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;" />
-              <h2 class="section-title" style="margin-bottom: 4px;">{{ t('profile.noSubscription') }}</h2>
-              <p class="section-desc">{{ t('profile.noSubscriptionDesc') }}</p>
-            </section>
+            <!-- Has subscription -->
+            <template v-if="hasSubscription">
+              <section class="section-card">
+                <div class="section-head">
+                  <h2 class="section-title">{{ t('profile.tabSubscription') }}</h2>
+                  <p class="section-desc">{{ t('profile.subscriptionDesc') }}</p>
+                </div>
+
+                <div class="sub-overview">
+                  <div class="sub-plan-row">
+                    <div class="sub-plan-info">
+                      <span class="sub-plan-name">{{ q.plan_name }}</span>
+                      <Tag :value="q.status" :severity="statusSeverity" class="mini-tag" />
+                    </div>
+                    <router-link v-if="q.plan_is_free" to="/pricing" class="upgrade-link">
+                      <Button :label="t('profile.upgradePlan')" icon="pi pi-arrow-up" size="small" />
+                    </router-link>
+                  </div>
+
+                  <!-- Credits -->
+                  <div class="sub-credits">
+                    <div class="sub-credits-header">
+                      <span class="sub-credits-label">{{ t('profile.credits') }}</span>
+                      <span class="sub-credits-count">{{ q.credits_remaining }} / {{ q.credits_total }}</span>
+                    </div>
+                    <ProgressBar
+                      :value="q.usage_percentage"
+                      :showValue="false"
+                      class="sub-progress"
+                      :style="{ '--p-progressbar-value-background': creditsBarColor }"
+                    />
+                    <span class="sub-credits-pct">{{ q.usage_percentage }}% {{ t('profile.used') }}</span>
+                  </div>
+
+                  <!-- Period -->
+                  <div v-if="q.period_start || q.period_end" class="sub-period">
+                    <div class="sub-period-item">
+                      <i class="pi pi-calendar" />
+                      <span>{{ t('profile.periodStart') }}: {{ q.period_start ? new Date(q.period_start).toLocaleDateString() : '—' }}</span>
+                    </div>
+                    <div class="sub-period-item">
+                      <i class="pi pi-calendar-times" />
+                      <span>{{ t('profile.periodEnd') }}: {{ q.period_end ? new Date(q.period_end).toLocaleDateString() : t('profile.unlimited') }}</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </template>
+
+            <!-- No subscription -->
+            <template v-else>
+              <section class="section-card" style="text-align: center; padding: 40px 20px;">
+                <i class="pi pi-credit-card" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;" />
+                <h2 class="section-title" style="margin-bottom: 4px;">{{ t('profile.noSubscription') }}</h2>
+                <p class="section-desc" style="margin-bottom: 16px;">{{ t('profile.noSubscriptionDesc') }}</p>
+                <router-link to="/pricing">
+                  <Button :label="t('profile.upgradePlan')" icon="pi pi-arrow-up" size="small" />
+                </router-link>
+              </section>
+            </template>
           </div>
         </TabPanel>
 
         <!-- ═══ USAGE TAB ═══ -->
         <TabPanel value="usage">
           <div class="tab-content">
-            <section class="section-card" style="text-align: center; padding: 40px 20px;">
-              <i class="pi pi-chart-bar" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;" />
-              <h2 class="section-title" style="margin-bottom: 4px;">{{ t('profile.noUsageData') }}</h2>
-              <p class="section-desc">{{ t('profile.noUsageDataDesc') }}</p>
-            </section>
+            <template v-if="hasSubscription">
+              <!-- Stats cards -->
+              <div class="usage-stats-grid">
+                <div class="usage-stat-card">
+                  <i class="pi pi-bolt" />
+                  <div class="usage-stat-value">{{ q.credits_used }}</div>
+                  <div class="usage-stat-label">{{ t('profile.creditsConsumed') }}</div>
+                </div>
+                <div class="usage-stat-card">
+                  <i class="pi pi-calendar" />
+                  <div class="usage-stat-value">{{ q.requests_today }}</div>
+                  <div class="usage-stat-label">{{ t('profile.requestsToday') }}</div>
+                </div>
+                <div class="usage-stat-card">
+                  <i class="pi pi-chart-line" />
+                  <div class="usage-stat-value">{{ q.requests_this_month }}</div>
+                  <div class="usage-stat-label">{{ t('profile.requestsThisMonth') }}</div>
+                </div>
+                <div class="usage-stat-card">
+                  <i class="pi pi-percentage" />
+                  <div class="usage-stat-value">{{ q.usage_percentage }}%</div>
+                  <div class="usage-stat-label">{{ t('profile.quotaUsed') }}</div>
+                </div>
+              </div>
+
+              <!-- Credits breakdown -->
+              <section class="section-card">
+                <div class="section-head">
+                  <h2 class="section-title">{{ t('profile.currentUsage') }}</h2>
+                  <p class="section-desc">{{ t('profile.currentUsageDesc') }}</p>
+                </div>
+                <div class="sub-credits">
+                  <div class="sub-credits-header">
+                    <span class="sub-credits-label">{{ t('profile.credits') }}</span>
+                    <span class="sub-credits-count">{{ q.credits_remaining }} {{ t('profile.remaining') }}</span>
+                  </div>
+                  <ProgressBar
+                    :value="q.usage_percentage"
+                    :showValue="false"
+                    class="sub-progress"
+                    :style="{ '--p-progressbar-value-background': creditsBarColor }"
+                  />
+                </div>
+              </section>
+            </template>
+
+            <template v-else>
+              <section class="section-card" style="text-align: center; padding: 40px 20px;">
+                <i class="pi pi-chart-bar" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;" />
+                <h2 class="section-title" style="margin-bottom: 4px;">{{ t('profile.noUsageData') }}</h2>
+                <p class="section-desc">{{ t('profile.noUsageDataDesc') }}</p>
+              </section>
+            </template>
           </div>
         </TabPanel>
       </TabPanels>
@@ -729,4 +852,122 @@ async function changePassword() {
 }
 
 .mini-tag { font-size: 0.58rem !important; padding: 2px 8px !important; }
+
+/* ── Subscription tab ── */
+.sub-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sub-plan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sub-plan-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sub-plan-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.upgrade-link { text-decoration: none; }
+
+.sub-credits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sub-credits-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sub-credits-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sub-credits-count {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sub-credits-pct {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+:deep(.sub-progress) {
+  height: 8px !important;
+  border-radius: 4px;
+}
+
+.sub-period {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.sub-period-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.sub-period-item i {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ── Usage tab ── */
+.usage-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.usage-stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.usage-stat-card i {
+  font-size: 1.4rem;
+  color: #6366f1;
+}
+
+.usage-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-stat-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
 </style>

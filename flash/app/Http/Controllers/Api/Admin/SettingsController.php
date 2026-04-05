@@ -109,7 +109,7 @@ class SettingsController extends Controller
     public function testAiIntegration(Request $request): JsonResponse
     {
         $request->validate([
-            'integration' => 'required|string|in:openai,stability_ai',
+            'integration' => 'required|string|in:gemini',
         ]);
 
         $result = $this->settings->testIntegration(

@@ -74,6 +74,9 @@ const typeOptions = computed(() => [
   { label: t('aiRequests.imageToImage'), value: 'image_to_image' },
   { label: t('aiRequests.inpainting'), value: 'inpainting' },
   { label: t('aiRequests.upscale'), value: 'upscale' },
+  { label: t('aiRequests.chat'), value: 'chat' },
+  { label: t('aiRequests.styledChat'), value: 'styled_chat' },
+  { label: t('aiRequests.multimodal'), value: 'multimodal' },
   { label: t('aiRequests.other'), value: 'other' },
 ] as Array<{ label: string; value: 'all' | AiRequestType }>)
 
@@ -380,6 +383,9 @@ function typeLabel(type: string) {
     image_to_image: 'Image→Image',
     inpainting: 'Inpainting',
     upscale: 'Upscale',
+    chat: 'Chat',
+    styled_chat: 'Styled Chat',
+    multimodal: 'Multimodal',
     other: 'Other',
   }[type] || type
 }

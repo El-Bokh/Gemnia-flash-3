@@ -13,7 +13,7 @@ export interface UpdateMaintenanceData {
 
 // ─── AI Integrations ────────────────────────────────────
 
-export type AiIntegrationType = 'openai' | 'stability_ai'
+export type AiIntegrationType = 'gemini'
 
 export interface AiIntegrationSetting {
   id: number

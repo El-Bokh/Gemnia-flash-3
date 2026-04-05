@@ -2,21 +2,34 @@
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
+import { useAuthStore } from '@/stores/auth'
 import { useLayoutStore } from '@/stores/layout'
 import Button from 'primevue/button'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
 import ImageStyleSelector from '@/components/chat/ImageStyleSelector.vue'
 import TypingIndicator from '@/components/chat/TypingIndicator.vue'
+import QuotaBar from '@/components/chat/QuotaBar.vue'
+import QuotaExhaustedModal from '@/components/chat/QuotaExhaustedModal.vue'
 
 const { t } = useI18n()
 const chat = useChatStore()
+const auth = useAuthStore()
 const layout = useLayoutStore()
 
 const messagesContainerRef = ref<HTMLDivElement | null>(null)
 const showStyles = ref(false)
 const selectedStyle = ref('')
+const selectedStyleName = ref('')
 const showScrollBtn = ref(false)
+const showQuotaModal = ref(false)
+
+// Watch for quota errors from the chat store
+watch(() => chat.quotaError, (err) => {
+  if (err) {
+    showQuotaModal.value = true
+  }
+})
 
 const hasActiveChat = computed(() => !!chat.activeConversation)
 const messages = computed(() => chat.activeConversation?.messages ?? [])
@@ -62,9 +75,9 @@ onMounted(() => {
   }
 })
 
-function handleSend(content: string) {
+function handleSend(content: string, image?: File) {
   const isNewChat = !chat.activeConversationId
-  chat.sendMessage(content, selectedStyle.value || undefined)
+  chat.sendMessage(content, selectedStyle.value || undefined, image)
   selectedStyle.value = ''
   showStyles.value = false
   if (isNewChat) {
@@ -97,6 +110,9 @@ function useSuggestion(text: string) {
 
 function handleStyleSelect(style: string) {
   selectedStyle.value = style
+  selectedStyleName.value = style
+    ? style.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : ''
 }
 
 function handleCopy(content: string) {
@@ -120,6 +136,13 @@ function handleRegenerate(_messageId: string) {
 
 <template>
   <div class="home-page" :class="{ 'has-chat': hasActiveChat }">
+    <!-- Quota Exhausted Modal -->
+    <QuotaExhaustedModal
+      :visible="showQuotaModal"
+      :error-code="chat.quotaError?.code"
+      @close="showQuotaModal = false; chat.clearQuotaError()"
+    />
+
     <!-- ═══════ Empty State / Landing ═══════ -->
     <div v-if="!hasActiveChat" class="home-center">
       <div class="hero-logo">
@@ -215,6 +238,9 @@ function handleRegenerate(_messageId: string) {
 
       <!-- Bottom input area -->
       <div class="chat-bottom">
+        <!-- Quota bar -->
+        <QuotaBar />
+
         <!-- Style selector -->
         <Transition name="slide-up">
           <ImageStyleSelector
@@ -227,14 +253,14 @@ function handleRegenerate(_messageId: string) {
         <!-- Selected style badge -->
         <div v-if="selectedStyle && !showStyles" class="selected-style-badge">
           <i class="pi pi-palette" />
-          <span>{{ t(`chat.style_${selectedStyle}`) }}</span>
+          <span>{{ selectedStyleName }}</span>
           <button class="badge-remove" @click="selectedStyle = ''">
             <i class="pi pi-times" />
           </button>
         </div>
 
         <ChatInput
-          :disabled="chat.isAiTyping"
+          :disabled="chat.isAiTyping || auth.quotaDepleted"
           @send="handleSend"
           @toggle-styles="showStyles = !showStyles"
         />

@@ -11,7 +11,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  send: [content: string]
+  send: [content: string, image?: File]
   toggleStyles: []
   openUpload: []
 }>()
@@ -47,7 +47,11 @@ function handleSend() {
   const text = message.value.trim()
   if (!text && attachedFiles.value.length === 0) return
   if (props.disabled) return
-  emit('send', text || '(attached files)')
+
+  // Find the first image attachment (if any)
+  const imageFile = attachedFiles.value.find(af => af.type === 'image')?.file
+  emit('send', text || '(attached files)', imageFile)
+
   message.value = ''
   attachedFiles.value = []
   showLinkInput.value = false

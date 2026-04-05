@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '@/router'
-import { logout as logoutApi, getMe } from '@/services/authService'
-import type { AuthUser } from '@/services/authService'
+import { logout as logoutApi, getMe, getSubscription } from '@/services/authService'
+import type { AuthUser, QuotaInfo } from '@/services/authService'
 import { clearStoredAuth, getStoredAuthUser, storeAuthUser } from '@/utils/auth'
 
 function emptyAuthUser(): AuthUser {
@@ -22,10 +22,52 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!localStorage.getItem('auth_token'))
   const isLoaded = ref(!!storedUser)
 
+  // ── Quota ──
+  const quota = ref<QuotaInfo>({
+    has_subscription: false,
+    plan_name: null,
+    plan_slug: null,
+    plan_is_free: true,
+    credits_remaining: 0,
+    credits_total: 0,
+    credits_used: 0,
+    usage_percentage: 100,
+    period_start: null,
+    period_end: null,
+    status: '',
+    requests_today: 0,
+    requests_this_month: 0,
+    warning_level: 'depleted',
+  })
+
+  const hasQuota = computed(() => quota.value.has_subscription && quota.value.credits_remaining > 0)
+  const quotaDepleted = computed(() => quota.value.has_subscription && quota.value.credits_remaining <= 0)
+  const noSubscription = computed(() => !quota.value.has_subscription)
+
   function setUser(data: AuthUser) {
     user.value = data
     storeAuthUser(data)
     isLoaded.value = true
+  }
+
+  function setQuota(data: QuotaInfo) {
+    quota.value = data
+  }
+
+  /** Deduct 1 credit locally (optimistic) */
+  function deductCredit() {
+    if (quota.value.credits_remaining > 0) {
+      quota.value.credits_remaining -= 1
+      quota.value.credits_used += 1
+      quota.value.usage_percentage = quota.value.credits_total > 0
+        ? Math.round((quota.value.credits_used / quota.value.credits_total) * 1000) / 10
+        : 100
+      // Recalc warning level
+      if (quota.value.credits_remaining <= 0) quota.value.warning_level = 'depleted'
+      else if (quota.value.usage_percentage >= 90) quota.value.warning_level = 'critical'
+      else if (quota.value.usage_percentage >= 80) quota.value.warning_level = 'low'
+      else quota.value.warning_level = 'none'
+    }
   }
 
   async function fetchUser() {
@@ -39,13 +81,26 @@ export const useAuthStore = defineStore('auth', () => {
           avatar: res.data.avatar,
           roles: res.data.roles,
         })
+        if (res.data.quota) {
+          setQuota(res.data.quota)
+        }
       }
     } catch {
-      // Token invalid — clear and redirect
       clearStoredAuth()
       user.value = emptyAuthUser()
       isLoaded.value = false
       void router.replace({ name: 'login' })
+    }
+  }
+
+  async function refreshQuota() {
+    try {
+      const res = await getSubscription()
+      if (res.success && res.data) {
+        setQuota(res.data)
+      }
+    } catch {
+      // Silently fail
     }
   }
 
@@ -61,5 +116,5 @@ export const useAuthStore = defineStore('auth', () => {
     void router.replace({ name: 'login' })
   }
 
-  return { user, isAuthenticated, isLoaded, setUser, fetchUser, logout }
+  return { user, isAuthenticated, isLoaded, quota, hasQuota, quotaDepleted, noSubscription, setUser, setQuota, deductCredit, fetchUser, refreshQuota, logout }
 })

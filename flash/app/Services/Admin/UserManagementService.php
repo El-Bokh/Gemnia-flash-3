@@ -30,7 +30,8 @@ class UserManagementService
                 'subscriptions' => fn ($q) => $q->with('plan:id,name,slug')
                     ->whereIn('status', ['active', 'trialing'])
                     ->latest(),
-            ]);
+            ])
+            ->withCount('aiRequests');
 
         // Include soft-deleted users
         if (! empty($filters['with_trashed'])) {

@@ -64,12 +64,12 @@ class UserResource extends JsonResource
                 ];
             }),
 
-            // ── Aggregated Stats (only when requested) ──
-            'stats' => $this->when($this->relationLoaded('aiRequests'), fn () => [
-                'ai_requests_count'      => $this->aiRequests->count(),
-                'generated_images_count' => $this->generatedImages->count(),
-                'total_credits_used'     => $this->usageLogs->sum('credits_used'),
-            ]),
+            // ── Aggregated Stats ──
+            'stats' => [
+                'ai_requests_count'      => $this->ai_requests_count ?? ($this->relationLoaded('aiRequests') ? $this->aiRequests->count() : 0),
+                'generated_images_count' => $this->generated_images_count ?? ($this->relationLoaded('generatedImages') ? $this->generatedImages->count() : 0),
+                'total_credits_used'     => $this->relationLoaded('usageLogs') ? $this->usageLogs->sum('credits_used') : 0,
+            ],
         ];
     }
 }

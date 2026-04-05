@@ -53,9 +53,37 @@ export function deleteConversation(id: number) {
   return apiDelete<ApiResponse<null>>(`/conversations/${id}`)
 }
 
-export function sendMessage(conversationId: number, content: string, imageStyle?: string) {
+export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File) {
+  if (image) {
+    const form = new FormData()
+    form.append('content', content)
+    if (imageStyle) form.append('image_style', imageStyle)
+    form.append('image', image)
+    return apiPost<ApiResponse<SendMessageResponse>>(
+      `/conversations/${conversationId}/messages`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+  }
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,
     { content, image_style: imageStyle },
   )
+}
+
+// ─── Styles ─────────────────────────────────────────────────
+
+export interface StyleData {
+  id: number
+  name: string
+  slug: string
+  description: string | null
+  thumbnail: string | null
+  category: string | null
+  is_premium: boolean
+  sort_order: number
+}
+
+export function getStyles() {
+  return apiGet<ApiResponse<StyleData[]>>('/styles')
 }

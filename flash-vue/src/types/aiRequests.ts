@@ -278,7 +278,7 @@ export interface AiRequestAggregations {
 // ─── Request Payloads ───────────────────────────────────────
 
 export type AiRequestStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'timeout'
-export type AiRequestType = 'text_to_image' | 'image_to_image' | 'inpainting' | 'upscale' | 'other'
+export type AiRequestType = 'text_to_image' | 'image_to_image' | 'inpainting' | 'upscale' | 'chat' | 'styled_chat' | 'multimodal' | 'other'
 
 export interface ListAiRequestsParams {
   search?: string

@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\RegisterRequest;
+use App\Models\Plan;
 use App\Models\Role;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\UsageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +44,24 @@ class AuthController extends Controller
 
             if ($defaultRole) {
                 $user->roles()->attach($defaultRole->id);
+            }
+
+            // Auto-subscribe to the Free plan
+            $freePlan = Plan::where('is_free', true)->where('is_active', true)->first();
+            if ($freePlan) {
+                Subscription::create([
+                    'user_id'           => $user->id,
+                    'plan_id'           => $freePlan->id,
+                    'billing_cycle'     => 'monthly',
+                    'status'            => 'active',
+                    'price'             => 0,
+                    'currency'          => $freePlan->currency ?? 'USD',
+                    'starts_at'         => now(),
+                    'ends_at'           => now()->addMonth(),
+                    'credits_remaining' => $freePlan->credits_monthly,
+                    'credits_total'     => $freePlan->credits_monthly,
+                    'auto_renew'        => true,
+                ]);
             }
 
             return $user->load('roles');
@@ -124,6 +145,9 @@ class AuthController extends Controller
         $user = $request->user();
         $user->load('roles');
 
+        $usageService = new UsageService();
+        $quota = $usageService->getUsageStats($user);
+
         return response()->json([
             'success' => true,
             'data'    => [
@@ -137,6 +161,7 @@ class AuthController extends Controller
                 'locale' => $user->locale,
                 'timezone' => $user->timezone,
                 'last_login_at' => $user->last_login_at?->toIso8601String(),
+                'quota'  => $quota,
             ],
         ]);
     }

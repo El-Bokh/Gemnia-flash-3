@@ -28,6 +28,23 @@ export interface LoginResponse {
   user: AuthUser
 }
 
+export interface QuotaInfo {
+  has_subscription: boolean
+  plan_name: string | null
+  plan_slug: string | null
+  plan_is_free: boolean
+  credits_remaining: number
+  credits_total: number
+  credits_used: number
+  usage_percentage: number
+  period_start: string | null
+  period_end: string | null
+  status: string
+  requests_today: number
+  requests_this_month: number
+  warning_level: 'none' | 'low' | 'critical' | 'depleted'
+}
+
 export interface MeResponse {
   id: number
   name: string
@@ -40,6 +57,7 @@ export interface MeResponse {
   timezone: string
   last_login_at: string | null
   last_login_ip: string | null
+  quota: QuotaInfo
 }
 
 // ─── Service ────────────────────────────────────────────────
@@ -58,4 +76,8 @@ export function logout() {
 
 export function getMe() {
   return apiGet<ApiResponse<MeResponse>>('/auth/me')
+}
+
+export function getSubscription() {
+  return apiGet<ApiResponse<QuotaInfo>>('/subscription')
 }
