@@ -26,68 +26,6 @@ const recentAi = ref<RecentAiRequest[]>([])
 const recentPayments = ref<RecentPayment[]>([])
 const alerts = ref<DashboardAlerts | null>(null)
 
-// ── Mock data for when API is unavailable ───────────────────
-function loadMockData() {
-  kpis.value = {
-    users: { total: 1284, active: 1102, suspended: 18, pending: 7, new_today: 12, new_week: 64 },
-    subscriptions_per_plan: [
-      { id: 1, name: 'Free', slug: 'free', active_count: 620, trial_count: 0, total_count: 620 },
-      { id: 2, name: 'Starter', slug: 'starter', active_count: 310, trial_count: 24, total_count: 334 },
-      { id: 3, name: 'Pro', slug: 'pro', active_count: 245, trial_count: 12, total_count: 257 },
-      { id: 4, name: 'Enterprise', slug: 'enterprise', active_count: 73, trial_count: 0, total_count: 73 },
-    ],
-    images_generated_today: 342,
-    images_generated_week: 2180,
-    revenue_today: { total: 1450, count: 18, currency: 'USD' },
-    revenue_week: { total: 12580, count: 142, currency: 'USD' },
-    ai_requests_pending: 8,
-    ai_requests_completed: 8432,
-    ai_requests_failed: 23,
-  }
-  charts.value = {
-    subscriptions_by_plan: [
-      { label: 'Free', value: 620 },
-      { label: 'Starter', value: 334 },
-      { label: 'Pro', value: 257 },
-      { label: 'Enterprise', value: 73 },
-    ],
-    images_last_7_days: [
-      { date: 'Mar 28', label: 'Mar 28', count: 280 },
-      { date: 'Mar 29', label: 'Mar 29', count: 310 },
-      { date: 'Mar 30', label: 'Mar 30', count: 295 },
-      { date: 'Mar 31', label: 'Mar 31', count: 340 },
-      { date: 'Apr 1', label: 'Apr 1', count: 378 },
-      { date: 'Apr 2', label: 'Apr 2', count: 355 },
-      { date: 'Apr 3', label: 'Apr 3', count: 342 },
-    ],
-    ai_requests_by_status: { pending: 8, processing: 3, completed: 8432, failed: 23 },
-  }
-  recentAi.value = [
-    { id: 1, uuid: 'a1', user: { id: 1, name: 'Sara Ahmed', email: 's@f.io', avatar: null }, prompt: 'Generate logo', style: 'Modern', type: 'image', status: 'completed', model: 'dall-e-3', credits: 5, processing_ms: 3200, date: '2026-04-03T10:32:00Z' },
-    { id: 2, uuid: 'a2', user: { id: 2, name: 'Omar Ali', email: 'o@f.io', avatar: null }, prompt: 'Product photo', style: 'Realistic', type: 'image', status: 'completed', model: 'dall-e-3', credits: 5, processing_ms: 2800, date: '2026-04-03T10:18:00Z' },
-    { id: 3, uuid: 'a3', user: { id: 3, name: 'Mona Khaled', email: 'm@f.io', avatar: null }, prompt: 'Banner design', style: 'Flat', type: 'image', status: 'processing', model: 'stable-diff', credits: 3, processing_ms: null, date: '2026-04-03T10:05:00Z' },
-    { id: 4, uuid: 'a4', user: { id: 4, name: 'Youssef Nabil', email: 'y@f.io', avatar: null }, prompt: 'Avatar creation', style: 'Anime', type: 'image', status: 'failed', model: 'dall-e-3', credits: 5, processing_ms: 1200, date: '2026-04-03T09:55:00Z' },
-    { id: 5, uuid: 'a5', user: { id: 5, name: 'Layla Hassan', email: 'l@f.io', avatar: null }, prompt: 'Icon set', style: 'Minimal', type: 'image', status: 'completed', model: 'stable-diff', credits: 3, processing_ms: 4100, date: '2026-04-03T09:40:00Z' },
-    { id: 6, uuid: 'a6', user: { id: 1, name: 'Sara Ahmed', email: 's@f.io', avatar: null }, prompt: 'Social media post', style: 'Vibrant', type: 'image', status: 'pending', model: 'dall-e-3', credits: 5, processing_ms: null, date: '2026-04-03T09:30:00Z' },
-  ]
-  recentPayments.value = [
-    { id: 1, uuid: 'p1', user: { id: 2, name: 'Omar Ali', email: 'o@f.io', avatar: null }, plan: 'Pro', amount: 49, net_amount: 46.55, currency: 'USD', payment_method: 'stripe', status: 'paid', paid_at: '2026-04-03T09:12:00Z', date: '2026-04-03T09:12:00Z' },
-    { id: 2, uuid: 'p2', user: { id: 5, name: 'Layla Hassan', email: 'l@f.io', avatar: null }, plan: 'Starter', amount: 19, net_amount: 18.05, currency: 'USD', payment_method: 'paypal', status: 'paid', paid_at: '2026-04-03T08:45:00Z', date: '2026-04-03T08:45:00Z' },
-    { id: 3, uuid: 'p3', user: { id: 6, name: 'Karim Mostafa', email: 'k@f.io', avatar: null }, plan: 'Enterprise', amount: 199, net_amount: 189.05, currency: 'USD', payment_method: 'stripe', status: 'pending', paid_at: null, date: '2026-04-03T08:20:00Z' },
-    { id: 4, uuid: 'p4', user: { id: 3, name: 'Mona Khaled', email: 'm@f.io', avatar: null }, plan: 'Pro', amount: 49, net_amount: 46.55, currency: 'USD', payment_method: 'stripe', status: 'paid', paid_at: '2026-04-02T22:10:00Z', date: '2026-04-02T22:10:00Z' },
-    { id: 5, uuid: 'p5', user: { id: 7, name: 'Nour Sayed', email: 'n@f.io', avatar: null }, plan: 'Starter', amount: 19, net_amount: 18.05, currency: 'USD', payment_method: 'paypal', status: 'refunded', paid_at: '2026-04-02T18:00:00Z', date: '2026-04-02T18:00:00Z' },
-  ]
-  alerts.value = {
-    failed_requests: { count_today: 3, recent: [
-      { id: 4, user: 'Youssef Nabil', error: 'Model timeout', date: '2026-04-03T09:55:00Z' },
-    ] },
-    pending_payments: { count: 2, recent: [
-      { id: 3, user: 'Karim Mostafa', amount: 199, currency: 'USD', status: 'pending', date: '2026-04-03T08:20:00Z' },
-    ] },
-    system: { low_credit_users: 14, subscriptions_expiring: 8 },
-  }
-}
-
 onMounted(async () => {
   try {
     const res = await getFullOverview()
@@ -100,8 +38,7 @@ onMounted(async () => {
       alerts.value = d.alerts
     }
   } catch {
-    // API unavailable — load demo data
-    loadMockData()
+    // API unavailable
   } finally {
     loading.value = false
   }

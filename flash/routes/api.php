@@ -283,29 +283,20 @@ Route::prefix('admin')
 
         // System Settings Management
         Route::prefix('settings')->name('settings.')->group(function () {
-            // Static routes first (before {setting} wildcard)
-            Route::put('/bulk',                [SettingsController::class, 'bulkUpdate'])->name('bulk-update');
+            // Audit Log
             Route::get('/audit-log',           [SettingsController::class, 'auditLog'])->name('audit-log');
+
+            // Maintenance Mode
             Route::get('/maintenance',         [SettingsController::class, 'maintenanceStatus'])->name('maintenance-status');
             Route::post('/maintenance/toggle', [SettingsController::class, 'toggleMaintenance'])->name('maintenance-toggle');
-            Route::post('/test-integration',   [SettingsController::class, 'testIntegration'])->name('test-integration');
-            Route::post('/reset/{group}',      [SettingsController::class, 'resetGroup'])->name('reset-group');
+            Route::put('/maintenance',         [SettingsController::class, 'updateMaintenance'])->name('maintenance-update');
 
-            // CRUD
-            Route::get('/',              [SettingsController::class, 'index'])->name('index');
-            Route::post('/',             [SettingsController::class, 'store'])->name('store');
-            Route::get('/{setting}',     [SettingsController::class, 'show'])->name('show');
-            Route::put('/{setting}',     [SettingsController::class, 'update'])->name('update');
-            Route::delete('/{setting}',  [SettingsController::class, 'destroy'])->name('destroy');
-
-            // Toggle feature
-            Route::post('/{setting}/toggle', [SettingsController::class, 'toggle'])->name('toggle');
+            // AI Integrations
+            Route::get('/ai-integrations',          [SettingsController::class, 'aiIntegrations'])->name('ai-integrations');
+            Route::put('/ai-integrations',          [SettingsController::class, 'updateAiIntegrations'])->name('ai-integrations-update');
+            Route::post('/ai-integrations/test',    [SettingsController::class, 'testAiIntegration'])->name('ai-integrations-test');
         });
 
     });
 
-// ──────────────────────────────────────────────
-//  Public Settings (no auth required)
-// ──────────────────────────────────────────────
 
-Route::get('/settings/public', [SettingsController::class, 'publicSettings'])->name('settings.public');

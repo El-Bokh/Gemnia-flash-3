@@ -50,20 +50,10 @@ async function fetchRoles() {
     const res = await getRoles(params)
     roles.value = res.data
   } catch {
-    loadMockRoles()
+    // API unavailable
   } finally {
     loading.value = false
   }
-}
-
-function loadMockRoles() {
-  roles.value = [
-    { id: 1, name: 'Super Admin', slug: 'super-admin', description: 'Full system access with all permissions', is_default: false, permissions_count: 42, users_count: 2, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-04-01T10:00:00Z' },
-    { id: 2, name: 'Admin', slug: 'admin', description: 'Administrative access with most permissions', is_default: false, permissions_count: 35, users_count: 5, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-04-01T10:00:00Z' },
-    { id: 3, name: 'Moderator', slug: 'moderator', description: 'Content moderation and user management', is_default: false, permissions_count: 18, users_count: 8, created_at: '2026-01-15T00:00:00Z', updated_at: '2026-03-20T10:00:00Z' },
-    { id: 4, name: 'User', slug: 'user', description: 'Default registered user role', is_default: true, permissions_count: 12, users_count: 245, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-02-15T10:00:00Z' },
-    { id: 5, name: 'Viewer', slug: 'viewer', description: 'Read-only access to public content', is_default: false, permissions_count: 5, users_count: 32, created_at: '2026-02-01T00:00:00Z', updated_at: '2026-03-10T10:00:00Z' },
-  ]
 }
 
 onMounted(fetchRoles)

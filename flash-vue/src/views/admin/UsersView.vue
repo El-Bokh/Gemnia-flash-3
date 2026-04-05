@@ -61,58 +61,10 @@ async function fetchUsers() {
     users.value = res.data
     totalRecords.value = res.meta.total
   } catch {
-    loadMockUsers()
+    // API unavailable
   } finally {
     loading.value = false
   }
-}
-
-function loadMockUsers() {
-  const statuses = ['active', 'active', 'active', 'suspended', 'pending', 'banned', 'active', 'active']
-  const names = ['Sara Ahmed', 'Omar Ali', 'Mona Khaled', 'Youssef Nabil', 'Layla Hassan', 'Karim Mostafa', 'Nour Sayed', 'Amira El-Din', 'Hassan Ibrahim', 'Dina Farouk', 'Tamer Hosny', 'Rania Youssef', 'Ahmed Maher', 'Fatma Ali', 'Mahmoud Nasr']
-  const mockPlans = [
-    { id: 1, name: 'Free', slug: 'free', price: 0 },
-    { id: 2, name: 'Starter', slug: 'starter', price: 19 },
-    { id: 3, name: 'Pro', slug: 'pro', price: 49 },
-  ] as const
-
-  users.value = names.map<User>((name, i) => {
-    const mockStatus = statuses[i % statuses.length] ?? 'active'
-    const mockPlan = mockPlans[i % mockPlans.length] ?? mockPlans[0]
-
-    return {
-      id: i + 1,
-      name,
-      email: `${name.toLowerCase().replace(' ', '.')}@klek.ai`,
-      phone: i % 3 === 0 ? '+20 10' + String(i).padStart(8, '0') : null,
-      avatar: null,
-      status: mockStatus,
-      locale: 'en',
-      timezone: 'UTC',
-      email_verified_at: i % 4 !== 3 ? '2026-03-15T10:00:00Z' : null,
-      last_login_at: i < 10 ? `2026-04-0${(i % 4) + 1}T${10 + i}:30:00Z` : null,
-      last_login_ip: i < 10 ? `192.168.1.${10 + i}` : null,
-      created_at: `2026-0${(i % 3) + 1}-${String((i % 28) + 1).padStart(2, '0')}T09:00:00Z`,
-      updated_at: '2026-04-03T12:00:00Z',
-      roles: [{ id: i % 3 === 0 ? 1 : 2, name: i % 3 === 0 ? 'Admin' : 'User', slug: i % 3 === 0 ? 'admin' : 'user' }],
-      active_subscription: i % 5 !== 4 ? {
-        id: i + 100,
-        plan: { id: mockPlan.id, name: mockPlan.name, slug: mockPlan.slug },
-        billing_cycle: i % 2 === 0 ? 'monthly' : 'yearly',
-        status: 'active',
-        price: mockPlan.price,
-        currency: 'USD',
-        credits_remaining: 50 + i * 10,
-        credits_total: 100 + i * 10,
-        starts_at: '2026-03-01T00:00:00Z',
-        ends_at: '2026-04-01T00:00:00Z',
-        trial_ends_at: null,
-        auto_renew: true,
-      } : null,
-      stats: { ai_requests_count: 20 + i * 5, generated_images_count: 15 + i * 3, total_credits_used: 80 + i * 12 },
-    }
-  })
-  totalRecords.value = names.length
 }
 
 onMounted(fetchUsers)

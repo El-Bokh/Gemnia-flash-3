@@ -1,70 +1,3 @@
-// ─── Setting Types ──────────────────────────────────────
-
-export type SettingType = 'string' | 'text' | 'boolean' | 'integer' | 'float' | 'json'
-
-export interface Setting {
-  id: number
-  group: string
-  key: string
-  value: string | number | boolean | Record<string, unknown> | unknown[] | null
-  raw_value?: string | null
-  type: SettingType
-  display_name: string | null
-  description: string | null
-  is_public: boolean
-  is_encrypted: boolean
-  options: Record<string, unknown>[] | null
-  sort_order: number
-  updated_at: string | null
-}
-
-export interface SettingGroup {
-  group: string
-  count: number
-  settings: Setting[]
-}
-
-// ─── Request Params ─────────────────────────────────────
-
-export interface ListSettingsParams {
-  group?: string
-  search?: string
-  type?: SettingType
-  is_public?: boolean
-}
-
-export interface CreateSettingData {
-  key: string
-  value: unknown
-  group?: string
-  type?: SettingType
-  display_name?: string
-  description?: string | null
-  is_public?: boolean
-  is_encrypted?: boolean
-  options?: Record<string, unknown>[] | null
-  sort_order?: number
-}
-
-export interface UpdateSettingData {
-  value: unknown
-}
-
-export interface BulkUpdateSettingItem {
-  key: string
-  value: unknown
-}
-
-export interface BulkUpdateResult {
-  updated: Setting[]
-  errors: BulkUpdateError[]
-}
-
-export interface BulkUpdateError {
-  key: string
-  message: string
-}
-
 // ─── Maintenance ────────────────────────────────────────
 
 export interface MaintenanceStatus {
@@ -73,36 +6,62 @@ export interface MaintenanceStatus {
   allowed_ips: string[]
 }
 
-// ─── Test Integration ───────────────────────────────────
-
-export type IntegrationType = 'openai' | 'stability_ai' | 'stripe' | 'paypal' | 'mailgun' | 'smtp' | 'google_analytics'
-
-export interface TestIntegrationData {
-  integration: IntegrationType
+export interface UpdateMaintenanceData {
+  message?: string
+  allowed_ips?: string[]
 }
 
-export interface TestIntegrationResult {
+// ─── AI Integrations ────────────────────────────────────
+
+export type AiIntegrationType = 'openai' | 'stability_ai'
+
+export interface AiIntegrationSetting {
+  id: number
+  key: string
+  value: string | number | boolean | null
+  type: string
+  display_name: string | null
+  description: string | null
+  is_encrypted: boolean
+  group: string
+}
+
+export interface UpdateAiIntegrationItem {
+  key: string
+  value: unknown
+}
+
+export interface UpdateAiIntegrationResult {
+  updated: { key: string; value: unknown }[]
+  errors: { key: string; message: string }[]
+}
+
+export interface TestAiIntegrationData {
+  integration: AiIntegrationType
+}
+
+export interface TestAiIntegrationResult {
   success: boolean
   message: string
 }
 
 // ─── Audit Log ──────────────────────────────────────────
 
-export interface SettingAuditLogUser {
+export interface AuditLogUser {
   id: number
   name: string
   email: string
   avatar: string | null
 }
 
-export interface SettingAuditLogEntry {
+export interface AuditLogEntry {
   id: number
   user_id: number
   action: string
   metadata: Record<string, unknown> | null
   created_at: string
   updated_at: string
-  user: SettingAuditLogUser | null
+  user: AuditLogUser | null
 }
 
 export interface AuditLogParams {

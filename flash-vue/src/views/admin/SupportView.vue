@@ -131,7 +131,7 @@ async function fetchTickets() {
     tickets.value = res.data
     ticketTotalRecords.value = res.meta.total
   } catch {
-    loadMockTickets()
+    // API unavailable
   } finally {
     ticketsLoading.value = false
   }
@@ -155,7 +155,7 @@ async function fetchCoupons() {
     coupons.value = res.data
     couponTotalRecords.value = res.meta.total
   } catch {
-    loadMockCoupons()
+    // API unavailable
   } finally {
     couponsLoading.value = false
   }
@@ -168,238 +168,9 @@ async function fetchAggregations() {
     ticketAggregations.value = ticketRes.data
     couponAggregations.value = couponRes.data
   } catch {
-    loadMockAggregations()
+    // API unavailable
   } finally {
     aggregationsLoading.value = false
-  }
-}
-
-function loadMockTickets() {
-  tickets.value = [
-    {
-      id: 18,
-      uuid: 'tkt_001',
-      ticket_number: 'SUP-2026-0018',
-      subject: 'Refund processed but credits were not restored',
-      message_preview: 'Customer was refunded successfully, but credit balance remains reduced inside workspace.',
-      status: 'in_progress',
-      priority: 'high',
-      category: 'billing',
-      replies_count: 3,
-      last_reply_at: '2026-04-04T09:38:00Z',
-      resolved_at: null,
-      closed_at: null,
-      created_at: '2026-04-04T08:55:00Z',
-      updated_at: '2026-04-04T09:38:00Z',
-      deleted_at: null,
-      user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
-      assigned_agent: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', avatar: null },
-      user_subscription: { id: 21, status: 'active', billing_cycle: 'monthly', plan: { id: 3, name: 'Pro', slug: 'pro' } },
-    },
-    {
-      id: 22,
-      uuid: 'tkt_002',
-      ticket_number: 'SUP-2026-0022',
-      subject: 'Generated image queue is stuck on processing',
-      message_preview: 'The request has been processing for over 40 minutes with no completion event.',
-      status: 'waiting_reply',
-      priority: 'urgent',
-      category: 'ai_generation',
-      replies_count: 5,
-      last_reply_at: '2026-04-04T10:12:00Z',
-      resolved_at: null,
-      closed_at: null,
-      created_at: '2026-04-04T07:20:00Z',
-      updated_at: '2026-04-04T10:12:00Z',
-      deleted_at: null,
-      user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null },
-      assigned_agent: null,
-      user_subscription: { id: 22, status: 'active', billing_cycle: 'monthly', plan: { id: 2, name: 'Starter', slug: 'starter' } },
-    },
-    {
-      id: 24,
-      uuid: 'tkt_003',
-      ticket_number: 'SUP-2026-0024',
-      subject: 'Need invoice copy for accounting archive',
-      message_preview: 'Customer requested signed invoice PDF for last Enterprise renewal.',
-      status: 'resolved',
-      priority: 'medium',
-      category: 'documents',
-      replies_count: 2,
-      last_reply_at: '2026-04-03T16:44:00Z',
-      resolved_at: '2026-04-03T17:02:00Z',
-      closed_at: null,
-      created_at: '2026-04-03T15:32:00Z',
-      updated_at: '2026-04-03T17:02:00Z',
-      deleted_at: null,
-      user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null },
-      assigned_agent: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null },
-      user_subscription: { id: 23, status: 'cancelled', billing_cycle: 'yearly', plan: { id: 4, name: 'Enterprise', slug: 'enterprise' } },
-    },
-    {
-      id: 29,
-      uuid: 'tkt_004',
-      ticket_number: 'SUP-2026-0029',
-      subject: 'Workspace owner can\'t update card details',
-      message_preview: 'Billing page returns invalid state after SCA step completes.',
-      status: 'open',
-      priority: 'high',
-      category: 'billing',
-      replies_count: 1,
-      last_reply_at: null,
-      resolved_at: null,
-      closed_at: null,
-      created_at: '2026-04-04T10:05:00Z',
-      updated_at: '2026-04-04T10:05:00Z',
-      deleted_at: '2026-04-04T10:10:00Z',
-      user: { id: 4, name: 'Karim Mostafa', email: 'karim@klek.ai', avatar: null },
-      assigned_agent: null,
-      user_subscription: null,
-    },
-  ]
-  ticketTotalRecords.value = 148
-}
-
-function loadMockCoupons() {
-  coupons.value = [
-    {
-      id: 3,
-      code: 'SPRING10',
-      name: 'Spring Promo',
-      discount_type: 'percentage',
-      discount_value: 10,
-      currency: 'USD',
-      is_active: true,
-      max_uses: 500,
-      max_uses_per_user: 2,
-      times_used: 148,
-      usage_percentage: 29.6,
-      starts_at: '2026-04-01T00:00:00Z',
-      expires_at: '2026-04-30T23:59:00Z',
-      is_expired: false,
-      applicable_plan: { id: 3, name: 'Pro', slug: 'pro' },
-      created_at: '2026-04-01T00:00:00Z',
-      deleted_at: null,
-    },
-    {
-      id: 8,
-      code: 'VIP20',
-      name: 'VIP Recovery',
-      discount_type: 'fixed_amount',
-      discount_value: 20,
-      currency: 'USD',
-      is_active: true,
-      max_uses: 120,
-      max_uses_per_user: 1,
-      times_used: 61,
-      usage_percentage: 50.8,
-      starts_at: '2026-03-20T00:00:00Z',
-      expires_at: '2026-04-15T23:59:00Z',
-      is_expired: false,
-      applicable_plan: { id: 4, name: 'Enterprise', slug: 'enterprise' },
-      created_at: '2026-03-20T00:00:00Z',
-      deleted_at: null,
-    },
-    {
-      id: 11,
-      code: 'CREDIT25',
-      name: 'Support Recovery Credits',
-      discount_type: 'credits',
-      discount_value: 25,
-      currency: 'USD',
-      is_active: false,
-      max_uses: 40,
-      max_uses_per_user: 1,
-      times_used: 17,
-      usage_percentage: 42.5,
-      starts_at: '2026-02-01T00:00:00Z',
-      expires_at: '2026-03-01T00:00:00Z',
-      is_expired: true,
-      applicable_plan: null,
-      created_at: '2026-02-01T00:00:00Z',
-      deleted_at: null,
-    },
-    {
-      id: 14,
-      code: 'RESTART15',
-      name: 'Restart Flow',
-      discount_type: 'percentage',
-      discount_value: 15,
-      currency: 'USD',
-      is_active: true,
-      max_uses: 80,
-      max_uses_per_user: 1,
-      times_used: 23,
-      usage_percentage: 28.7,
-      starts_at: '2026-04-02T00:00:00Z',
-      expires_at: '2026-04-25T23:59:00Z',
-      is_expired: false,
-      applicable_plan: { id: 2, name: 'Starter', slug: 'starter' },
-      created_at: '2026-04-02T00:00:00Z',
-      deleted_at: '2026-04-03T00:00:00Z',
-    },
-  ]
-  couponTotalRecords.value = 64
-}
-
-function loadMockAggregations() {
-  ticketAggregations.value = {
-    summary: {
-      total_tickets: 148,
-      open_count: 34,
-      in_progress_count: 29,
-      waiting_reply_count: 18,
-      resolved_count: 51,
-      closed_count: 16,
-      unassigned_active_count: 11,
-    },
-    by_priority: [
-      { priority: 'low', count: 18, active_count: 3 },
-      { priority: 'medium', count: 44, active_count: 10 },
-      { priority: 'high', count: 59, active_count: 24 },
-      { priority: 'urgent', count: 27, active_count: 15 },
-    ],
-    by_category: [
-      { category: 'billing', count: 56 },
-      { category: 'ai_generation', count: 33 },
-      { category: 'account', count: 21 },
-      { category: 'documents', count: 14 },
-    ],
-    agent_performance: [
-      { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', total_assigned: 31, resolved_count: 19, active_count: 12, avg_resolution_hours: 5.4 },
-      { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', total_assigned: 24, resolved_count: 17, active_count: 7, avg_resolution_hours: 4.2 },
-      { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', total_assigned: 17, resolved_count: 9, active_count: 8, avg_resolution_hours: 6.8 },
-    ],
-    daily_trend: [
-      { date: '2026-03-29', created: 14, resolved: 9 },
-      { date: '2026-03-30', created: 18, resolved: 10 },
-      { date: '2026-03-31', created: 16, resolved: 12 },
-      { date: '2026-04-01', created: 21, resolved: 13 },
-      { date: '2026-04-02', created: 24, resolved: 15 },
-      { date: '2026-04-03', created: 19, resolved: 18 },
-      { date: '2026-04-04', created: 22, resolved: 11 },
-    ],
-    avg_first_response: { avg_first_response_minutes: 42 },
-  }
-
-  couponAggregations.value = {
-    summary: {
-      total_coupons: 64,
-      active_count: 41,
-      inactive_count: 23,
-      total_uses: 612,
-    },
-    expired_count: 13,
-    by_type: [
-      { discount_type: 'percentage', count: 31, total_uses: 318 },
-      { discount_type: 'fixed_amount', count: 21, total_uses: 201 },
-      { discount_type: 'credits', count: 12, total_uses: 93 },
-    ],
-    top_coupons: [
-      { id: 3, code: 'SPRING10', name: 'Spring Promo', discount_type: 'percentage', discount_value: 10, times_used: 148 },
-      { id: 8, code: 'VIP20', name: 'VIP Recovery', discount_type: 'fixed_amount', discount_value: 20, times_used: 61 },
-      { id: 14, code: 'RESTART15', name: 'Restart Flow', discount_type: 'percentage', discount_value: 15, times_used: 23 },
-    ],
   }
 }
 

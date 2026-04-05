@@ -1,54 +1,25 @@
-import { apiGet, apiPost, apiPut, apiDelete } from '@/api/client'
+import { apiGet, apiPost, apiPut } from '@/api/client'
 import type { ApiResponse, PaginatedResponse } from '@/api/client'
 import type {
-  Setting,
-  SettingGroup,
-  ListSettingsParams,
-  CreateSettingData,
-  UpdateSettingData,
-  BulkUpdateSettingItem,
-  BulkUpdateResult,
   MaintenanceStatus,
-  TestIntegrationData,
-  TestIntegrationResult,
-  SettingAuditLogEntry,
+  UpdateMaintenanceData,
+  AiIntegrationSetting,
+  UpdateAiIntegrationItem,
+  UpdateAiIntegrationResult,
+  TestAiIntegrationData,
+  TestAiIntegrationResult,
+  AuditLogEntry,
   AuditLogParams,
 } from '@/types/settings'
 
 const BASE = '/admin/settings'
 
-export function getSettings(params?: ListSettingsParams) {
-  return apiGet<ApiResponse<SettingGroup[]>>(BASE, { params })
+// ── Audit Log ───────────────────────────────────────────
+export function getAuditLog(params?: AuditLogParams) {
+  return apiGet<PaginatedResponse<AuditLogEntry>>(`${BASE}/audit-log`, { params })
 }
 
-export function getSetting(id: number) {
-  return apiGet<ApiResponse<Setting>>(`${BASE}/${id}`)
-}
-
-export function createSetting(data: CreateSettingData) {
-  return apiPost<ApiResponse<Setting>>(BASE, data)
-}
-
-export function updateSetting(id: number, data: UpdateSettingData) {
-  return apiPut<ApiResponse<Setting>>(`${BASE}/${id}`, data)
-}
-
-export function deleteSetting(id: number) {
-  return apiDelete<ApiResponse<null>>(`${BASE}/${id}`)
-}
-
-export function toggleSetting(id: number) {
-  return apiPost<ApiResponse<Setting>>(`${BASE}/${id}/toggle`)
-}
-
-export function bulkUpdateSettings(settings: BulkUpdateSettingItem[]) {
-  return apiPut<ApiResponse<BulkUpdateResult>>(`${BASE}/bulk`, { settings })
-}
-
-export function resetSettingsGroup(group: string) {
-  return apiPost<ApiResponse<Setting[]>>(`${BASE}/reset/${group}`)
-}
-
+// ── Maintenance Mode ────────────────────────────────────
 export function getMaintenanceStatus() {
   return apiGet<ApiResponse<MaintenanceStatus>>(`${BASE}/maintenance`)
 }
@@ -57,14 +28,19 @@ export function toggleMaintenance() {
   return apiPost<ApiResponse<MaintenanceStatus>>(`${BASE}/maintenance/toggle`)
 }
 
-export function testIntegration(data: TestIntegrationData) {
-  return apiPost<ApiResponse<TestIntegrationResult>>(`${BASE}/test-integration`, data)
+export function updateMaintenance(data: UpdateMaintenanceData) {
+  return apiPut<ApiResponse<MaintenanceStatus>>(`${BASE}/maintenance`, data)
 }
 
-export function getSettingsAuditLog(params?: AuditLogParams) {
-  return apiGet<PaginatedResponse<SettingAuditLogEntry>>(`${BASE}/audit-log`, { params })
+// ── AI Integrations ─────────────────────────────────────
+export function getAiIntegrations() {
+  return apiGet<ApiResponse<AiIntegrationSetting[]>>(`${BASE}/ai-integrations`)
 }
 
-export function getPublicSettings() {
-  return apiGet<ApiResponse<Record<string, unknown>>>('/settings/public')
+export function updateAiIntegrations(settings: UpdateAiIntegrationItem[]) {
+  return apiPut<ApiResponse<UpdateAiIntegrationResult>>(`${BASE}/ai-integrations`, { settings })
+}
+
+export function testAiIntegration(data: TestAiIntegrationData) {
+  return apiPost<ApiResponse<TestAiIntegrationResult>>(`${BASE}/ai-integrations/test`, data)
 }

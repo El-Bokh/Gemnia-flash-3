@@ -126,7 +126,7 @@ async function fetchPlans() {
     const res = await getPlans(params)
     plans.value = [...res.data].sort((left, right) => left.sort_order - right.sort_order)
   } catch {
-    loadMockPlans()
+    // API unavailable
   } finally {
     plansLoading.value = false
   }
@@ -148,117 +148,10 @@ async function fetchFeatures() {
     const res = await getFeatures(params)
     features.value = [...res.data].sort((left, right) => left.sort_order - right.sort_order)
   } catch {
-    loadMockFeatures()
+    // API unavailable
   } finally {
     featuresLoading.value = false
   }
-}
-
-function loadMockPlans() {
-  plans.value = [
-    {
-      id: 1,
-      name: 'Free',
-      slug: 'free',
-      description: 'Entry plan for light usage and onboarding.',
-      price_monthly: 0,
-      price_yearly: 0,
-      currency: 'USD',
-      credits_monthly: 120,
-      credits_yearly: 1200,
-      is_free: true,
-      is_active: true,
-      is_featured: false,
-      sort_order: 1,
-      trial_days: 0,
-      metadata: null,
-      created_at: '2026-01-04T10:00:00Z',
-      updated_at: '2026-04-02T12:00:00Z',
-      deleted_at: null,
-      features_count: 8,
-      subscriptions_count: 420,
-      active_subscriptions_count: 402,
-    },
-    {
-      id: 2,
-      name: 'Starter',
-      slug: 'starter',
-      description: 'Balanced plan for teams with weekly generation needs.',
-      price_monthly: 19,
-      price_yearly: 190,
-      currency: 'USD',
-      credits_monthly: 900,
-      credits_yearly: 10800,
-      is_free: false,
-      is_active: true,
-      is_featured: true,
-      sort_order: 2,
-      trial_days: 7,
-      metadata: null,
-      created_at: '2026-01-06T10:00:00Z',
-      updated_at: '2026-04-02T12:00:00Z',
-      deleted_at: null,
-      features_count: 14,
-      subscriptions_count: 310,
-      active_subscriptions_count: 298,
-    },
-    {
-      id: 3,
-      name: 'Pro',
-      slug: 'pro',
-      description: 'High-throughput plan with premium features and faster models.',
-      price_monthly: 49,
-      price_yearly: 490,
-      currency: 'USD',
-      credits_monthly: 2800,
-      credits_yearly: 33600,
-      is_free: false,
-      is_active: true,
-      is_featured: true,
-      sort_order: 3,
-      trial_days: 14,
-      metadata: null,
-      created_at: '2026-01-08T10:00:00Z',
-      updated_at: '2026-04-02T12:00:00Z',
-      deleted_at: null,
-      features_count: 20,
-      subscriptions_count: 188,
-      active_subscriptions_count: 180,
-    },
-    {
-      id: 4,
-      name: 'Enterprise',
-      slug: 'enterprise',
-      description: 'Custom governance, highest limits, and advanced controls.',
-      price_monthly: 199,
-      price_yearly: 1990,
-      currency: 'USD',
-      credits_monthly: 12000,
-      credits_yearly: 144000,
-      is_free: false,
-      is_active: false,
-      is_featured: false,
-      sort_order: 4,
-      trial_days: 30,
-      metadata: null,
-      created_at: '2026-01-09T10:00:00Z',
-      updated_at: '2026-04-02T12:00:00Z',
-      deleted_at: null,
-      features_count: 28,
-      subscriptions_count: 42,
-      active_subscriptions_count: 39,
-    },
-  ]
-}
-
-function loadMockFeatures() {
-  features.value = [
-    { id: 1, name: 'Text to Image', slug: 'text-to-image', description: 'Prompt-based image generation.', type: 'text_to_image', is_active: true, sort_order: 1, metadata: null, created_at: '2026-01-04T10:00:00Z', updated_at: '2026-03-01T10:00:00Z', plans_count: 4 },
-    { id: 2, name: 'Image to Image', slug: 'image-to-image', description: 'Transform existing assets into new variants.', type: 'image_to_image', is_active: true, sort_order: 2, metadata: null, created_at: '2026-01-04T10:00:00Z', updated_at: '2026-03-01T10:00:00Z', plans_count: 3 },
-    { id: 3, name: 'Inpainting', slug: 'inpainting', description: 'Edit selected image regions with targeted prompts.', type: 'inpainting', is_active: true, sort_order: 3, metadata: null, created_at: '2026-01-04T10:00:00Z', updated_at: '2026-03-01T10:00:00Z', plans_count: 2 },
-    { id: 4, name: 'Upscale', slug: 'upscale', description: 'High-resolution output enhancement.', type: 'upscale', is_active: false, sort_order: 4, metadata: null, created_at: '2026-01-04T10:00:00Z', updated_at: '2026-03-01T10:00:00Z', plans_count: 3 },
-    { id: 5, name: 'Priority Queue', slug: 'priority-queue', description: 'Shorter queue times for premium tiers.', type: 'other', is_active: true, sort_order: 5, metadata: null, created_at: '2026-01-04T10:00:00Z', updated_at: '2026-03-01T10:00:00Z', plans_count: 2 },
-  ]
 }
 
 function openCreatePlan() {

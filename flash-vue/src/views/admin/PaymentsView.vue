@@ -124,7 +124,7 @@ async function fetchPayments() {
     payments.value = res.data
     paymentTotalRecords.value = res.meta.total
   } catch {
-    loadMockPayments()
+    // API unavailable
   } finally {
     paymentsLoading.value = false
   }
@@ -147,7 +147,7 @@ async function fetchInvoices() {
     invoices.value = res.data
     invoiceTotalRecords.value = res.meta.total
   } catch {
-    loadMockInvoices()
+    // API unavailable
   } finally {
     invoicesLoading.value = false
   }
@@ -160,95 +160,9 @@ async function fetchAggregations() {
     paymentAggregations.value = paymentsRes.data
     invoiceAggregations.value = invoicesRes.data
   } catch {
-    loadMockAggregations()
+    // API unavailable
   } finally {
     aggregationsLoading.value = false
-  }
-}
-
-function loadMockPayments() {
-  payments.value = [
-    { id: 501, uuid: 'pay_001', payment_gateway: 'stripe', gateway_payment_id: 'pi_001', status: 'completed', amount: 49, discount_amount: 5, tax_amount: 2.2, net_amount: 46.2, currency: 'USD', payment_method: 'card', description: 'Pro monthly renewal', refunded_amount: 0, refunded_at: null, paid_at: '2026-04-04T08:30:00Z', created_at: '2026-04-04T08:28:00Z', updated_at: '2026-04-04T08:30:00Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null }, subscription: { id: 21, status: 'active', plan: { id: 3, name: 'Pro', slug: 'pro' } }, coupon: { id: 3, code: 'SPRING10', discount_type: 'percent', discount_value: 10 }, invoices_count: 1 },
-    { id: 502, uuid: 'pay_002', payment_gateway: 'paypal', gateway_payment_id: 'txn_002', status: 'pending', amount: 19, discount_amount: 0, tax_amount: 0.95, net_amount: 19.95, currency: 'USD', payment_method: 'paypal_balance', description: 'Starter monthly', refunded_amount: 0, refunded_at: null, paid_at: null, created_at: '2026-04-04T09:05:00Z', updated_at: '2026-04-04T09:05:00Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null }, subscription: { id: 22, status: 'pending', plan: { id: 2, name: 'Starter', slug: 'starter' } }, coupon: null, invoices_count: 0 },
-    { id: 503, uuid: 'pay_003', payment_gateway: 'stripe', gateway_payment_id: 'pi_003', status: 'refunded', amount: 199, discount_amount: 20, tax_amount: 8.95, net_amount: 187.95, currency: 'USD', payment_method: 'card', description: 'Enterprise annual', refunded_amount: 187.95, refunded_at: '2026-04-03T18:00:00Z', paid_at: '2026-04-02T16:40:00Z', created_at: '2026-04-02T16:38:00Z', updated_at: '2026-04-03T18:00:00Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null }, subscription: { id: 23, status: 'cancelled', plan: { id: 4, name: 'Enterprise', slug: 'enterprise' } }, coupon: { id: 8, code: 'VIP20', discount_type: 'amount', discount_value: 20 }, invoices_count: 1 },
-    { id: 504, uuid: 'pay_004', payment_gateway: 'stripe', gateway_payment_id: 'pi_004', status: 'failed', amount: 19, discount_amount: 0, tax_amount: 0.95, net_amount: 19.95, currency: 'USD', payment_method: 'card', description: 'Starter upgrade attempt', refunded_amount: 0, refunded_at: null, paid_at: null, created_at: '2026-04-03T11:10:00Z', updated_at: '2026-04-03T11:12:00Z', deleted_at: null, user: { id: 4, name: 'Karim Mostafa', email: 'karim@klek.ai', avatar: null }, subscription: null, coupon: null, invoices_count: 0 },
-    { id: 505, uuid: 'pay_005', payment_gateway: 'stripe', gateway_payment_id: 'pi_005', status: 'completed', amount: 49, discount_amount: 0, tax_amount: 2.45, net_amount: 51.45, currency: 'USD', payment_method: 'card', description: 'Pro monthly', refunded_amount: 0, refunded_at: null, paid_at: '2026-04-01T13:12:00Z', created_at: '2026-04-01T13:10:00Z', updated_at: '2026-04-01T13:12:00Z', deleted_at: '2026-04-03T00:00:00Z', user: { id: 5, name: 'Layla Hassan', email: 'layla@klek.ai', avatar: null }, subscription: { id: 24, status: 'active', plan: { id: 3, name: 'Pro', slug: 'pro' } }, coupon: null, invoices_count: 1 },
-  ]
-  paymentTotalRecords.value = 184
-}
-
-function loadMockInvoices() {
-  invoices.value = [
-    { id: 701, uuid: 'inv_001', invoice_number: 'INV-2026-0001', status: 'paid', subtotal: 49, discount_amount: 5, tax_amount: 2.2, total: 46.2, currency: 'USD', issued_at: '2026-04-04T08:29:00Z', due_at: '2026-04-11T08:29:00Z', paid_at: '2026-04-04T08:30:00Z', created_at: '2026-04-04T08:29:00Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai' }, payment: { id: 501, uuid: 'pay_001', payment_gateway: 'stripe', status: 'completed', amount: 49 }, subscription: { id: 21, status: 'active', plan: { id: 3, name: 'Pro' } } },
-    { id: 702, uuid: 'inv_002', invoice_number: 'INV-2026-0002', status: 'issued', subtotal: 19, discount_amount: 0, tax_amount: 0.95, total: 19.95, currency: 'USD', issued_at: '2026-04-04T09:05:00Z', due_at: '2026-04-11T09:05:00Z', paid_at: null, created_at: '2026-04-04T09:05:00Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai' }, payment: null, subscription: { id: 22, status: 'pending', plan: { id: 2, name: 'Starter' } } },
-    { id: 703, uuid: 'inv_003', invoice_number: 'INV-2026-0003', status: 'refunded', subtotal: 199, discount_amount: 20, tax_amount: 8.95, total: 187.95, currency: 'USD', issued_at: '2026-04-02T16:39:00Z', due_at: '2026-04-09T16:39:00Z', paid_at: '2026-04-02T16:40:00Z', created_at: '2026-04-02T16:39:00Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai' }, payment: { id: 503, uuid: 'pay_003', payment_gateway: 'stripe', status: 'refunded', amount: 199 }, subscription: { id: 23, status: 'cancelled', plan: { id: 4, name: 'Enterprise' } } },
-    { id: 704, uuid: 'inv_004', invoice_number: 'INV-2026-0004', status: 'overdue', subtotal: 99, discount_amount: 0, tax_amount: 4.95, total: 103.95, currency: 'USD', issued_at: '2026-03-26T10:00:00Z', due_at: '2026-04-02T10:00:00Z', paid_at: null, created_at: '2026-03-26T10:00:00Z', deleted_at: null, user: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai' }, payment: null, subscription: null },
-    { id: 705, uuid: 'inv_005', invoice_number: 'INV-2026-0005', status: 'paid', subtotal: 49, discount_amount: 0, tax_amount: 2.45, total: 51.45, currency: 'USD', issued_at: '2026-04-01T13:11:00Z', due_at: '2026-04-08T13:11:00Z', paid_at: '2026-04-01T13:12:00Z', created_at: '2026-04-01T13:11:00Z', deleted_at: '2026-04-03T00:00:00Z', user: { id: 5, name: 'Layla Hassan', email: 'layla@klek.ai' }, payment: { id: 505, uuid: 'pay_005', payment_gateway: 'stripe', status: 'completed', amount: 49 }, subscription: { id: 24, status: 'active', plan: { id: 3, name: 'Pro' } } },
-  ]
-  invoiceTotalRecords.value = 129
-}
-
-function loadMockAggregations() {
-  paymentAggregations.value = {
-    summary: {
-      total_payments: 4218,
-      total_revenue: 183420,
-      total_net_revenue: 171804,
-      total_discounts: 8160,
-      total_taxes: 6544,
-      total_refunded: 12355,
-      avg_payment_amount: 43.5,
-      completed_count: 3782,
-      failed_count: 146,
-      pending_count: 104,
-      refunded_count: 132,
-      disputed_count: 54,
-    },
-    by_gateway: [
-      { payment_gateway: 'stripe', count: 2910, total: 132450, net_total: 124880 },
-      { payment_gateway: 'paypal', count: 980, total: 33240, net_total: 31400 },
-      { payment_gateway: 'manual', count: 328, total: 17730, net_total: 15524 },
-    ],
-    by_currency: [{ currency: 'USD', count: 4020, total: 176900 }, { currency: 'EUR', count: 198, total: 6520 }],
-    daily_trend: [
-      { date: '2026-03-29', count: 54, total: 2240, net_total: 2108 },
-      { date: '2026-03-30', count: 61, total: 2630, net_total: 2472 },
-      { date: '2026-03-31', count: 58, total: 2510, net_total: 2360 },
-      { date: '2026-04-01', count: 66, total: 2810, net_total: 2646 },
-      { date: '2026-04-02', count: 73, total: 3240, net_total: 3054 },
-      { date: '2026-04-03', count: 69, total: 3010, net_total: 2829 },
-      { date: '2026-04-04', count: 77, total: 3480, net_total: 3286 },
-    ],
-    top_users: [
-      { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', payments_count: 18, total_spent: 882 },
-      { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', payments_count: 15, total_spent: 631 },
-      { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', payments_count: 13, total_spent: 594 },
-    ],
-    status_distribution: [
-      { status: 'completed', count: 3782, total: 171804 },
-      { status: 'pending', count: 104, total: 4920 },
-      { status: 'failed', count: 146, total: 6110 },
-      { status: 'refunded', count: 132, total: 12355 },
-      { status: 'disputed', count: 54, total: 2860 },
-    ],
-  }
-
-  invoiceAggregations.value = {
-    summary: {
-      total_invoices: 4021,
-      total_paid: 167910,
-      paid_count: 3580,
-      draft_count: 72,
-      issued_count: 188,
-      overdue_count: 121,
-      cancelled_count: 35,
-      refunded_count: 25,
-      avg_invoice_total: 41.7,
-    },
-    overdue: {
-      count: 121,
-      total: 8844,
-    },
   }
 }
 

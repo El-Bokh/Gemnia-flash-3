@@ -108,7 +108,7 @@ async function fetchRequests() {
     totalRecords.value = res.meta.total
     selectedIds.value = selectedIds.value.filter(id => requests.value.some(item => item.id === id))
   } catch {
-    loadMockRequests()
+    // API unavailable
   } finally {
     loading.value = false
   }
@@ -120,67 +120,9 @@ async function fetchAggregations() {
     const res = await getAiRequestAggregations()
     aggregations.value = res.data
   } catch {
-    loadMockAggregations()
+    // API unavailable
   } finally {
     aggregationsLoading.value = false
-  }
-}
-
-function loadMockRequests() {
-  requests.value = [
-    { id: 101, uuid: 'req_001', type: 'text_to_image', status: 'completed', user_prompt: 'Luxury perfume bottle on stone podium with soft shadows', model_used: 'flux-pro', engine_provider: 'fal', width: 1024, height: 1024, num_images: 4, credits_consumed: 12, retry_count: 0, processing_time_ms: 4200, error_message: null, error_code: null, started_at: '2026-04-04T08:30:00Z', completed_at: '2026-04-04T08:30:04Z', created_at: '2026-04-04T08:30:00Z', updated_at: '2026-04-04T08:30:04Z', deleted_at: null, user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null }, visual_style: { id: 3, name: 'Editorial Luxe', slug: 'editorial-luxe', thumbnail: null }, generated_images_count: 4 },
-    { id: 102, uuid: 'req_002', type: 'image_to_image', status: 'processing', user_prompt: 'Convert this room photo into Nordic interior style', model_used: 'sdxl-img2img', engine_provider: 'replicate', width: 1344, height: 768, num_images: 2, credits_consumed: 8, retry_count: 1, processing_time_ms: null, error_message: null, error_code: null, started_at: '2026-04-04T08:42:00Z', completed_at: null, created_at: '2026-04-04T08:42:00Z', updated_at: '2026-04-04T08:42:15Z', deleted_at: null, user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null }, visual_style: { id: 4, name: 'Nordic Clean', slug: 'nordic-clean', thumbnail: null }, generated_images_count: 0 },
-    { id: 103, uuid: 'req_003', type: 'inpainting', status: 'failed', user_prompt: 'Remove the background crowd and extend jacket texture naturally', model_used: 'sdxl-inpaint', engine_provider: 'fal', width: 1024, height: 1536, num_images: 1, credits_consumed: 5, retry_count: 2, processing_time_ms: 1900, error_message: 'Worker timeout during inpaint stage', error_code: 'WORKER_TIMEOUT', started_at: '2026-04-04T07:58:00Z', completed_at: '2026-04-04T07:58:02Z', created_at: '2026-04-04T07:58:00Z', updated_at: '2026-04-04T07:58:02Z', deleted_at: null, user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null }, visual_style: null, generated_images_count: 0 },
-    { id: 104, uuid: 'req_004', type: 'upscale', status: 'pending', user_prompt: 'Upscale product thumbnail for homepage hero banner', model_used: 'real-esrgan', engine_provider: 'internal', width: 800, height: 800, num_images: 1, credits_consumed: 2, retry_count: 0, processing_time_ms: null, error_message: null, error_code: null, started_at: null, completed_at: null, created_at: '2026-04-04T08:48:00Z', updated_at: '2026-04-04T08:48:00Z', deleted_at: null, user: { id: 4, name: 'Karim Mostafa', email: 'karim@klek.ai', avatar: null }, visual_style: null, generated_images_count: 0 },
-    { id: 105, uuid: 'req_005', type: 'text_to_image', status: 'cancelled', user_prompt: 'Fashion campaign shot with reflective floor and blue backlight', model_used: 'flux-pro', engine_provider: 'fal', width: 1024, height: 1280, num_images: 3, credits_consumed: 0, retry_count: 1, processing_time_ms: 800, error_message: 'Cancelled by admin', error_code: 'ADMIN_CANCELLED', started_at: '2026-04-04T06:40:00Z', completed_at: '2026-04-04T06:40:01Z', created_at: '2026-04-04T06:40:00Z', updated_at: '2026-04-04T06:40:01Z', deleted_at: null, user: { id: 5, name: 'Layla Hassan', email: 'layla@klek.ai', avatar: null }, visual_style: { id: 5, name: 'Studio Blue', slug: 'studio-blue', thumbnail: null }, generated_images_count: 0 },
-    { id: 106, uuid: 'req_006', type: 'text_to_image', status: 'completed', user_prompt: 'Minimal UI dashboard illustration in black and gray', model_used: 'dall-e-3', engine_provider: 'openai', width: 1792, height: 1024, num_images: 1, credits_consumed: 10, retry_count: 0, processing_time_ms: 6100, error_message: null, error_code: null, started_at: '2026-04-03T19:20:00Z', completed_at: '2026-04-03T19:20:06Z', created_at: '2026-04-03T19:20:00Z', updated_at: '2026-04-03T19:20:06Z', deleted_at: '2026-04-04T00:30:00Z', user: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', avatar: null }, visual_style: { id: 2, name: 'Minimal Noir', slug: 'minimal-noir', thumbnail: null }, generated_images_count: 1 },
-  ]
-  totalRecords.value = 126
-}
-
-function loadMockAggregations() {
-  aggregations.value = {
-    overview: {
-      total_requests: 12842,
-      total_credits_consumed: 68420,
-      total_images_requested: 23811,
-      avg_processing_time_ms: 3240,
-      max_processing_time_ms: 15220,
-      min_processing_time_ms: 640,
-      avg_credits_per_request: 5.3,
-      avg_retry_count: 0.4,
-      requests_with_retries: 842,
-      success_rate: 91.4,
-      failure_rate: 4.8,
-    },
-    by_status: { pending: 42, processing: 18, completed: 11733, failed: 621, cancelled: 286, timeout: 142 },
-    by_type: { text_to_image: 8021, image_to_image: 2420, inpainting: 1103, upscale: 912, other: 386 },
-    by_engine: { fal: 5220, replicate: 2900, openai: 3410, internal: 1312 },
-    by_model: { 'flux-pro': 3310, 'dall-e-3': 2504, 'sdxl-img2img': 2114, 'sdxl-inpaint': 984, 'real-esrgan': 912 },
-    daily_trend: [
-      { date: '2026-03-29', total: 1710, completed: 1570, failed: 58, credits: 9031 },
-      { date: '2026-03-30', total: 1652, completed: 1511, failed: 66, credits: 8762 },
-      { date: '2026-03-31', total: 1780, completed: 1631, failed: 73, credits: 9540 },
-      { date: '2026-04-01', total: 1864, completed: 1708, failed: 81, credits: 9905 },
-      { date: '2026-04-02', total: 1930, completed: 1764, failed: 92, credits: 10362 },
-      { date: '2026-04-03', total: 2014, completed: 1838, failed: 111, credits: 10710 },
-      { date: '2026-04-04', total: 1892, completed: 1711, failed: 140, credits: 10110 },
-    ],
-    top_users: [
-      { user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null }, request_count: 382, total_credits: 2190, completed_count: 358 },
-      { user: { id: 2, name: 'Omar Ali', email: 'omar@klek.ai', avatar: null }, request_count: 341, total_credits: 1844, completed_count: 327 },
-      { user: { id: 3, name: 'Mona Khaled', email: 'mona@klek.ai', avatar: null }, request_count: 298, total_credits: 1652, completed_count: 276 },
-    ],
-    top_visual_styles: [
-      { style: { id: 1, name: 'Minimal Noir', slug: 'minimal-noir', thumbnail: null }, usage_count: 1220 },
-      { style: { id: 2, name: 'Editorial Luxe', slug: 'editorial-luxe', thumbnail: null }, usage_count: 981 },
-      { style: { id: 3, name: 'Nordic Clean', slug: 'nordic-clean', thumbnail: null }, usage_count: 744 },
-    ],
-    error_codes: [
-      { error_code: 'WORKER_TIMEOUT', count: 184 },
-      { error_code: 'MODEL_UNAVAILABLE', count: 96 },
-      { error_code: 'RATE_LIMITED', count: 53 },
-    ],
   }
 }
 
