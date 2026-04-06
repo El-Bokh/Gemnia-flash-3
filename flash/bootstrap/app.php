@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->statefulApi();
+
+        // Global API rate limiting
+        $middleware->throttleApi('120,1');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

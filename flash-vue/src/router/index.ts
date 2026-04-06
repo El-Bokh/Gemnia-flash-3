@@ -74,6 +74,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Plans & Features' },
       },
       {
+        path: 'styles',
+        name: 'admin-styles',
+        component: () => import('@/views/admin/StylesView.vue'),
+        meta: { title: 'Visual Styles' },
+      },
+      {
         path: 'payments',
         name: 'admin-payments',
         component: () => import('@/views/admin/PaymentsView.vue'),

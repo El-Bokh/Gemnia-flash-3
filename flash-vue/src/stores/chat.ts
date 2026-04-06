@@ -261,9 +261,8 @@ export const useChatStore = defineStore('chat', () => {
           const { useAuthStore } = await import('@/stores/auth')
           const auth = useAuthStore()
           auth.quota.credits_remaining = res.quota.remaining
-          if (res.quota.warning !== 'none') {
-            auth.quota.warning_level = res.quota.warning
-          }
+          // Always update warning level (including 'none') to stay in sync
+          auth.quota.warning_level = res.quota.warning
         }
       }
     } catch (err: unknown) {
@@ -277,6 +276,11 @@ export const useChatStore = defineStore('chat', () => {
         // Remove the optimistic message
         const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
         if (idx !== -1) conv.messages.splice(idx, 1)
+
+        // Sync quota with server to ensure consistency
+        const { useAuthStore } = await import('@/stores/auth')
+        const auth = useAuthStore()
+        await auth.refreshQuota()
       } else {
         userMsg.status = 'error'
       }

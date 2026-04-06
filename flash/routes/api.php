@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\SupportTicketController;
 use App\Http\Controllers\Api\Admin\UserController;
+use App\Http\Controllers\Api\Admin\VisualStyleController as AdminVisualStyleController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\NotificationController;
@@ -36,8 +37,8 @@ use Illuminate\Support\Facades\Route;
 // ──────────────────────────────────────────────
 
 Route::prefix('auth')->name('auth.')->group(function () {
-    Route::post('/register', [AuthController::class, 'register'])->name('register');
-    Route::post('/login',  [AuthController::class, 'login'])->name('login');
+    Route::post('/register', [AuthController::class, 'register'])->name('register')->middleware('throttle:5,1');
+    Route::post('/login',  [AuthController::class, 'login'])->name('login')->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -59,7 +60,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Conversations
     Route::apiResource('conversations', ConversationController::class);
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage'])
-        ->name('conversations.messages');
+        ->name('conversations.messages')
+        ->middleware('throttle:20,1');
 
     // Visual Styles
     Route::get('/styles', [VisualStyleController::class, 'index'])->name('styles.index');
@@ -67,6 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Subscription & Quota
     Route::get('/subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
     Route::get('/plans/public',  [SubscriptionController::class, 'plans'])->name('plans.public');
+    Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])->name('subscription.upgrade');
+    Route::post('/subscription/cancel',  [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
 
     // Notifications
     Route::prefix('notifications')->name('notifications.')->group(function () {
@@ -304,6 +308,26 @@ Route::prefix('admin')
             Route::get('/ai-integrations',          [SettingsController::class, 'aiIntegrations'])->name('ai-integrations');
             Route::put('/ai-integrations',          [SettingsController::class, 'updateAiIntegrations'])->name('ai-integrations-update');
             Route::post('/ai-integrations/test',    [SettingsController::class, 'testAiIntegration'])->name('ai-integrations-test');
+        });
+
+        // Visual Styles Management
+        Route::prefix('styles')->name('styles.')->group(function () {
+            // Static routes first
+            Route::post('/reorder', [AdminVisualStyleController::class, 'reorder'])->name('reorder');
+
+            // CRUD
+            Route::get('/',            [AdminVisualStyleController::class, 'index'])->name('index');
+            Route::post('/',           [AdminVisualStyleController::class, 'store'])->name('store');
+            Route::get('/{style}',     [AdminVisualStyleController::class, 'show'])->name('show');
+            Route::put('/{style}',     [AdminVisualStyleController::class, 'update'])->name('update');
+            Route::delete('/{style}',  [AdminVisualStyleController::class, 'destroy'])->name('destroy');
+
+            // Extra actions
+            Route::delete('/{style}/force',            [AdminVisualStyleController::class, 'forceDelete'])->name('force-delete');
+            Route::post('/{style}/restore',            [AdminVisualStyleController::class, 'restore'])->name('restore');
+            Route::post('/{style}/duplicate',          [AdminVisualStyleController::class, 'duplicate'])->name('duplicate');
+            Route::post('/{style}/toggle-active',      [AdminVisualStyleController::class, 'toggleActive'])->name('toggle-active');
+            Route::post('/{style}/upload-thumbnail',   [AdminVisualStyleController::class, 'uploadThumbnailEndpoint'])->name('upload-thumbnail');
         });
 
     });

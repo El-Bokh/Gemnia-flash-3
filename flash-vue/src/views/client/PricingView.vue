@@ -1,87 +1,80 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import SelectButton from 'primevue/selectbutton'
+import { getPlans, upgradeSubscription } from '@/services/subscriptionService'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const router = useRouter()
+const auth = useAuthStore()
 
-const plans = computed(() => [
-  {
-    name: t('client.planFree'),
-    slug: 'free',
-    price: 0,
-    period: t('client.perMonth'),
-    description: t('client.planFreeDesc'),
-    features: [
-      t('client.freeFeature1'),
-      t('client.freeFeature2'),
-      t('client.freeFeature3'),
-      t('client.freeFeature4'),
-    ],
-    cta: t('client.startFree'),
-    popular: false,
-    tone: '#64748b',
-  },
-  {
-    name: t('client.planStarter'),
-    slug: 'starter',
-    price: 9,
-    period: t('client.perMonth'),
-    description: t('client.planStarterDesc'),
-    features: [
-      t('client.starterFeature1'),
-      t('client.starterFeature2'),
-      t('client.starterFeature3'),
-      t('client.starterFeature4'),
-      t('client.starterFeature5'),
-    ],
-    cta: t('client.subscribe'),
-    popular: false,
-    tone: '#0ea5e9',
-  },
-  {
-    name: t('client.planPro'),
-    slug: 'pro',
-    price: 29,
-    period: t('client.perMonth'),
-    description: t('client.planProDesc'),
-    features: [
-      t('client.proFeature1'),
-      t('client.proFeature2'),
-      t('client.proFeature3'),
-      t('client.proFeature4'),
-      t('client.proFeature5'),
-      t('client.proFeature6'),
-    ],
-    cta: t('client.subscribe'),
-    popular: true,
-    tone: '#8b5cf6',
-  },
-  {
-    name: t('client.planEnterprise'),
-    slug: 'enterprise',
-    price: 99,
-    period: t('client.perMonth'),
-    description: t('client.planEnterpriseDesc'),
-    features: [
-      t('client.enterpriseFeature1'),
-      t('client.enterpriseFeature2'),
-      t('client.enterpriseFeature3'),
-      t('client.enterpriseFeature4'),
-      t('client.enterpriseFeature5'),
-      t('client.enterpriseFeature6'),
-    ],
-    cta: t('client.contactSales'),
-    popular: false,
-    tone: '#f59e0b',
-  },
+const loading = ref(true)
+const upgrading = ref<number | null>(null)
+const billingCycle = ref<'monthly' | 'yearly'>('monthly')
+const rawPlans = ref<any[]>([])
+
+const cycleOptions = computed(() => [
+  { label: t('client.monthly'), value: 'monthly' },
+  { label: t('client.yearly'), value: 'yearly' },
 ])
 
-function selectPlan(slug: string) {
-  router.push({ name: 'login' })
+const toneMap: Record<string, string> = {
+  free: '#64748b',
+  starter: '#0ea5e9',
+  pro: '#8b5cf6',
+  professional: '#8b5cf6',
+  enterprise: '#f59e0b',
+}
+
+const plans = computed(() =>
+  (rawPlans.value ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    price: billingCycle.value === 'yearly' ? p.price_yearly : p.price_monthly,
+    credits: billingCycle.value === 'yearly' ? p.credits_yearly : p.credits_monthly,
+    currency: p.currency ?? 'USD',
+    description: p.description ?? '',
+    is_free: p.is_free,
+    is_featured: p.is_featured,
+    features: (p.features ?? []).map((f: any) => f.name),
+    tone: toneMap[p.slug] ?? '#64748b',
+    isCurrent: auth.isAuthenticated && auth.quota?.plan_slug === p.slug,
+  })),
+)
+
+onMounted(async () => {
+  try {
+    const res = await getPlans()
+    const payload = res.data
+    rawPlans.value = Array.isArray(payload) ? payload : (payload?.data ?? [])
+  } catch {
+    rawPlans.value = []
+  } finally {
+    loading.value = false
+  }
+})
+
+async function selectPlan(plan: any) {
+  if (!auth.isAuthenticated) {
+    router.push({ name: 'login' })
+    return
+  }
+  if (plan.isCurrent || plan.is_free) return
+
+  upgrading.value = plan.id
+  try {
+    await upgradeSubscription(plan.id, billingCycle.value)
+    await auth.refreshQuota()
+  } catch {
+    // error handled by global interceptor
+  } finally {
+    upgrading.value = null
+  }
 }
 </script>
 
@@ -90,17 +83,35 @@ function selectPlan(slug: string) {
     <div class="pricing-header">
       <h1 class="pricing-title">{{ t('client.pricingTitle') }}</h1>
       <p class="pricing-sub">{{ t('client.pricingSub') }}</p>
+
+      <div class="cycle-toggle">
+        <SelectButton
+          v-model="billingCycle"
+          :options="cycleOptions"
+          optionLabel="label"
+          optionValue="value"
+          :allowEmpty="false"
+        />
+        <span v-if="billingCycle === 'yearly'" class="save-badge">{{ t('client.save20') }}</span>
+      </div>
     </div>
 
-    <div class="plans-grid">
+    <div v-if="loading" class="loading-state">
+      <i class="pi pi-spin pi-spinner" style="font-size: 2rem; color: var(--text-muted)" />
+    </div>
+
+    <div v-else class="plans-grid">
       <article
         v-for="plan in plans"
         :key="plan.slug"
         class="plan-card"
-        :class="{ popular: plan.popular }"
+        :class="{ popular: plan.is_featured, current: plan.isCurrent }"
       >
-        <div v-if="plan.popular" class="popular-badge">
+        <div v-if="plan.is_featured" class="popular-badge">
           <Tag :value="t('client.mostPopular')" severity="contrast" class="pop-tag" />
+        </div>
+        <div v-if="plan.isCurrent" class="current-badge">
+          <Tag :value="t('client.currentPlan')" severity="success" class="pop-tag" />
         </div>
 
         <div class="plan-head">
@@ -110,7 +121,12 @@ function selectPlan(slug: string) {
 
         <div class="plan-price">
           <span class="price-amount">${{ plan.price }}</span>
-          <span class="price-period">/ {{ plan.period }}</span>
+          <span class="price-period">/ {{ billingCycle === 'yearly' ? t('client.perYear') : t('client.perMonth') }}</span>
+        </div>
+
+        <div class="plan-credits">
+          <span class="credits-amount">{{ plan.credits?.toLocaleString() }}</span>
+          <span class="credits-label">{{ t('client.credits') }}</span>
         </div>
 
         <ul class="plan-features">
@@ -121,12 +137,14 @@ function selectPlan(slug: string) {
         </ul>
 
         <Button
-          :label="plan.cta"
-          :outlined="!plan.popular"
-          :severity="plan.popular ? undefined : 'secondary'"
+          :label="plan.isCurrent ? t('client.currentPlan') : plan.is_free ? t('client.startFree') : t('client.subscribe')"
+          :outlined="!plan.is_featured"
+          :severity="plan.is_featured ? undefined : 'secondary'"
+          :disabled="plan.isCurrent || upgrading !== null"
+          :loading="upgrading === plan.id"
           size="small"
           class="plan-cta"
-          @click="selectPlan(plan.slug)"
+          @click="selectPlan(plan)"
         />
       </article>
     </div>
@@ -165,6 +183,29 @@ function selectPlan(slug: string) {
   font-size: 0.88rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+.cycle-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.save-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
 }
 
 /* Grid */
@@ -206,11 +247,22 @@ function selectPlan(slug: string) {
   box-shadow: 0 0 0 1px var(--active-color), 0 8px 24px rgba(99, 102, 241, 0.1);
 }
 
+.plan-card.current {
+  border-color: #10b981;
+  box-shadow: 0 0 0 1px #10b981, 0 8px 24px rgba(16, 185, 129, 0.1);
+}
+
 .popular-badge {
   position: absolute;
   top: -10px;
   inset-inline-start: 50%;
   transform: translateX(-50%);
+}
+
+.current-badge {
+  position: absolute;
+  top: -10px;
+  inset-inline-end: 12px;
 }
 
 [dir='rtl'] .popular-badge {
@@ -256,6 +308,23 @@ function selectPlan(slug: string) {
 
 .price-period {
   font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.plan-credits {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.credits-amount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.credits-label {
+  font-size: 0.74rem;
   color: var(--text-muted);
 }
 

@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiRequest;
 use App\Models\Conversation;
+use App\Models\CreditLedger;
 use App\Models\MediaFile;
 use App\Models\VisualStyle;
 use App\Services\GeminiService;
 use App\Services\UsageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -119,6 +121,32 @@ class ConversationController extends Controller
 
         // ── Quota enforcement (concurrency-safe) ──
         $usageService = new UsageService();
+
+        // Check feature-level limits first
+        $featureSlug = ($request->input('mode', 'text') === 'image') ? 'text_to_image' : 'text_to_image';
+        $featureCheck = $usageService->checkFeatureLimit($request->user(), $featureSlug);
+
+        if (! $featureCheck['allowed']) {
+            $messages = [
+                'no_subscription'       => 'You need an active subscription to use this feature.',
+                'feature_not_available' => 'This feature is not available in your current plan. Please upgrade.',
+                'feature_disabled'      => 'This feature is not available in your current plan. Please upgrade.',
+                'feature_limit_reached' => "You've reached your {$featureCheck['period']} limit for this feature ({$featureCheck['used']}/{$featureCheck['limit']}). Please upgrade or wait.",
+            ];
+
+            return response()->json([
+                'success'    => false,
+                'message'    => $messages[$featureCheck['reason']] ?? 'Feature limit reached.',
+                'error_code' => $featureCheck['reason'],
+                'quota'      => [
+                    'remaining'     => 0,
+                    'feature_used'  => $featureCheck['used'],
+                    'feature_limit' => $featureCheck['limit'],
+                    'feature_period'=> $featureCheck['period'],
+                ],
+            ], 402);
+        }
+
         $consumption = $usageService->consume($request->user(), 1, 'chat_message');
 
         if (! $consumption['success']) {
@@ -323,12 +351,34 @@ class ConversationController extends Controller
                 'status'    => 'sent',
             ]);
         } else {
+            // ── Refund credit on AI failure ──
+            $usageService->refund($request->user(), 1, 'ai_failure', [
+                'ai_request_id' => $aiRequest->id,
+                'error'         => $result['error'] ?? 'Unknown error',
+            ]);
+
+            // Update the consumption remaining after refund
+            $consumption['remaining'] = $consumption['remaining'] + 1;
+
+            $aiRequest->update(['credits_consumed' => 0]);
+
+            Log::warning('AI request failed — credit refunded', [
+                'user_id'       => $request->user()->id,
+                'ai_request_id' => $aiRequest->id,
+            ]);
+
             $aiMsg = $conversation->messages()->create([
                 'role'    => 'assistant',
                 'content' => 'عذراً، حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.',
                 'status'  => 'error',
             ]);
         }
+
+        // Use unified warning level calculation
+        $quotaStats = $usageService->computeWarningLevel(
+            $consumption['remaining'],
+            $consumption['subscription']->credits_total ?? 0
+        );
 
         return response()->json([
             'success' => true,
@@ -339,10 +389,7 @@ class ConversationController extends Controller
             ],
             'quota' => [
                 'remaining' => $consumption['remaining'],
-                'warning'   => $consumption['remaining'] <= 0 ? 'depleted'
-                    : ($consumption['remaining'] <= (($consumption['subscription']->credits_total ?? 0) * 0.1) ? 'critical'
-                    : ($consumption['remaining'] <= (($consumption['subscription']->credits_total ?? 0) * 0.2) ? 'low'
-                    : 'none')),
+                'warning'   => $quotaStats,
             ],
         ]);
     }

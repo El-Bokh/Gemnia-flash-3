@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\RegisterRequest;
+use App\Models\CreditLedger;
 use App\Models\Plan;
 use App\Models\Role;
 use App\Models\Subscription;
@@ -49,7 +50,7 @@ class AuthController extends Controller
             // Auto-subscribe to the Free plan
             $freePlan = Plan::where('is_free', true)->where('is_active', true)->first();
             if ($freePlan) {
-                Subscription::create([
+                $subscription = Subscription::create([
                     'user_id'           => $user->id,
                     'plan_id'           => $freePlan->id,
                     'billing_cycle'     => 'monthly',
@@ -61,6 +62,23 @@ class AuthController extends Controller
                     'credits_remaining' => $freePlan->credits_monthly,
                     'credits_total'     => $freePlan->credits_monthly,
                     'auto_renew'        => true,
+                ]);
+
+                // Record initial credits in ledger for audit consistency
+                CreditLedger::create([
+                    'user_id'         => $user->id,
+                    'subscription_id' => $subscription->id,
+                    'type'            => 'credit',
+                    'amount'          => $freePlan->credits_monthly,
+                    'balance_after'   => $freePlan->credits_monthly,
+                    'source'          => 'subscription',
+                    'reference_type'  => Subscription::class,
+                    'reference_id'    => $subscription->id,
+                    'description'     => "Initial credits from {$freePlan->name} plan (monthly)",
+                ]);
+            } else {
+                \Illuminate\Support\Facades\Log::critical('No active free plan found during registration', [
+                    'user_id' => $user->id,
                 ]);
             }
 
