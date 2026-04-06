@@ -190,12 +190,38 @@ class ConversationController extends Controller
 
         $conversation->touch();
 
-        // Build the prompt — inject hidden style prompts if a style is selected
+        // Build the prompt — inject hidden base + style prompts
         $userContent = $data['content'];
         $styleSlug = $data['image_style'] ?? null;
         $geminiPrompt = $userContent;
 
-        if ($styleSlug) {
+        // Hidden master base prompt — always prepended in image mode
+        $basePrompt = 'portrait of a young man, looking straight at the camera, centered composition, neutral background, soft studio lighting, 50mm lens, high quality, clean face, no accessories, same face, same pose, same framing, consistent character';
+
+        if ($mode === 'image') {
+            $parts = [];
+            $parts[] = $basePrompt;
+
+            // Inject hidden style prompt if a style is selected
+            $style = null;
+            if ($styleSlug) {
+                $style = VisualStyle::where('slug', $styleSlug)->where('is_active', true)->first();
+                if ($style && $style->prompt_prefix) {
+                    $parts[] = $style->prompt_prefix;
+                }
+            }
+
+            // User prompt
+            $parts[] = $userContent;
+
+            // Style suffix (if any)
+            if ($style && $style->prompt_suffix) {
+                $parts[] = $style->prompt_suffix;
+            }
+
+            $geminiPrompt = implode(', ', $parts);
+        } elseif ($styleSlug) {
+            // Text mode with style — just wrap with prefix/suffix
             $style = VisualStyle::where('slug', $styleSlug)->where('is_active', true)->first();
             if ($style) {
                 $parts = [];

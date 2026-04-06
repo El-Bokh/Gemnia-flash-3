@@ -31,6 +31,19 @@ const categoryGradients: Record<string, string> = {
   design: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
 }
 
+const styleThumbnailMap: Record<string, string> = {
+  realistic: '/style-gallery/realistic.jpg',
+  anime: '/style-gallery/anime.jpg',
+  watercolor: '/style-gallery/watercolor.jpg',
+  'oil-painting': '/style-gallery/oil-painting.jpg',
+  'digital-art': '/style-gallery/digital-art.jpg',
+  cyberpunk: '/style-gallery/cyberpunk.jpg',
+  minimalist: '/style-gallery/minimalist.jpg',
+  'pop-art': '/style-gallery/pop-art.jpg',
+}
+
+const apiOrigin = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8099/api').replace(/\/api\/?$/, '')
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -51,6 +64,22 @@ function getIcon(style: StyleData) {
 
 function getGradient(style: StyleData) {
   return categoryGradients[style.category ?? ''] ?? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+}
+
+function resolveThumbnail(style: StyleData) {
+  const thumbnail = style.thumbnail ?? styleThumbnailMap[style.slug] ?? null
+  if (!thumbnail) return null
+  if (/^https?:\/\//i.test(thumbnail)) return thumbnail
+
+  const normalizedPath = thumbnail.startsWith('/') ? thumbnail : `/${thumbnail}`
+
+  return `${apiOrigin}${normalizedPath}`
+}
+
+function formatCategory(category: string | null) {
+  if (!category) return ''
+
+  return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
 function selectStyle(slug: string) {
@@ -81,17 +110,33 @@ function selectStyle(slug: string) {
       <button
         v-for="s in styles"
         :key="s.slug"
+        type="button"
         class="style-card"
         :class="{ selected: selectedStyle === s.slug }"
         @click="selectStyle(s.slug)"
       >
-        <div class="style-icon" :style="{ background: getGradient(s) }">
-          <i :class="getIcon(s)" />
+        <div class="style-preview" :style="{ background: getGradient(s) }">
+          <img
+            v-if="resolveThumbnail(s)"
+            :src="resolveThumbnail(s) || undefined"
+            :alt="s.name"
+            class="style-preview-image"
+            loading="lazy"
+            decoding="async"
+          >
+          <div v-else class="style-icon">
+            <i :class="getIcon(s)" />
+          </div>
+          <div class="style-preview-scrim" />
+          <span v-if="formatCategory(s.category)" class="style-category">{{ formatCategory(s.category) }}</span>
+          <span v-if="s.is_premium" class="style-premium">PRO</span>
+          <div v-if="selectedStyle === s.slug" class="style-check">
+            <i class="pi pi-check" />
+          </div>
         </div>
-        <span class="style-name">{{ s.name }}</span>
-        <span v-if="s.is_premium" class="style-premium">PRO</span>
-        <div v-if="selectedStyle === s.slug" class="style-check">
-          <i class="pi pi-check" />
+        <div class="style-meta">
+          <span class="style-name">{{ s.name }}</span>
+          <span v-if="s.description" class="style-description">{{ s.description }}</span>
         </div>
       </button>
     </div>
@@ -139,86 +184,151 @@ function selectStyle(slug: string) {
 
 .style-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(152px, 1fr));
+  gap: 12px;
 }
 
 .style-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 8px;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px;
   border: 1.5px solid var(--card-border);
-  border-radius: 14px;
+  border-radius: 18px;
   background: var(--card-bg);
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  text-align: start;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.18s, box-shadow 0.2s;
 }
 
 .style-card:hover {
-  border-color: var(--text-muted);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border-color: rgba(99, 102, 241, 0.26);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
 }
 
 .style-card.selected {
   border-color: var(--active-color);
   background: var(--active-bg);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14), 0 16px 30px rgba(99, 102, 241, 0.14);
+}
+
+.style-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+}
+
+.style-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.28s ease;
+}
+
+.style-card:hover .style-preview-image {
+  transform: scale(1.05);
+}
+
+.style-preview-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.12) 58%, rgba(15, 23, 42, 0.72) 100%);
+  pointer-events: none;
 }
 
 .style-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 1rem;
-  transition: transform 0.2s;
+  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
 }
 
-.style-card:hover .style-icon {
-  transform: scale(1.08);
+.style-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 56px;
 }
 
 .style-name {
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700;
   color: var(--text-primary);
-  text-align: center;
+  line-height: 1.25;
+}
+
+.style-description {
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .style-check {
   position: absolute;
-  top: 6px;
-  inset-inline-end: 6px;
-  width: 20px;
-  height: 20px;
+  top: 8px;
+  inset-inline-end: 8px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--active-color);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   animation: checkPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
 }
 
 .style-premium {
   position: absolute;
-  top: 6px;
-  inset-inline-start: 6px;
+  top: 8px;
+  inset-inline-start: 8px;
   font-size: 0.5rem;
   font-weight: 700;
   background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #fff;
-  padding: 1px 5px;
-  border-radius: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
   letter-spacing: 0.04em;
+  z-index: 1;
+}
+
+.style-category {
+  position: absolute;
+  inset-inline-start: 8px;
+  inset-block-end: 8px;
+  z-index: 1;
+  max-width: calc(100% - 16px);
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(10px);
 }
 
 .style-loading {
@@ -241,18 +351,20 @@ function selectStyle(slug: string) {
   }
 
   .style-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .style-card {
-    padding: 10px 6px;
+    padding: 8px;
   }
 
-  .style-icon {
-    width: 34px;
-    height: 34px;
-    font-size: 0.85rem;
+  .style-name {
+    font-size: 0.76rem;
+  }
+
+  .style-description {
+    font-size: 0.62rem;
   }
 }
 </style>

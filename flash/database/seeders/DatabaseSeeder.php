@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             AdminDashboardSeeder::class,
             PlanFeatureLimitsSeeder::class,
             SystemSettingsSeeder::class,
+            VisualStyleSeeder::class,
         ]);
     }
 }
