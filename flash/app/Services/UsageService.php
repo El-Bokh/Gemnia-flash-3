@@ -18,14 +18,7 @@ class UsageService
      */
     public function getActiveSubscription(User $user): ?Subscription
     {
-        return $user->subscriptions()
-            ->whereIn('status', ['active', 'trialing'])
-            ->where(function ($q) {
-                $q->whereNull('ends_at')
-                  ->orWhere('ends_at', '>', now());
-            })
-            ->latest('starts_at')
-            ->first();
+        return $this->findCurrentSubscription($user);
     }
 
     /**
@@ -76,15 +69,7 @@ class UsageService
     {
         return DB::transaction(function () use ($user, $cost, $action, $meta) {
             // Lock the subscription row for update (SELECT ... FOR UPDATE)
-            $subscription = $user->subscriptions()
-                ->whereIn('status', ['active', 'trialing'])
-                ->where(function ($q) {
-                    $q->whereNull('ends_at')
-                      ->orWhere('ends_at', '>', now());
-                })
-                ->latest('starts_at')
-                ->lockForUpdate()
-                ->first();
+            $subscription = $this->findCurrentSubscription($user, true);
 
             if (! $subscription) {
                 return [
@@ -155,15 +140,7 @@ class UsageService
     public function refund(User $user, int $amount = 1, ?string $reason = null, array $meta = []): array
     {
         return DB::transaction(function () use ($user, $amount, $reason, $meta) {
-            $subscription = $user->subscriptions()
-                ->whereIn('status', ['active', 'trialing'])
-                ->where(function ($q) {
-                    $q->whereNull('ends_at')
-                      ->orWhere('ends_at', '>', now());
-                })
-                ->latest('starts_at')
-                ->lockForUpdate()
-                ->first();
+            $subscription = $this->findCurrentSubscription($user, true);
 
             if (! $subscription) {
                 return [
@@ -395,5 +372,25 @@ class UsageService
             'requests_this_month' => $requestsThisMonth,
             'warning_level'       => $warningLevel,
         ];
+    }
+
+    private function findCurrentSubscription(User $user, bool $lockForUpdate = false): ?Subscription
+    {
+        $query = $user->subscriptions()
+            ->with('plan')
+            ->whereIn('status', ['active', 'trialing'])
+            ->where(function ($q) {
+                $q->whereNull('ends_at')
+                  ->orWhere('ends_at', '>', now());
+            })
+            ->latest('starts_at');
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $subscription = $query->first();
+
+        return $subscription?->syncTrialStatus();
     }
 }

@@ -126,6 +126,7 @@ class PlanManagementService
     {
         return DB::transaction(function () use ($planId, $data) {
             $plan = Plan::findOrFail($planId);
+            $originalTrialDays = (int) $plan->trial_days;
 
             $fillable = [
                 'name', 'slug', 'description',
@@ -137,6 +138,10 @@ class PlanManagementService
 
             $updateData = array_intersect_key($data, array_flip($fillable));
             $plan->update($updateData);
+
+            if (array_key_exists('trial_days', $updateData) && (int) $updateData['trial_days'] !== $originalTrialDays) {
+                $this->syncTrialStatusesToSubscribers($plan);
+            }
 
             // Sync features if provided
             if (array_key_exists('features', $data)) {
@@ -447,5 +452,18 @@ class PlanManagementService
                 );
             }
         }
+    }
+
+    private function syncTrialStatusesToSubscribers(Plan $plan): void
+    {
+        Subscription::where('plan_id', $plan->id)
+            ->where('status', 'trialing')
+            ->orderBy('id')
+            ->chunkById(100, function ($subscriptions) use ($plan) {
+                foreach ($subscriptions as $subscription) {
+                    $subscription->setRelation('plan', $plan);
+                    $subscription->syncTrialStatus();
+                }
+            });
     }
 }
