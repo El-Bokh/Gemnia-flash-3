@@ -47,7 +47,7 @@ const routes: RouteRecordRaw[] = [
     meta: { guest: true },
   },
   {
-    path: '/auth/google/callback',
+    path: '/oauth/callback',
     name: 'google-callback',
     component: () => import('@/views/GoogleCallbackView.vue'),
   },

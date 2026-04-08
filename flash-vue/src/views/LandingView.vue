@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
@@ -31,7 +31,7 @@ useSeo({
 
 const features = computed(() => [
   { icon: 'pi pi-sparkles', title: t('landing.feature1Title'), desc: t('landing.feature1Desc'), color: '#8b5cf6' },
-  { icon: 'pi pi-palette', title: t('landing.feature2Title'), desc: t('landing.feature2Desc'), color: '#0ea5e9' },
+  { icon: 'pi pi-palette', title: t('landing.feature2Title'), desc: t('landing.feature2Desc'), color: '#06b6d4' },
   { icon: 'pi pi-bolt', title: t('landing.feature3Title'), desc: t('landing.feature3Desc'), color: '#f59e0b' },
   { icon: 'pi pi-check-circle', title: t('landing.feature4Title'), desc: t('landing.feature4Desc'), color: '#10b981' },
 ])
@@ -41,6 +41,28 @@ const steps = computed(() => [
   { num: '2', icon: 'pi pi-cog', title: t('landing.step2Title'), desc: t('landing.step2Desc') },
   { num: '3', icon: 'pi pi-download', title: t('landing.step3Title'), desc: t('landing.step3Desc') },
 ])
+
+// Scroll reveal
+let observer: IntersectionObserver | null = null
+
+onMounted(() => {
+  observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed')
+          observer?.unobserve(entry.target)
+        }
+      })
+    },
+    { threshold: 0.12, rootMargin: '0px 0px -40px 0px' },
+  )
+  document.querySelectorAll('.reveal').forEach((el) => observer?.observe(el))
+})
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+})
 
 function goRegister() {
   if (auth.isAuthenticated) {
@@ -65,6 +87,13 @@ function goChat() {
 
 <template>
   <div class="landing-page">
+    <!-- Ambient animated background -->
+    <div class="ambient-bg">
+      <div class="ambient-orb orb-a" />
+      <div class="ambient-orb orb-b" />
+      <div class="ambient-orb orb-c" />
+    </div>
+
     <!-- ═══ Navbar ═══ -->
     <nav class="landing-nav">
       <div class="nav-inner">
@@ -74,16 +103,14 @@ function goChat() {
         </div>
         <div class="nav-links">
           <router-link to="/pricing" class="nav-link">{{ t('landing.viewPricing') }}</router-link>
-          <!-- Theme toggle -->
+        </div>
+        <div class="nav-actions">
           <button class="nav-icon-btn" @click="layout.toggleDarkMode()" :title="t('client.toggleTheme')">
             <i :class="layout.darkMode ? 'pi pi-sun' : 'pi pi-moon'" />
           </button>
-          <!-- Language toggle -->
           <button class="nav-icon-btn" @click="layout.toggleLocale()" :title="layout.locale === 'ar' ? 'English' : 'العربية'">
             <i class="pi pi-globe" />
           </button>
-        </div>
-        <div class="nav-actions">
           <template v-if="auth.isAuthenticated">
             <Button :label="t('client.home')" icon="pi pi-sparkles" size="small" class="nav-cta" @click="goChat" />
           </template>
@@ -97,14 +124,7 @@ function goChat() {
 
     <!-- ═══ Hero ═══ -->
     <section class="hero-section">
-      <div class="hero-bg">
-        <div class="hero-orb orb-1" />
-        <div class="hero-orb orb-2" />
-        <div class="hero-orb orb-3" />
-        <div class="hero-grid" />
-        <div class="hero-noise" />
-      </div>
-      <div class="hero-content">
+      <div class="hero-content reveal">
         <div class="hero-badge">
           <i class="pi pi-sparkles" />
           <span>{{ t('landing.trustedBy') }}</span>
@@ -120,8 +140,7 @@ function goChat() {
         </div>
       </div>
 
-      <!-- Floating preview -->
-      <div class="hero-preview">
+      <div class="hero-preview reveal" style="--reveal-delay: 0.2s;">
         <div class="preview-card">
           <div class="preview-header">
             <div class="preview-dot red" />
@@ -150,11 +169,11 @@ function goChat() {
     <!-- ═══ Features ═══ -->
     <section class="features-section">
       <div class="section-inner">
-        <h2 class="section-title">{{ t('landing.featuresTitle') }}</h2>
-        <p class="section-sub">{{ t('landing.featuresSub') }}</p>
+        <h2 class="section-title reveal">{{ t('landing.featuresTitle') }}</h2>
+        <p class="section-sub reveal" style="--reveal-delay: 0.1s;">{{ t('landing.featuresSub') }}</p>
         <div class="features-grid">
-          <div v-for="(f, i) in features" :key="i" class="feature-card">
-            <div class="feature-icon" :style="{ background: f.color + '15', color: f.color }">
+          <div v-for="(f, i) in features" :key="i" class="feature-card reveal" :style="{ '--reveal-delay': i * 0.08 + 's' }">
+            <div class="feature-icon" :style="{ background: f.color + '12', color: f.color }">
               <i :class="f.icon" />
             </div>
             <h3 class="feature-title">{{ f.title }}</h3>
@@ -167,10 +186,10 @@ function goChat() {
     <!-- ═══ How It Works ═══ -->
     <section class="how-section">
       <div class="section-inner">
-        <h2 class="section-title">{{ t('landing.howTitle') }}</h2>
-        <p class="section-sub">{{ t('landing.howSub') }}</p>
+        <h2 class="section-title reveal">{{ t('landing.howTitle') }}</h2>
+        <p class="section-sub reveal" style="--reveal-delay: 0.1s;">{{ t('landing.howSub') }}</p>
         <div class="steps-grid">
-          <div v-for="(s, i) in steps" :key="i" class="step-card">
+          <div v-for="(s, i) in steps" :key="i" class="step-card reveal" :style="{ '--reveal-delay': i * 0.1 + 's' }">
             <div class="step-num">{{ s.num }}</div>
             <div class="step-icon-wrap">
               <i :class="s.icon" />
@@ -184,8 +203,7 @@ function goChat() {
 
     <!-- ═══ CTA ═══ -->
     <section class="cta-section">
-      <div class="cta-inner">
-        <div class="cta-glow" />
+      <div class="cta-inner reveal">
         <h2 class="cta-title">{{ t('landing.ctaTitle') }}</h2>
         <p class="cta-sub">{{ t('landing.ctaSub') }}</p>
         <Button :label="t('landing.ctaButton')" icon="pi pi-arrow-right" iconPos="right" class="cta-btn" @click="goRegister" />
@@ -206,23 +224,89 @@ function goChat() {
 </template>
 
 <style scoped>
-/* ═══ Force dark palette on landing ═══ */
+/* ═══ Scroll reveal ═══ */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition-delay: var(--reveal-delay, 0s);
+}
+.reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ═══ Base ═══ */
 .landing-page {
-  --lp-bg: #050510;
-  --lp-surface: #0c0c1d;
-  --lp-card: rgba(15, 15, 35, 0.6);
-  --lp-card-border: rgba(139, 92, 246, 0.12);
-  --lp-text: #e8e8f0;
-  --lp-text-dim: #9896b0;
-  --lp-text-muted: #5e5c78;
-  --lp-accent: #a78bfa;
-  --lp-accent2: #c084fc;
-  --lp-glow: rgba(139, 92, 246, 0.15);
+  --lp-bg: #07070e;
+  --lp-surface: #0b0b16;
+  --lp-card: rgba(14, 14, 28, 0.65);
+  --lp-card-border: rgba(255, 255, 255, 0.06);
+  --lp-text: #dddde4;
+  --lp-text-dim: #8b8b9e;
+  --lp-text-muted: #55556a;
+  --lp-accent: #9580ff;
+  --lp-accent-dim: rgba(149, 128, 255, 0.12);
 
   min-height: 100vh;
   background: var(--lp-bg);
   color: var(--lp-text);
   overflow-x: hidden;
+  position: relative;
+}
+
+/* ═══ Ambient background ═══ */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.35;
+  will-change: transform;
+}
+.orb-a {
+  width: 500px;
+  height: 500px;
+  top: -10%;
+  left: 30%;
+  background: radial-gradient(circle, rgba(120, 90, 220, 0.4) 0%, transparent 70%);
+  animation: drift-a 16s ease-in-out infinite;
+}
+.orb-b {
+  width: 350px;
+  height: 350px;
+  top: 40%;
+  right: -5%;
+  background: radial-gradient(circle, rgba(60, 100, 200, 0.3) 0%, transparent 70%);
+  animation: drift-b 20s ease-in-out infinite;
+}
+.orb-c {
+  width: 300px;
+  height: 300px;
+  bottom: 10%;
+  left: -5%;
+  background: radial-gradient(circle, rgba(140, 80, 200, 0.25) 0%, transparent 70%);
+  animation: drift-c 18s ease-in-out infinite;
+}
+
+@keyframes drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, 20px) scale(1.05); }
+  66% { transform: translate(-20px, 40px) scale(0.95); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-30px, -20px); }
+}
+@keyframes drift-c {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(25px, -30px); }
 }
 
 /* ═══ Navbar ═══ */
@@ -232,10 +316,10 @@ function goChat() {
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(5, 5, 16, 0.7);
+  background: rgba(7, 7, 14, 0.65);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(139, 92, 246, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 .nav-inner {
   max-width: 1100px;
@@ -253,12 +337,12 @@ function goChat() {
   gap: 10px;
 }
 .nav-logo {
-  width: 32px;
-  height: 32px;
-  filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.5));
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 0 8px rgba(149, 128, 255, 0.35));
 }
 .nav-brand-text {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #fff;
@@ -274,11 +358,11 @@ function goChat() {
   color: var(--lp-text-dim);
   padding: 6px 12px;
   border-radius: 8px;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.2s, background 0.2s;
 }
 .nav-link:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
 }
 .nav-icon-btn {
   width: 34px;
@@ -291,17 +375,17 @@ function goChat() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
-  transition: color 0.15s, background 0.15s;
+  font-size: 0.88rem;
+  transition: color 0.2s, background 0.2s;
 }
 .nav-icon-btn:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
 }
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .nav-login-btn {
   font-size: 0.8rem;
@@ -312,11 +396,11 @@ function goChat() {
   cursor: pointer;
   padding: 6px 14px;
   border-radius: 8px;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.2s, background 0.2s;
 }
 .nav-login-btn:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
 }
 .nav-cta {
   font-size: 0.78rem !important;
@@ -327,217 +411,137 @@ function goChat() {
 /* ═══ Hero ═══ */
 .hero-section {
   position: relative;
-  padding: 150px 24px 90px;
-  overflow: hidden;
+  z-index: 1;
+  padding: 150px 24px 80px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(180deg, #050510 0%, #0a0a20 40%, #0d0820 70%, #050510 100%);
 }
-.hero-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-/* Animated floating orbs */
-.hero-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.5;
-}
-.orb-1 {
-  width: 600px;
-  height: 600px;
-  top: -200px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.35) 0%, rgba(99, 102, 241, 0.1) 50%, transparent 70%);
-  animation: orbFloat1 8s ease-in-out infinite;
-}
-.orb-2 {
-  width: 400px;
-  height: 400px;
-  top: 20%;
-  right: -100px;
-  background: radial-gradient(circle, rgba(192, 132, 252, 0.25) 0%, transparent 70%);
-  animation: orbFloat2 10s ease-in-out infinite;
-}
-.orb-3 {
-  width: 350px;
-  height: 350px;
-  bottom: -50px;
-  left: -80px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%);
-  animation: orbFloat3 12s ease-in-out infinite;
-}
-
-@keyframes orbFloat1 {
-  0%, 100% { transform: translateX(-50%) translateY(0); }
-  50% { transform: translateX(-50%) translateY(30px); }
-}
-@keyframes orbFloat2 {
-  0%, 100% { transform: translateY(0) translateX(0); }
-  50% { transform: translateY(-25px) translateX(-15px); }
-}
-@keyframes orbFloat3 {
-  0%, 100% { transform: translateY(0) translateX(0); }
-  50% { transform: translateY(-20px) translateX(20px); }
-}
-
-.hero-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(139, 92, 246, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(139, 92, 246, 0.06) 1px, transparent 1px);
-  background-size: 60px 60px;
-  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 30%, transparent 85%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 30%, transparent 85%);
-}
-
-.hero-noise {
-  position: absolute;
-  inset: 0;
-  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  opacity: 0.4;
-}
-
 .hero-content {
-  position: relative;
-  z-index: 2;
   text-align: center;
-  max-width: 700px;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
 }
 .hero-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 18px;
+  padding: 6px 16px;
   border-radius: 100px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: var(--lp-accent-dim);
+  border: 1px solid rgba(149, 128, 255, 0.15);
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--lp-accent);
-  backdrop-filter: blur(8px);
 }
-.hero-badge i { font-size: 0.7rem; }
+.hero-badge i { font-size: 0.68rem; }
 .hero-title {
-  font-size: 3.2rem;
+  font-size: 3rem;
   font-weight: 900;
-  line-height: 1.08;
+  line-height: 1.1;
   letter-spacing: -0.03em;
   margin: 0;
   color: #fff;
 }
 .hero-highlight {
-  background: linear-gradient(135deg, #8b5cf6, #a78bfa, #c084fc, #e879f9);
+  background: linear-gradient(135deg, #9580ff 0%, #b8a4ff 50%, #c9b8ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .hero-sub {
-  font-size: 1.05rem;
+  font-size: 1rem;
   color: var(--lp-text-dim);
   line-height: 1.7;
   margin: 0;
-  max-width: 540px;
+  max-width: 500px;
 }
 .hero-actions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 8px;
 }
 .hero-btn-primary {
-  font-size: 0.9rem !important;
+  font-size: 0.88rem !important;
   font-weight: 700 !important;
-  border-radius: 12px !important;
-  padding: 11px 30px !important;
-  background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
-  border-color: #8b5cf6 !important;
-  box-shadow: 0 0 24px rgba(139, 92, 246, 0.3) !important;
-  transition: box-shadow 0.2s, transform 0.2s !important;
+  border-radius: 10px !important;
+  padding: 10px 28px !important;
+  background: linear-gradient(135deg, #7c5ce0, #9580ff) !important;
+  border-color: rgba(149, 128, 255, 0.4) !important;
+  box-shadow: 0 4px 20px rgba(149, 128, 255, 0.2) !important;
+  transition: box-shadow 0.25s, transform 0.25s !important;
 }
 .hero-btn-primary:hover {
-  box-shadow: 0 0 36px rgba(139, 92, 246, 0.5) !important;
+  box-shadow: 0 6px 28px rgba(149, 128, 255, 0.35) !important;
   transform: translateY(-1px) !important;
 }
 .hero-btn-secondary {
-  font-size: 0.9rem !important;
+  font-size: 0.88rem !important;
   font-weight: 600 !important;
-  border-radius: 12px !important;
-  padding: 11px 30px !important;
+  border-radius: 10px !important;
+  padding: 10px 28px !important;
   color: var(--lp-text-dim) !important;
-  border-color: rgba(139, 92, 246, 0.25) !important;
-  background: rgba(139, 92, 246, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 .hero-btn-secondary:hover {
-  background: rgba(139, 92, 246, 0.12) !important;
-  border-color: rgba(139, 92, 246, 0.4) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
   color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
 }
 
-/* Hero preview card */
+/* Preview card */
 .hero-preview {
-  position: relative;
-  z-index: 2;
-  margin-top: 50px;
+  margin-top: 48px;
   width: 100%;
-  max-width: 560px;
+  max-width: 520px;
+  z-index: 1;
 }
 .preview-card {
-  background: rgba(12, 12, 30, 0.7);
-  border: 1px solid rgba(139, 92, 246, 0.15);
-  border-radius: 18px;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-card-border);
+  border-radius: 16px;
   overflow: hidden;
-  backdrop-filter: blur(12px);
-  box-shadow:
-    0 8px 40px rgba(0, 0, 0, 0.3),
-    0 0 80px rgba(139, 92, 246, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
 }
 .preview-header {
   display: flex;
   gap: 6px;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--lp-card-border);
 }
 .preview-dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 .preview-dot.red { background: #ef4444; }
 .preview-dot.yellow { background: #f59e0b; }
 .preview-dot.green { background: #10b981; }
 .preview-body {
-  padding: 20px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 .preview-prompt {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
-  background: rgba(139, 92, 246, 0.06);
-  border: 1px solid rgba(139, 92, 246, 0.1);
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--lp-card-border);
   border-radius: 10px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--lp-text-dim);
 }
 .preview-prompt i {
   color: var(--lp-accent);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 .preview-result {
   display: flex;
@@ -545,16 +549,16 @@ function goChat() {
   align-items: flex-start;
 }
 .preview-img-placeholder {
-  width: 100px;
-  height: 100px;
+  width: 90px;
+  height: 90px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(192, 132, 252, 0.1));
-  border: 1px solid rgba(139, 92, 246, 0.15);
+  background: linear-gradient(135deg, rgba(149, 128, 255, 0.1), rgba(120, 90, 220, 0.06));
+  border: 1px solid var(--lp-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--lp-accent);
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   flex-shrink: 0;
 }
 .preview-generating {
@@ -565,11 +569,11 @@ function goChat() {
   padding-top: 8px;
 }
 .gen-bar {
-  height: 10px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, rgba(139, 92, 246, 0.08) 25%, rgba(139, 92, 246, 0.18) 50%, rgba(139, 92, 246, 0.08) 75%);
+  height: 9px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+  animation: shimmer 2s ease-in-out infinite;
 }
 .gen-bar.short { width: 60%; }
 @keyframes shimmer {
@@ -579,16 +583,16 @@ function goChat() {
 
 /* ═══ Features ═══ */
 .features-section {
-  padding: 90px 24px;
-  background: var(--lp-bg);
   position: relative;
+  z-index: 1;
+  padding: 80px 24px;
 }
 .section-inner {
-  max-width: 1000px;
+  max-width: 960px;
   margin: 0 auto;
 }
 .section-title {
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: 800;
   text-align: center;
   letter-spacing: -0.02em;
@@ -597,46 +601,45 @@ function goChat() {
 }
 .section-sub {
   text-align: center;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--lp-text-dim);
-  margin: 0 0 44px;
+  margin: 0 0 40px;
 }
 .features-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  gap: 16px;
 }
 .feature-card {
-  padding: 28px 24px;
+  padding: 24px 22px;
   background: var(--lp-card);
   border: 1px solid var(--lp-card-border);
-  border-radius: 16px;
-  backdrop-filter: blur(8px);
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+  transition: transform 0.25s, border-color 0.25s;
 }
 .feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(139, 92, 246, 0.08);
-  border-color: rgba(139, 92, 246, 0.25);
+  transform: translateY(-3px);
+  border-color: rgba(149, 128, 255, 0.15);
 }
 .feature-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.15rem;
-  margin-bottom: 14px;
+  font-size: 1.05rem;
+  margin-bottom: 12px;
 }
 .feature-title {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  margin: 0 0 6px;
+  margin: 0 0 5px;
   color: #fff;
 }
 .feature-desc {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--lp-text-dim);
   margin: 0;
   line-height: 1.55;
@@ -644,7 +647,9 @@ function goChat() {
 
 /* ═══ How It Works ═══ */
 .how-section {
-  padding: 90px 24px;
+  position: relative;
+  z-index: 1;
+  padding: 80px 24px;
   background: var(--lp-surface);
   border-top: 1px solid var(--lp-card-border);
   border-bottom: 1px solid var(--lp-card-border);
@@ -652,43 +657,43 @@ function goChat() {
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 20px;
 }
 .step-card {
   text-align: center;
-  padding: 32px 20px;
+  padding: 28px 18px;
 }
 .step-num {
-  font-size: 2.5rem;
+  font-size: 2.2rem;
   font-weight: 900;
-  background: linear-gradient(135deg, #8b5cf6, #c084fc);
+  background: linear-gradient(135deg, #9580ff, #b8a4ff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   line-height: 1;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .step-icon-wrap {
-  width: 50px;
-  height: 50px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.15);
+  background: var(--lp-accent-dim);
+  border: 1px solid rgba(149, 128, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 14px;
+  margin: 0 auto 12px;
   color: var(--lp-accent);
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 .step-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  margin: 0 0 6px;
+  margin: 0 0 5px;
   color: #fff;
 }
 .step-desc {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--lp-text-dim);
   margin: 0;
   line-height: 1.55;
@@ -696,60 +701,47 @@ function goChat() {
 
 /* ═══ CTA ═══ */
 .cta-section {
-  padding: 90px 24px;
-  position: relative;
-  overflow: hidden;
-  background: var(--lp-bg);
-}
-.cta-inner {
-  max-width: 600px;
-  margin: 0 auto;
-  text-align: center;
   position: relative;
   z-index: 1;
+  padding: 80px 24px;
 }
-.cta-glow {
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
-  pointer-events: none;
+.cta-inner {
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: center;
 }
 .cta-title {
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0 0 10px;
   color: #fff;
 }
 .cta-sub {
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   color: var(--lp-text-dim);
-  margin: 0 0 28px;
+  margin: 0 0 24px;
   line-height: 1.6;
 }
 .cta-btn {
-  font-size: 0.92rem !important;
+  font-size: 0.9rem !important;
   font-weight: 700 !important;
-  border-radius: 12px !important;
-  padding: 12px 32px !important;
-  background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
-  border-color: #8b5cf6 !important;
-  box-shadow: 0 0 24px rgba(139, 92, 246, 0.3) !important;
+  border-radius: 10px !important;
+  padding: 11px 30px !important;
+  background: linear-gradient(135deg, #7c5ce0, #9580ff) !important;
+  border-color: rgba(149, 128, 255, 0.4) !important;
+  box-shadow: 0 4px 20px rgba(149, 128, 255, 0.2) !important;
 }
 .cta-btn:hover {
-  box-shadow: 0 0 36px rgba(139, 92, 246, 0.5) !important;
+  box-shadow: 0 6px 28px rgba(149, 128, 255, 0.35) !important;
 }
 
 /* ═══ Footer ═══ */
 .landing-footer {
+  position: relative;
+  z-index: 1;
   border-top: 1px solid var(--lp-card-border);
-  padding: 24px;
-  background: var(--lp-bg);
+  padding: 22px 24px;
 }
 .footer-inner {
   max-width: 1100px;
@@ -763,66 +755,45 @@ function goChat() {
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #fff;
 }
 .footer-logo {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 .footer-rights {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--lp-text-muted);
 }
 
 /* ═══ Responsive ═══ */
 @media (max-width: 768px) {
-  .hero-title {
-    font-size: 2.1rem;
-  }
-  .hero-sub {
-    font-size: 0.9rem;
-  }
+  .hero-title { font-size: 2rem; }
+  .hero-sub { font-size: 0.88rem; }
   .hero-actions {
     flex-direction: column;
     width: 100%;
   }
   .hero-btn-primary,
-  .hero-btn-secondary {
-    width: 100%;
-  }
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
-  .steps-grid {
-    grid-template-columns: 1fr;
-  }
-  .section-title {
-    font-size: 1.5rem;
-  }
-  .cta-title {
-    font-size: 1.5rem;
-  }
-  .nav-links {
-    display: none;
-  }
+  .hero-btn-secondary { width: 100%; }
+  .features-grid { grid-template-columns: 1fr; }
+  .steps-grid { grid-template-columns: 1fr; }
+  .section-title { font-size: 1.4rem; }
+  .cta-title { font-size: 1.4rem; }
+  .nav-links { display: none; }
+  .nav-login-btn { display: none; }
+  .hero-preview { max-width: 100%; }
   .footer-inner {
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     text-align: center;
   }
-  .hero-preview {
-    max-width: 100%;
-  }
-  .orb-2 { display: none; }
+  .orb-b { display: none; }
 }
 
 @media (max-width: 480px) {
-  .hero-section {
-    padding: 120px 16px 60px;
-  }
-  .hero-title {
-    font-size: 1.75rem;
-  }
+  .hero-section { padding: 120px 16px 60px; }
+  .hero-title { font-size: 1.7rem; }
 }
 </style>

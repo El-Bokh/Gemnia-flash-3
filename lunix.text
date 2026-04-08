@@ -1,5 +1,8 @@
 scp "D:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/flash-vue
 scp -r "D:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/flash-vue
+scp -r "D:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/Gemnia-flash-3/flash-vue
+git pull origin main
+git reset --hard
 git pull origin main
 
 cd /var/www

@@ -1,4 +1,4 @@
-import{$n as e,E as t,It as n,K as r,Lt as i,Mt as a,P as o,Qt as s,Rt as c,V as l,W as u,bn as d,dn as f,dt as p,fn as m,ln as h,mt as g,o as _,on as v,pt as y,r as b,s as x,tt as S,v as C,wt as w,yn as T,z as E,zt as D}from"./_plugin-vue_export-helper-BQA7LogN.js";import{N as O}from"./index-3oX3sP5N.js";import{t as k}from"./chevronright-DpjeC4Yk.js";var A=C.extend({name:`tabs`,style:`
+import{$n as e,E as t,It as n,K as r,Lt as i,Mt as a,P as o,Qt as s,Rt as c,V as l,W as u,bn as d,dn as f,dt as p,fn as m,ln as h,mt as g,o as _,on as v,pt as y,r as b,s as x,tt as S,v as C,wt as w,yn as T,z as E,zt as D}from"./_plugin-vue_export-helper-BQA7LogN.js";import{N as O}from"./index-B0hekVNU.js";import{t as k}from"./chevronright-DpjeC4Yk.js";var A=C.extend({name:`tabs`,style:`
     .p-tabs {
         display: flex;
         flex-direction: column;

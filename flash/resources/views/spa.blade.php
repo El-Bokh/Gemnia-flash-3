@@ -37,7 +37,7 @@
     <link rel="manifest" href="/manifest.json">
 
     <title>Klek AI - AI Image Generation & Creative Design</title>
-    <script type="module" crossorigin src="/assets/index-3oX3sP5N.js"></script>
+    <script type="module" crossorigin src="/assets/index-B0hekVNU.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/_plugin-vue_export-helper-BQA7LogN.js">
     <link rel="stylesheet" crossorigin href="/assets/index-B8DlfLBc.css">
   </head>

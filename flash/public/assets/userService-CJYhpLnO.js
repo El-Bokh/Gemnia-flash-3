@@ -1,0 +1,1 @@
+import{f as e,g as t,h as n,p as r}from"./index-B0hekVNU.js";var i=`/admin/users`;function a(e){return r(i,{params:e})}function o(e){return r(`${i}/${e}`)}function s(e){return n(`${i}`,e)}function c(e,n){return t(`${i}/${e}`,n)}function l(t){return e(`${i}/${t}`)}function u(e,t){return n(`${i}/${e}/reset-password`,t)}export{u as a,a as i,l as n,c as o,o as r,s as t};

@@ -36,7 +36,7 @@ class GoogleAuthController extends Controller
         } catch (\Exception $e) {
             Log::error('Google OAuth callback failed', ['error' => $e->getMessage()]);
 
-            return redirect($this->spaUrl('/login?error=google_auth_failed'));
+            return redirect($this->spaUrl('/oauth/callback?error=google_auth_failed'));
         }
 
         $user = User::where('google_id', $googleUser->getId())->first();
@@ -60,7 +60,7 @@ class GoogleAuthController extends Controller
             }
 
             if ($user->status !== 'active') {
-                return redirect($this->spaUrl('/login?error=account_inactive'));
+                return redirect($this->spaUrl('/oauth/callback?error=account_inactive'));
             }
         } else {
             // New user — create account
@@ -147,7 +147,7 @@ class GoogleAuthController extends Controller
             'user'  => base64_encode(json_encode($userData)),
         ]);
 
-        return redirect($this->spaUrl("/auth/google/callback?{$params}"));
+        return redirect($this->spaUrl("/oauth/callback?{$params}"));
     }
 
     private function spaUrl(string $path): string
