@@ -88,6 +88,8 @@ export const useChatStore = defineStore('chat', () => {
 
   async function loadConversations() {
     if (loaded.value) return
+    // Skip API call for unauthenticated visitors
+    if (!localStorage.getItem('auth_token')) return
     try {
       const res = await fetchConversationsApi()
       if (res.success && res.data) {

@@ -1154,4 +1154,11 @@ export default {
     upgradePlan: 'ترقية الخطة',
     maybeLater: 'ربما لاحقاً',
   },
+
+  // ── PWA ──────────────────────────────────────────────────────
+  pwa: {
+    installTitle: 'تثبيت Klek AI',
+    installDesc: 'أضفه للشاشة الرئيسية لتجربة أفضل.',
+    install: 'تثبيت',
+  },
 }

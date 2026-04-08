@@ -13,6 +13,14 @@
     <title>Klek AI</title>
   </head>
   <body>
+    <script>
+      // Apply dark mode immediately before render (default: dark)
+      if (localStorage.getItem('flash-dark-mode') !== 'false') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    </script>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
     <script>

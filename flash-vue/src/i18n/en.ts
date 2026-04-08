@@ -1154,4 +1154,11 @@ export default {
     upgradePlan: 'Upgrade Plan',
     maybeLater: 'Maybe Later',
   },
+
+  // ── PWA ──────────────────────────────────────────────────
+  pwa: {
+    installTitle: 'Install Klek AI',
+    installDesc: 'Add to your home screen for a better experience.',
+    install: 'Install',
+  },
 }

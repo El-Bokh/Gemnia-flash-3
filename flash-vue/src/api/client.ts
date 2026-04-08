@@ -38,9 +38,10 @@ apiClient.interceptors.response.use(
       const { status } = error.response
 
       if (status === 401) {
+        // Only redirect to login if user was previously authenticated
+        const wasAuthenticated = !!localStorage.getItem('auth_token')
         clearStoredAuth()
-        // Only redirect if not already on the login page
-        if (router.currentRoute.value.name !== 'login') {
+        if (wasAuthenticated && router.currentRoute.value.name !== 'login') {
           void router.replace({ name: 'login' })
         }
       }
