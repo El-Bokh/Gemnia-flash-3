@@ -6,7 +6,6 @@ import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
 import { useSeo } from '@/composables/useSeo'
 import { getAuthenticatedHome } from '@/utils/auth'
-import Button from 'primevue/button'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -87,13 +86,6 @@ function goChat() {
 
 <template>
   <div class="landing-page">
-    <!-- Ambient animated background -->
-    <div class="ambient-bg">
-      <div class="ambient-orb orb-a" />
-      <div class="ambient-orb orb-b" />
-      <div class="ambient-orb orb-c" />
-    </div>
-
     <!-- ═══ Navbar ═══ -->
     <nav class="landing-nav">
       <div class="nav-inner">
@@ -112,11 +104,17 @@ function goChat() {
             <i class="pi pi-globe" />
           </button>
           <template v-if="auth.isAuthenticated">
-            <Button :label="t('client.home')" icon="pi pi-sparkles" size="small" class="nav-cta" @click="goChat" />
+            <button type="button" class="nav-cta" @click="goChat">
+              <i class="pi pi-sparkles" />
+              <span>{{ t('client.home') }}</span>
+            </button>
           </template>
           <template v-else>
             <button class="nav-login-btn" @click="goLogin">{{ t('landing.login') }}</button>
-            <Button :label="t('landing.register')" icon="pi pi-user-plus" size="small" class="nav-cta" @click="goRegister" />
+            <button type="button" class="nav-cta" @click="goRegister">
+              <i class="pi pi-user-plus" />
+              <span>{{ t('landing.register') }}</span>
+            </button>
           </template>
         </div>
       </div>
@@ -135,8 +133,14 @@ function goChat() {
         </h1>
         <p class="hero-sub">{{ t('landing.heroSub') }}</p>
         <div class="hero-actions">
-          <Button :label="t('landing.getStarted')" icon="pi pi-arrow-right" iconPos="right" class="hero-btn-primary" @click="goRegister" />
-          <Button :label="t('landing.viewPricing')" icon="pi pi-tag" severity="secondary" outlined class="hero-btn-secondary" @click="goPricing" />
+          <button type="button" class="hero-btn hero-btn-primary" @click="goRegister">
+            <span>{{ t('landing.getStarted') }}</span>
+            <i class="pi pi-arrow-right" />
+          </button>
+          <button type="button" class="hero-btn hero-btn-secondary" @click="goPricing">
+            <i class="pi pi-tag" />
+            <span>{{ t('landing.viewPricing') }}</span>
+          </button>
         </div>
       </div>
 
@@ -206,7 +210,10 @@ function goChat() {
       <div class="cta-inner reveal">
         <h2 class="cta-title">{{ t('landing.ctaTitle') }}</h2>
         <p class="cta-sub">{{ t('landing.ctaSub') }}</p>
-        <Button :label="t('landing.ctaButton')" icon="pi pi-arrow-right" iconPos="right" class="cta-btn" @click="goRegister" />
+        <button type="button" class="cta-btn" @click="goRegister">
+          <span>{{ t('landing.ctaButton') }}</span>
+          <i class="pi pi-arrow-right" />
+        </button>
       </div>
     </section>
 
@@ -253,41 +260,22 @@ function goChat() {
   color: var(--lp-text);
   overflow-x: hidden;
   position: relative;
+  isolation: isolate;
 }
 
 /* ═══ Ambient background ═══ */
-.ambient-bg {
-  position: fixed;
-  inset: 0;
+.landing-page::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 860px;
   pointer-events: none;
   z-index: 0;
-  overflow: hidden;
-}
-.ambient-orb {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.3;
-}
-.orb-a {
-  width: 600px;
-  height: 600px;
-  top: -15%;
-  left: 25%;
-  background: radial-gradient(circle, rgba(120, 90, 220, 0.25) 0%, transparent 70%);
-}
-.orb-b {
-  width: 400px;
-  height: 400px;
-  top: 40%;
-  right: -5%;
-  background: radial-gradient(circle, rgba(60, 100, 200, 0.18) 0%, transparent 70%);
-}
-.orb-c {
-  width: 350px;
-  height: 350px;
-  bottom: 10%;
-  left: -5%;
-  background: radial-gradient(circle, rgba(140, 80, 200, 0.15) 0%, transparent 70%);
+  background:
+    radial-gradient(circle at 50% 8%, rgba(120, 90, 220, 0.22) 0%, transparent 34%),
+    radial-gradient(circle at 88% 42%, rgba(60, 100, 200, 0.14) 0%, transparent 28%),
+    radial-gradient(circle at 12% 64%, rgba(140, 80, 200, 0.12) 0%, transparent 24%);
+  opacity: 0.9;
 }
 
 /* ═══ Navbar ═══ */
@@ -382,9 +370,23 @@ function goChat() {
   background: rgba(255, 255, 255, 0.05);
 }
 .nav-cta {
-  font-size: 0.78rem !important;
-  font-weight: 600 !important;
-  border-radius: 9px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(85, 245, 190, 0.15);
+  border-radius: 9px;
+  background: #55f5be;
+  color: #072116;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+}
+.nav-cta:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
 }
 
 /* ═══ Hero ═══ */
@@ -444,32 +446,43 @@ function goChat() {
   gap: 12px;
   margin-top: 8px;
 }
+.hero-btn,
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: box-shadow 0.25s, transform 0.25s, background 0.25s, border-color 0.25s, color 0.25s;
+}
 .hero-btn-primary {
-  font-size: 0.88rem !important;
-  font-weight: 700 !important;
-  border-radius: 10px !important;
-  padding: 10px 28px !important;
-  background: linear-gradient(135deg, #7c5ce0, #9580ff) !important;
-  border-color: rgba(149, 128, 255, 0.4) !important;
-  box-shadow: 0 4px 20px rgba(149, 128, 255, 0.2) !important;
-  transition: box-shadow 0.25s, transform 0.25s !important;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 28px;
+  background: linear-gradient(135deg, #7c5ce0, #9580ff);
+  border-color: rgba(149, 128, 255, 0.4);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(149, 128, 255, 0.2);
 }
 .hero-btn-primary:hover {
-  box-shadow: 0 6px 28px rgba(149, 128, 255, 0.35) !important;
-  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 28px rgba(149, 128, 255, 0.35);
+  transform: translateY(-1px);
 }
 .hero-btn-secondary {
-  font-size: 0.88rem !important;
-  font-weight: 600 !important;
-  border-radius: 10px !important;
-  padding: 10px 28px !important;
-  color: var(--lp-text-dim) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 10px 28px;
+  background: transparent;
+  color: var(--lp-text-dim);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 .hero-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.04) !important;
-  color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* Preview card */
@@ -484,7 +497,7 @@ function goChat() {
   border: 1px solid var(--lp-card-border);
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
 }
 .preview-header {
   display: flex;
@@ -549,15 +562,9 @@ function goChat() {
 .gen-bar {
   height: 9px;
   border-radius: 5px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(149, 128, 255, 0.12));
 }
 .gen-bar.short { width: 60%; }
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
 
 /* ═══ Features ═══ */
 .features-section {
@@ -701,16 +708,18 @@ function goChat() {
   line-height: 1.6;
 }
 .cta-btn {
-  font-size: 0.9rem !important;
-  font-weight: 700 !important;
-  border-radius: 10px !important;
-  padding: 11px 30px !important;
-  background: linear-gradient(135deg, #7c5ce0, #9580ff) !important;
-  border-color: rgba(149, 128, 255, 0.4) !important;
-  box-shadow: 0 4px 20px rgba(149, 128, 255, 0.2) !important;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 11px 30px;
+  background: linear-gradient(135deg, #7c5ce0, #9580ff);
+  border-color: rgba(149, 128, 255, 0.4);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(149, 128, 255, 0.2);
 }
 .cta-btn:hover {
-  box-shadow: 0 6px 28px rgba(149, 128, 255, 0.35) !important;
+  box-shadow: 0 6px 28px rgba(149, 128, 255, 0.35);
+  transform: translateY(-1px);
 }
 
 /* ═══ Footer ═══ */
@@ -719,6 +728,25 @@ function goChat() {
   z-index: 1;
   border-top: 1px solid var(--lp-card-border);
   padding: 22px 24px;
+}
+
+@supports (content-visibility: auto) {
+  .features-section,
+  .how-section,
+  .cta-section,
+  .landing-footer {
+    content-visibility: auto;
+  }
+
+  .features-section,
+  .how-section,
+  .cta-section {
+    contain-intrinsic-size: 760px;
+  }
+
+  .landing-footer {
+    contain-intrinsic-size: 96px;
+  }
 }
 .footer-inner {
   max-width: 1100px;
@@ -766,7 +794,12 @@ function goChat() {
     gap: 10px;
     text-align: center;
   }
-  .orb-b { display: none; }
+  .landing-page::before {
+    height: 720px;
+    background:
+      radial-gradient(circle at 50% 10%, rgba(120, 90, 220, 0.2) 0%, transparent 38%),
+      radial-gradient(circle at 20% 70%, rgba(140, 80, 200, 0.1) 0%, transparent 28%);
+  }
 }
 
 @media (max-width: 480px) {

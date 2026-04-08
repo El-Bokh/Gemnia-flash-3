@@ -1,6 +1,4 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import AdminLayout from '@/layouts/AdminLayout.vue'
-import ClientLayout from '@/layouts/ClientLayout.vue'
 import { getAuthenticatedHome, getStoredAuthUser, isAdminUser } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
@@ -13,7 +11,7 @@ const routes: RouteRecordRaw[] = [
   // ── Client (authenticated) ─────────────────────
   {
     path: '/',
-    component: ClientLayout,
+    component: () => import('@/layouts/ClientLayout.vue'),
     children: [
       {
         path: 'chat',
@@ -53,7 +51,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    component: AdminLayout,
+    component: () => import('@/layouts/AdminLayout.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
     children: [
       {

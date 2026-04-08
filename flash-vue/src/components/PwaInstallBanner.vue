@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
 
 const { t } = useI18n()
 
@@ -55,13 +54,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="install-actions">
-        <Button
-          :label="t('pwa.install')"
-          icon="pi pi-download"
-          size="small"
-          class="install-btn"
-          @click="installApp"
-        />
+        <button type="button" class="install-btn" @click="installApp">
+          <i class="pi pi-download" />
+          <span>{{ t('pwa.install') }}</span>
+        </button>
         <button class="dismiss-btn" @click="dismissBanner">
           <i class="pi pi-times" />
         </button>
@@ -130,10 +126,24 @@ onBeforeUnmount(() => {
 }
 
 .install-btn {
-  font-size: 0.75rem !important;
-  border-radius: 8px !important;
-  font-weight: 600 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(129, 140, 248, 0.2);
+  background: linear-gradient(135deg, #7c5ce0, #9580ff);
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  font-weight: 600;
   white-space: nowrap;
+  transition: filter 0.15s, transform 0.15s;
+}
+
+.install-btn:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
 }
 
 .dismiss-btn {

@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
@@ -40,6 +41,7 @@ class GoogleAuthController extends Controller
     {
         try {
             $googleUser = $this->socialiteDriver()->user();
+            $email = $this->normalizedGoogleEmail($googleUser);
         } catch (Throwable $e) {
             $this->logGoogleAuthFailure('Google OAuth callback failed', $e);
 
@@ -49,21 +51,28 @@ class GoogleAuthController extends Controller
         $user = User::where('google_id', $googleUser->getId())->first();
 
         if (! $user) {
-            $user = User::where('email', Str::lower($googleUser->getEmail()))->first();
+            $user = User::where('email', $email)->first();
         }
 
         if ($user) {
             // Existing user — link Google ID if not already linked
+            $updates = [];
+
             if (! $user->google_id) {
-                $user->update([
-                    'google_id' => $googleUser->getId(),
-                    'provider'  => 'google',
-                ]);
+                $updates['google_id'] = $googleUser->getId();
+                $updates['provider'] = 'google';
             }
 
-            // Update avatar from Google if user has no avatar
             if (! $user->avatar && $googleUser->getAvatar()) {
-                $user->update(['avatar' => $googleUser->getAvatar()]);
+                $updates['avatar'] = $googleUser->getAvatar();
+            }
+
+            if (! $user->email_verified_at && $this->googleEmailIsVerified($googleUser)) {
+                $updates['email_verified_at'] = now();
+            }
+
+            if ($updates !== []) {
+                $user->forceFill($updates)->save();
             }
 
             if ($user->status !== 'active') {
@@ -71,10 +80,11 @@ class GoogleAuthController extends Controller
             }
         } else {
             // New user — create account
-            $user = DB::transaction(function () use ($googleUser) {
-                $user = User::create([
-                    'name'      => $googleUser->getName(),
-                    'email'     => Str::lower($googleUser->getEmail()),
+            $user = DB::transaction(function () use ($googleUser, $email) {
+                $user = new User([
+                    'name'      => $this->googleDisplayName($googleUser, $email),
+                    'email'     => $email,
+                    'password'  => Hash::make(Str::random(40)),
                     'google_id' => $googleUser->getId(),
                     'provider'  => 'google',
                     'avatar'    => $googleUser->getAvatar(),
@@ -82,6 +92,12 @@ class GoogleAuthController extends Controller
                     'locale'    => app()->getLocale(),
                     'timezone'  => config('app.timezone', 'UTC'),
                 ]);
+
+                if ($this->googleEmailIsVerified($googleUser)) {
+                    $user->email_verified_at = now();
+                }
+
+                $user->save();
 
                 $defaultRole = Role::query()->where('is_default', true)->first();
                 if ($defaultRole) {
@@ -184,5 +200,32 @@ class GoogleAuthController extends Controller
             'google_client_secret_configured' => filled(config('services.google.client_secret')),
             'google_redirect_configured' => filled(config('services.google.redirect')),
         ]);
+    }
+
+    private function normalizedGoogleEmail(\Laravel\Socialite\Contracts\User $googleUser): string
+    {
+        $email = Str::lower(trim((string) $googleUser->getEmail()));
+
+        if (blank($email)) {
+            throw new \UnexpectedValueException('Google account did not return an email address.');
+        }
+
+        return $email;
+    }
+
+    private function googleDisplayName(\Laravel\Socialite\Contracts\User $googleUser, string $email): string
+    {
+        $name = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: ''));
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return Str::headline(Str::before($email, '@'));
+    }
+
+    private function googleEmailIsVerified(\Laravel\Socialite\Contracts\User $googleUser): bool
+    {
+        return (bool) ($googleUser->getRaw()['email_verified'] ?? false);
     }
 }
