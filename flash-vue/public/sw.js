@@ -64,6 +64,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls — network only
-  event.respondWith(fetch(request));
+  // API calls — network only (with fallback for offline)
+  event.respondWith(
+    fetch(request).catch(() =>
+      new Response(JSON.stringify({ success: false, message: 'Network unavailable' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+  );
 });
