@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VisualStyleController as AdminVisualStyleController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -37,12 +38,12 @@ use Illuminate\Support\Facades\Route;
 // ──────────────────────────────────────────────
 
 Route::prefix('auth')->name('auth.')->group(function () {
-    Route::post('/register', [AuthController::class, 'register'])->name('register')->middleware('throttle:5,1');
+    Route::post('/register', [AuthController::class, 'register'])->name('register')->middleware(['throttle:5,1', 'platform.maintenance']);
     Route::post('/login',  [AuthController::class, 'login'])->name('login')->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-        Route::get('/me',      [AuthController::class, 'me'])->name('me');
+        Route::get('/me',      [AuthController::class, 'me'])->name('me')->middleware('platform.maintenance');
     });
 });
 
@@ -50,13 +51,14 @@ Route::prefix('auth')->name('auth.')->group(function () {
 //  Public Routes (no auth required)
 // ──────────────────────────────────────────────
 
-Route::get('/plans/public', [SubscriptionController::class, 'plans'])->name('plans.public');
+Route::get('/maintenance/status', [MaintenanceController::class, 'show'])->name('maintenance.status');
+Route::get('/plans/public', [SubscriptionController::class, 'plans'])->middleware('platform.maintenance')->name('plans.public');
 
 // ──────────────────────────────────────────────
 //  Client Routes (authenticated)
 // ──────────────────────────────────────────────
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'platform.maintenance'])->group(function () {
 
     // Profile
     Route::put('/profile',          [ProfileController::class, 'update']);

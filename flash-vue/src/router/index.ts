@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { getPublicMaintenanceStatus } from '@/services/maintenanceService'
 import { getAuthenticatedHome, getStoredAuthUser, isAdminUser } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
@@ -36,7 +37,7 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { guest: true },
+    meta: { guest: true, skipMaintenanceCheck: true },
   },
   {
     path: '/register',
@@ -45,9 +46,15 @@ const routes: RouteRecordRaw[] = [
     meta: { guest: true },
   },
   {
+    path: '/maintenance',
+    name: 'maintenance',
+    component: () => import('@/views/MaintenanceView.vue'),
+  },
+  {
     path: '/oauth/callback',
     name: 'google-callback',
     component: () => import('@/views/GoogleCallbackView.vue'),
+    meta: { skipMaintenanceCheck: true },
   },
   {
     path: '/admin',
@@ -128,27 +135,47 @@ const router = createRouter({
 })
 
 // ── Navigation Guard ────────────────────────────────────────
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to) => {
   const token = localStorage.getItem('auth_token')
   const isAuthenticated = !!token
   const storedUser = getStoredAuthUser()
 
+  if (!to.meta.skipMaintenanceCheck) {
+    try {
+      const maintenance = await getPublicMaintenanceStatus()
+      const canBypass = maintenance.can_bypass || isAdminUser(storedUser)
+
+      if (maintenance.is_enabled && !canBypass && to.name !== 'maintenance') {
+        return {
+          name: 'maintenance',
+          query: to.fullPath !== '/maintenance' ? { redirect: to.fullPath } : undefined,
+        }
+      }
+
+      if (to.name === 'maintenance' && (!maintenance.is_enabled || canBypass)) {
+        return isAuthenticated ? getAuthenticatedHome(storedUser) : '/'
+      }
+    } catch {
+      // Do not block navigation when the status endpoint is temporarily unreachable.
+    }
+  }
+
   // Going to a protected route without a token → redirect to login
   if (to.matched.some(r => r.meta.requiresAuth) && !isAuthenticated) {
-    return next({ name: 'login', query: { redirect: to.fullPath } })
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   // Going to an admin-only route with a non-admin account → redirect to profile
   if (to.matched.some(r => r.meta.requiresAdmin) && isAuthenticated && storedUser && !isAdminUser(storedUser)) {
-    return next('/profile')
+    return '/profile'
   }
 
   // Going to a guest page while authenticated → redirect by role
   if (to.meta.guest && isAuthenticated) {
-    return next(getAuthenticatedHome(storedUser))
+    return getAuthenticatedHome(storedUser)
   }
 
-  next()
+  return true
 })
 
 export default router

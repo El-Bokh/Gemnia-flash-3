@@ -6,7 +6,9 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\GoogleProvider;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use Mockery;
 use Tests\TestCase;
 
 class GoogleAuthTest extends TestCase
@@ -37,9 +39,18 @@ class GoogleAuthTest extends TestCase
                 'avatar' => 'https://example.com/avatar.jpg',
             ]);
 
-        Socialite::shouldReceive('driver->stateless->user')
+        $provider = Mockery::mock(GoogleProvider::class);
+        $provider->shouldReceive('stateless')
+            ->once()
+            ->andReturnSelf();
+        $provider->shouldReceive('user')
             ->once()
             ->andReturn($googleUser);
+
+        Socialite::shouldReceive('driver')
+            ->once()
+            ->with('google')
+            ->andReturn($provider);
 
         $response = $this->get(route('auth.google.callback'));
 

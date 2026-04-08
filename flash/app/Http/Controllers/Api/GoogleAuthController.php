@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\MaintenanceModeService;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,10 @@ use Throwable;
 
 class GoogleAuthController extends Controller
 {
+    public function __construct(
+        private readonly MaintenanceModeService $maintenance,
+    ) {}
+
     /**
      * Redirect to Google OAuth consent screen.
      */
@@ -78,7 +83,15 @@ class GoogleAuthController extends Controller
             if ($user->status !== 'active') {
                 return redirect($this->spaUrl('/oauth/callback?error=account_inactive'));
             }
+
+            if ($this->maintenance->blocks(request(), $user)) {
+                return redirect($this->spaUrl('/maintenance'));
+            }
         } else {
+            if ($this->maintenance->blocks(request())) {
+                return redirect($this->spaUrl('/maintenance'));
+            }
+
             // New user — create account
             $user = DB::transaction(function () use ($googleUser, $email) {
                 $user = new User([

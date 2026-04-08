@@ -6,6 +6,12 @@ export interface MaintenanceStatus {
   allowed_ips: string[]
 }
 
+export interface PublicMaintenanceStatus {
+  is_enabled: boolean
+  message: string
+  can_bypass: boolean
+}
+
 export interface UpdateMaintenanceData {
   message?: string
   allowed_ips?: string[]

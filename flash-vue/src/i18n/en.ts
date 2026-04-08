@@ -973,6 +973,18 @@ export default {
     allActions: 'All Actions',
   },
 
+  maintenancePage: {
+    seoTitle: 'Maintenance',
+    badge: 'Temporary maintenance',
+    heading: 'We are improving the platform',
+    description: 'The service is temporarily unavailable while we complete updates and maintenance.',
+    statusLabel: 'Current status',
+    retry: 'Check again',
+    meta: 'We will reopen the platform as soon as the maintenance window ends.',
+    messageFallback: 'The platform is currently under maintenance. Please try again later.',
+    refreshError: 'Unable to refresh maintenance status right now. Please try again in a moment.',
+  },
+
   // ── Landing Page ────────────────────────────────────
   landing: {
     heroTitle: 'Create Stunning Images',

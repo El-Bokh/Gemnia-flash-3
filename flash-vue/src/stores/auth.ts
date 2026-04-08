@@ -85,7 +85,12 @@ export const useAuthStore = defineStore('auth', () => {
           setQuota(res.data.quota)
         }
       }
-    } catch {
+    } catch (error) {
+      if ((error as any)?.response?.status === 503) {
+        isLoaded.value = false
+        return
+      }
+
       clearStoredAuth()
       user.value = emptyAuthUser()
       isLoaded.value = false

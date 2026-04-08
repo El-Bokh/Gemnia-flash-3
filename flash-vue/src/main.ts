@@ -20,15 +20,6 @@ async function bootstrap() {
 
 	app.use(pinia)
 	app.provide(headSymbol, head)
-
-	const auth = useAuthStore(pinia)
-	const hasToken = !!localStorage.getItem('auth_token')
-	const hasStoredUser = !!getStoredAuthUser()
-
-	if (hasToken && !hasStoredUser) {
-		await auth.fetchUser()
-	}
-
 	app.use(router)
 	app.use(i18n)
 	app.use(PrimeVue, {
@@ -42,6 +33,16 @@ async function bootstrap() {
 	})
 
 	app.directive('tooltip', Tooltip)
+
+	const auth = useAuthStore(pinia)
+	const hasToken = !!localStorage.getItem('auth_token')
+	const hasStoredUser = !!getStoredAuthUser()
+
+	if (hasToken && !hasStoredUser) {
+		await auth.fetchUser()
+	}
+
+	await router.isReady()
 
 	app.mount('#app')
 }

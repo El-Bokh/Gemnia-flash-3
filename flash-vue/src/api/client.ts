@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
 import router from '@/router'
+import { recordMaintenanceFromMessage } from '@/utils/maintenanceState'
 import { clearStoredAuth } from '@/utils/auth'
 
 // ─── Base API Configuration ─────────────────────────────────
@@ -59,7 +60,20 @@ apiClient.interceptors.response.use(
       }
 
       if (status === 503) {
+        const currentPath = router.currentRoute.value.fullPath || '/'
+        const message = typeof error.response.data?.message === 'string'
+          ? error.response.data.message
+          : 'The platform is currently under maintenance. Please try again later.'
+
+        recordMaintenanceFromMessage(message)
         console.error('[API] Service unavailable — maintenance mode')
+
+        if (router.currentRoute.value.name !== 'maintenance') {
+          void router.replace({
+            name: 'maintenance',
+            query: currentPath !== '/maintenance' ? { redirect: currentPath } : undefined,
+          })
+        }
       }
     }
 

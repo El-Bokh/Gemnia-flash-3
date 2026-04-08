@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\MaintenanceModeService;
 use App\Services\NotificationService;
 use App\Services\UsageService;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,10 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     private const TOKEN_NAME = 'web-session';
+
+    public function __construct(
+        private readonly MaintenanceModeService $maintenance,
+    ) {}
 
     /**
      * POST /api/auth/register
@@ -125,6 +130,16 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'Account is not active.',
             ], 403);
+        }
+
+        if ($this->maintenance->blocks($request, $user)) {
+            $status = $this->maintenance->getPublicStatus($request, $user);
+
+            return response()->json([
+                'success' => false,
+                'message' => $status['message'],
+                'data' => $status,
+            ], 503);
         }
 
         return $this->authenticatedResponse($user, $request);
