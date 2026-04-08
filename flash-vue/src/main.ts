@@ -3,7 +3,7 @@ import 'primeicons/primeicons.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createHead } from '@unhead/vue'
+import { createHeadCore, headSymbol } from '@unhead/vue'
 import Aura from '@primeuix/themes/aura'
 import PrimeVue from 'primevue/config'
 import Tooltip from 'primevue/tooltip'
@@ -16,10 +16,10 @@ import { getStoredAuthUser } from '@/utils/auth'
 async function bootstrap() {
 	const app = createApp(App)
 	const pinia = createPinia()
-	const head = createHead()
+	const head = createHeadCore()
 
 	app.use(pinia)
-	app.use(head)
+	app.provide(headSymbol, head)
 
 	const auth = useAuthStore(pinia)
 	const hasToken = !!localStorage.getItem('auth_token')
