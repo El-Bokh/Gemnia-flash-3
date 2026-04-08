@@ -85,6 +85,7 @@ export default {
     switchLanguage: 'تغيير اللغة',
     markAllRead: 'تعليم الكل كمقروء',
     noNotifications: 'لا توجد إشعارات',
+    goToPlatform: 'الذهاب للمنصة',
   },
 
   // ── تسجيل الدخول ────────────────────────────────────────

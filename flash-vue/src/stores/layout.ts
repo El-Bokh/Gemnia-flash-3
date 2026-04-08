@@ -5,13 +5,15 @@ import i18n from '@/i18n'
 export const useLayoutStore = defineStore('layout', () => {
   const sidebarCollapsed = ref(false)
   const sidebarMobileOpen = ref(false)
-  const darkMode = ref(false)
+  const darkMode = ref(true)
   const locale = ref<'en' | 'ar'>('en')
 
-  // Initialize dark mode from localStorage
+  // Initialize dark mode from localStorage (default: true)
   const savedDark = localStorage.getItem('flash-dark-mode')
-  if (savedDark === 'true') {
-    darkMode.value = true
+  if (savedDark === 'false') {
+    darkMode.value = false
+    document.documentElement.classList.remove('dark')
+  } else {
     document.documentElement.classList.add('dark')
   }
 

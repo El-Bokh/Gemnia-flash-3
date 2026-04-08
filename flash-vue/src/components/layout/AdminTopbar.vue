@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
@@ -12,6 +13,7 @@ import Popover from 'primevue/popover'
 const layout = useLayoutStore()
 const auth = useAuthStore()
 const notificationStore = useNotificationStore()
+const router = useRouter()
 const { t } = useI18n()
 
 const profileMenu = ref()
@@ -21,12 +23,17 @@ const profileItems = computed(() => [
   {
     label: t('topbar.profile'),
     icon: 'pi pi-user',
-    command: () => {},
+    command: () => void router.push({ name: 'admin-profile' }),
+  },
+  {
+    label: t('topbar.goToPlatform'),
+    icon: 'pi pi-external-link',
+    command: () => void router.push({ name: 'home' }),
   },
   {
     label: t('topbar.settings'),
     icon: 'pi pi-cog',
-    command: () => {},
+    command: () => void router.push({ name: 'admin-settings' }),
   },
   { separator: true },
   {

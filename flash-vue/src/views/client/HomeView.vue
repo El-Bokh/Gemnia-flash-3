@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
 import { useLayoutStore } from '@/stores/layout'
@@ -13,6 +14,7 @@ import QuotaBar from '@/components/chat/QuotaBar.vue'
 import QuotaExhaustedModal from '@/components/chat/QuotaExhaustedModal.vue'
 
 const { t } = useI18n()
+const router = useRouter()
 const chat = useChatStore()
 const auth = useAuthStore()
 const layout = useLayoutStore()
@@ -76,6 +78,17 @@ onMounted(() => {
 })
 
 function handleSend(content: string, image?: File) {
+  // Guest → must login first
+  if (!auth.isAuthenticated) {
+    void router.push({ name: 'login', query: { redirect: '/' } })
+    return
+  }
+  // Authenticated but no subscription → go to pricing
+  if (auth.noSubscription) {
+    void router.push({ name: 'pricing' })
+    return
+  }
+
   const isNewChat = !chat.activeConversationId
   chat.sendMessage(content, selectedStyle.value || undefined, image)
   selectedStyle.value = ''
@@ -92,6 +105,17 @@ function handleSend(content: string, image?: File) {
 }
 
 function useSuggestion(text: string) {
+  // Guest → must login first
+  if (!auth.isAuthenticated) {
+    void router.push({ name: 'login', query: { redirect: '/' } })
+    return
+  }
+  // Authenticated but no subscription → go to pricing
+  if (auth.noSubscription) {
+    void router.push({ name: 'pricing' })
+    return
+  }
+
   const isNewChat = !chat.activeConversationId
   if (!chat.activeConversationId) {
     chat.createConversation()

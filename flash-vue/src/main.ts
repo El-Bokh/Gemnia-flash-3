@@ -32,6 +32,9 @@ async function bootstrap() {
 		ripple: true,
 		theme: {
 			preset: Aura,
+			options: {
+				darkModeSelector: '.dark',
+			},
 		},
 	})
 

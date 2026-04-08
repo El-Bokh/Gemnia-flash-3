@@ -85,6 +85,7 @@ export default {
     switchLanguage: 'Switch language',
     markAllRead: 'Mark all read',
     noNotifications: 'No notifications',
+    goToPlatform: 'Go to Platform',
   },
 
   // ── Login ───────────────────────────────────────────────

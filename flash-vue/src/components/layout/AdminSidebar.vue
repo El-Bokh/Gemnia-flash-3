@@ -106,8 +106,12 @@ const collapsed = computed(() => layout.sidebarCollapsed)
       </div>
     </nav>
 
-    <div class="sidebar-footer" v-show="!collapsed">
-      <div class="footer-version">
+    <div class="sidebar-footer">
+      <router-link to="/" class="nav-item platform-link" v-tooltip.right="collapsed ? t('topbar.goToPlatform') : undefined" @click="layout.closeMobileSidebar()">
+        <i class="pi pi-external-link nav-icon" />
+        <span class="nav-label" v-show="!collapsed">{{ t('topbar.goToPlatform') }}</span>
+      </router-link>
+      <div class="footer-version" v-show="!collapsed">
         <img class="footer-logo" src="/klek-ai-mark.svg" alt="Klek AI" />
         <span>Klek AI v1.0</span>
       </div>
@@ -271,8 +275,23 @@ const collapsed = computed(() => layout.sidebarCollapsed)
 
 /* Footer */
 .sidebar-footer {
-  padding: 10px 16px;
+  padding: 8px;
   border-top: 1px solid var(--sidebar-border, #e2e8f0);
+}
+
+.platform-link {
+  margin-bottom: 8px;
+  color: var(--active-color, #4f46e5) !important;
+  font-weight: 600 !important;
+}
+
+.platform-link:hover {
+  background: var(--active-bg, #eef2ff);
+}
+
+.sidebar-collapsed .platform-link {
+  justify-content: center;
+  padding: 10px;
 }
 
 .footer-version {

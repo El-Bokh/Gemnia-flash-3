@@ -25,6 +25,9 @@ const sidebarOpen = computed({
   set: (val: boolean) => { layout.sidebarCollapsed = !val },
 })
 const mobileSidebarOpen = ref(false)
+
+// Show full sidebar content when expanded OR when mobile sidebar is open
+const showSidebarContent = computed(() => sidebarOpen.value || mobileSidebarOpen.value)
 const showUserMenu = ref(false)
 const showNotifications = ref(false)
 const editTitle = ref('')
@@ -164,8 +167,10 @@ function handleDocumentPointerDown(e: PointerEvent) {
 
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
-  notificationStore.setMode(false)
-  notificationStore.startPolling()
+  if (auth.isAuthenticated) {
+    notificationStore.setMode(false)
+    notificationStore.startPolling()
+  }
 })
 
 onBeforeUnmount(() => {
@@ -188,24 +193,24 @@ onBeforeUnmount(() => {
     <aside class="client-sidebar" :class="{ 'mobile-open': mobileSidebarOpen }">
       <!-- Header -->
       <div class="sidebar-header">
-        <div class="brand" v-if="sidebarOpen">
+        <div class="brand" v-if="showSidebarContent">
           <span class="brand-icon"><i class="pi pi-sparkles" /></span>
           <span class="brand-text">Klek AI</span>
         </div>
         <Button
-          :icon="sidebarOpen ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"
-          severity="secondary"
+          :icon=\"sidebarOpen ? 'pi pi-chevron-right' : 'pi pi-chevron-left'\"
+          severity=\"secondary\"
           text
           rounded
-          size="small"
-          class="collapse-btn desktop-only"
-          @click="toggleSidebar"
-          v-tooltip.left="sidebarOpen ? t('client.collapseSidebar') : t('client.expandSidebar')"
+          size=\"small\"
+          class=\"collapse-btn desktop-only\"
+          @click=\"toggleSidebar\"
+          v-tooltip.left=\"sidebarOpen ? t('client.collapseSidebar') : t('client.expandSidebar')\"
         />
       </div>
 
       <!-- New Chat Button -->
-      <div class="sidebar-new-chat" v-if="sidebarOpen">
+      <div class="sidebar-new-chat" v-if="showSidebarContent">
         <Button
           :label="t('client.newChat')"
           icon="pi pi-plus"
@@ -222,7 +227,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Search -->
-      <div class="sidebar-search" v-if="sidebarOpen">
+      <div class="sidebar-search" v-if="showSidebarContent">
         <div class="search-box">
           <i class="pi pi-search search-icon" />
           <input
@@ -243,7 +248,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Conversations list -->
-      <div class="sidebar-conversations" v-if="sidebarOpen">
+      <div class="sidebar-conversations" v-if="showSidebarContent">
         <!-- Search results -->
         <template v-if="chat.filteredConversations">
           <div class="conv-section-label">{{ t('chat.searchResults') }}</div>
@@ -365,7 +370,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Footer -->
-      <div class="sidebar-footer" v-if="sidebarOpen">
+      <div class="sidebar-footer" v-if="showSidebarContent">
         <Button :label="t('client.pricing')" icon="pi pi-tag" severity="secondary" text size="small" class="footer-link" @click="goToPricing" />
       </div>
       <div class="sidebar-footer" v-else>

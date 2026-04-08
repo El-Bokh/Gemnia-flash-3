@@ -97,6 +97,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/SettingsView.vue'),
         meta: { title: 'System Settings' },
       },
+      {
+        path: 'profile',
+        name: 'admin-profile',
+        component: () => import('@/views/client/ProfileView.vue'),
+        meta: { title: 'Profile' },
+      },
     ],
   },
   {
