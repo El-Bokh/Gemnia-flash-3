@@ -266,47 +266,28 @@ function goChat() {
 .ambient-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.35;
-  will-change: transform;
+  opacity: 0.3;
 }
 .orb-a {
-  width: 500px;
-  height: 500px;
-  top: -10%;
-  left: 30%;
-  background: radial-gradient(circle, rgba(120, 90, 220, 0.4) 0%, transparent 70%);
-  animation: drift-a 16s ease-in-out infinite;
+  width: 600px;
+  height: 600px;
+  top: -15%;
+  left: 25%;
+  background: radial-gradient(circle, rgba(120, 90, 220, 0.25) 0%, transparent 70%);
 }
 .orb-b {
-  width: 350px;
-  height: 350px;
+  width: 400px;
+  height: 400px;
   top: 40%;
   right: -5%;
-  background: radial-gradient(circle, rgba(60, 100, 200, 0.3) 0%, transparent 70%);
-  animation: drift-b 20s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(60, 100, 200, 0.18) 0%, transparent 70%);
 }
 .orb-c {
-  width: 300px;
-  height: 300px;
+  width: 350px;
+  height: 350px;
   bottom: 10%;
   left: -5%;
-  background: radial-gradient(circle, rgba(140, 80, 200, 0.25) 0%, transparent 70%);
-  animation: drift-c 18s ease-in-out infinite;
-}
-
-@keyframes drift-a {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(40px, 20px) scale(1.05); }
-  66% { transform: translate(-20px, 40px) scale(0.95); }
-}
-@keyframes drift-b {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-30px, -20px); }
-}
-@keyframes drift-c {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(25px, -30px); }
+  background: radial-gradient(circle, rgba(140, 80, 200, 0.15) 0%, transparent 70%);
 }
 
 /* ═══ Navbar ═══ */
@@ -316,9 +297,7 @@ function goChat() {
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(7, 7, 14, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(7, 7, 14, 0.92);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 .nav-inner {
@@ -505,7 +484,6 @@ function goChat() {
   border: 1px solid var(--lp-card-border);
   border-radius: 16px;
   overflow: hidden;
-  backdrop-filter: blur(10px);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
 }
 .preview-header {
@@ -615,7 +593,6 @@ function goChat() {
   background: var(--lp-card);
   border: 1px solid var(--lp-card-border);
   border-radius: 14px;
-  backdrop-filter: blur(6px);
   transition: transform 0.25s, border-color 0.25s;
 }
 .feature-card:hover {
