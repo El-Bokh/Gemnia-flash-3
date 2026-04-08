@@ -42,7 +42,7 @@ const styleThumbnailMap: Record<string, string> = {
   'pop-art': '/style-gallery/pop-art.jpg',
 }
 
-const apiOrigin = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8099/api').replace(/\/api\/?$/, '')
+const apiOrigin = (import.meta.env.VITE_API_BASE_URL || 'https://klek.studio/api').replace(/\/api\/?$/, '')
 
 onMounted(async () => {
   loading.value = true
