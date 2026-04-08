@@ -50,8 +50,7 @@ const plans = computed(() =>
 onMounted(async () => {
   try {
     const res = await getPlans()
-    const payload = res.data
-    rawPlans.value = Array.isArray(payload) ? payload : (payload?.data ?? [])
+    rawPlans.value = res.data ?? []
   } catch {
     rawPlans.value = []
   } finally {

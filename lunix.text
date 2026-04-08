@@ -1,0 +1,7 @@
+scp "D:\Gemnia flash 3\flash\.env" root@72.61.192.23:/var/www/Gemnia-flash-3/
+
+git pull origin main
+
+cd /var/www
+
+git clone git@github.com:El-Bokh/Gemnia-flash-3.git

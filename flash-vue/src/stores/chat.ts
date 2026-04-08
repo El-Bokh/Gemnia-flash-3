@@ -9,6 +9,7 @@ import {
   sendMessage as sendMessageApi,
 } from '@/services/chatService'
 import type { ConversationData, MessageData } from '@/services/chatService'
+import { useAuthStore } from '@/stores/auth'
 
 export interface ChatMessage {
   id: string
@@ -258,7 +259,6 @@ export const useChatStore = defineStore('chat', () => {
 
         // Update quota from response
         if (res.quota) {
-          const { useAuthStore } = await import('@/stores/auth')
           const auth = useAuthStore()
           auth.quota.credits_remaining = res.quota.remaining
           // Always update warning level (including 'none') to stay in sync
@@ -278,7 +278,6 @@ export const useChatStore = defineStore('chat', () => {
         if (idx !== -1) conv.messages.splice(idx, 1)
 
         // Sync quota with server to ensure consistency
-        const { useAuthStore } = await import('@/stores/auth')
         const auth = useAuthStore()
         await auth.refreshQuota()
       } else {
