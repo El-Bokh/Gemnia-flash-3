@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Throwable;
 
 class GoogleAuthController extends Controller
 {
@@ -22,7 +23,13 @@ class GoogleAuthController extends Controller
      */
     public function redirect(): RedirectResponse|\Symfony\Component\HttpFoundation\RedirectResponse
     {
-        return Socialite::driver('google')->stateless()->redirect();
+        try {
+            return $this->socialiteDriver()->redirect();
+        } catch (Throwable $e) {
+            $this->logGoogleAuthFailure('Google OAuth redirect failed', $e);
+
+            return redirect($this->spaUrl('/oauth/callback?error=google_auth_failed'));
+        }
     }
 
     /**
@@ -32,9 +39,9 @@ class GoogleAuthController extends Controller
     public function callback(): RedirectResponse
     {
         try {
-            $googleUser = Socialite::driver('google')->stateless()->user();
-        } catch (\Exception $e) {
-            Log::error('Google OAuth callback failed', ['error' => $e->getMessage()]);
+            $googleUser = $this->socialiteDriver()->user();
+        } catch (Throwable $e) {
+            $this->logGoogleAuthFailure('Google OAuth callback failed', $e);
 
             return redirect($this->spaUrl('/oauth/callback?error=google_auth_failed'));
         }
@@ -155,5 +162,27 @@ class GoogleAuthController extends Controller
         $baseUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
 
         return $baseUrl . $path;
+    }
+
+    private function socialiteDriver(): \Laravel\Socialite\Contracts\Provider
+    {
+        if (! class_exists(Socialite::class)) {
+            throw new \RuntimeException(
+                'Laravel Socialite facade is unavailable. Run composer install and refresh Laravel caches on the deployed backend.'
+            );
+        }
+
+        return Socialite::driver('google')->stateless();
+    }
+
+    private function logGoogleAuthFailure(string $message, Throwable $e): void
+    {
+        Log::error($message, [
+            'error' => $e->getMessage(),
+            'socialite_facade_available' => class_exists(Socialite::class),
+            'google_client_id_configured' => filled(config('services.google.client_id')),
+            'google_client_secret_configured' => filled(config('services.google.client_secret')),
+            'google_redirect_configured' => filled(config('services.google.redirect')),
+        ]);
     }
 }

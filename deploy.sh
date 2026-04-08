@@ -51,9 +51,28 @@ awk '/@verbatim/{v=1} v && /<\/script>/{print; print "    @endverbatim"; v=0; ne
 
 echo ""
 echo "══════════════════════════════════════════"
-echo "  🚀 Optimizing Laravel for production..."
+echo "  🧩 Syncing PHP dependencies..."
 echo "══════════════════════════════════════════"
 cd "$LARAVEL_DIR"
+
+COMPOSER_INSTALLED_FILE="$LARAVEL_DIR/vendor/composer/installed.php"
+
+if [ ! -f "$LARAVEL_DIR/vendor/autoload.php" ] || [ ! -f "$COMPOSER_INSTALLED_FILE" ] || [ "$LARAVEL_DIR/composer.lock" -nt "$COMPOSER_INSTALLED_FILE" ]; then
+	if command -v composer >/dev/null 2>&1; then
+		composer install --no-interaction --prefer-dist --optimize-autoloader
+	else
+		echo "  Composer not found in PATH. Run 'composer install --no-interaction --prefer-dist --optimize-autoloader' before caching Laravel."
+	fi
+else
+	echo "  PHP dependencies are up to date."
+fi
+
+echo ""
+echo "══════════════════════════════════════════"
+echo "  🚀 Optimizing Laravel for production..."
+echo "══════════════════════════════════════════"
+php artisan optimize:clear
+php artisan package:discover --ansi
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
