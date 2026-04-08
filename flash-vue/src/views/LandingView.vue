@@ -98,8 +98,11 @@ function goChat() {
     <!-- ═══ Hero ═══ -->
     <section class="hero-section">
       <div class="hero-bg">
-        <div class="hero-glow" />
+        <div class="hero-orb orb-1" />
+        <div class="hero-orb orb-2" />
+        <div class="hero-orb orb-3" />
         <div class="hero-grid" />
+        <div class="hero-noise" />
       </div>
       <div class="hero-content">
         <div class="hero-badge">
@@ -203,10 +206,23 @@ function goChat() {
 </template>
 
 <style scoped>
+/* ═══ Force dark palette on landing ═══ */
 .landing-page {
+  --lp-bg: #050510;
+  --lp-surface: #0c0c1d;
+  --lp-card: rgba(15, 15, 35, 0.6);
+  --lp-card-border: rgba(139, 92, 246, 0.12);
+  --lp-text: #e8e8f0;
+  --lp-text-dim: #9896b0;
+  --lp-text-muted: #5e5c78;
+  --lp-accent: #a78bfa;
+  --lp-accent2: #c084fc;
+  --lp-glow: rgba(139, 92, 246, 0.15);
+
   min-height: 100vh;
-  background: var(--layout-bg);
-  color: var(--text-primary);
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  overflow-x: hidden;
 }
 
 /* ═══ Navbar ═══ */
@@ -216,10 +232,10 @@ function goChat() {
   left: 0;
   right: 0;
   z-index: 100;
-  background: color-mix(in srgb, var(--layout-bg) 80%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--card-border);
+  background: rgba(5, 5, 16, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.08);
 }
 .nav-inner {
   max-width: 1100px;
@@ -239,12 +255,13 @@ function goChat() {
 .nav-logo {
   width: 32px;
   height: 32px;
-  filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.4));
+  filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.5));
 }
 .nav-brand-text {
   font-size: 1.1rem;
   font-weight: 800;
   letter-spacing: -0.02em;
+  color: #fff;
 }
 .nav-links {
   display: flex;
@@ -254,21 +271,21 @@ function goChat() {
 .nav-link {
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--lp-text-dim);
   padding: 6px 12px;
   border-radius: 8px;
   transition: color 0.15s, background 0.15s;
 }
 .nav-link:hover {
-  color: var(--text-primary);
-  background: var(--hover-bg);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
 }
 .nav-icon-btn {
   width: 34px;
   height: 34px;
   border: none;
   background: none;
-  color: var(--text-secondary);
+  color: var(--lp-text-dim);
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -278,8 +295,8 @@ function goChat() {
   transition: color 0.15s, background 0.15s;
 }
 .nav-icon-btn:hover {
-  color: var(--text-primary);
-  background: var(--hover-bg);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
 }
 .nav-actions {
   display: flex;
@@ -289,7 +306,7 @@ function goChat() {
 .nav-login-btn {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--lp-text-dim);
   background: none;
   border: none;
   cursor: pointer;
@@ -298,8 +315,8 @@ function goChat() {
   transition: color 0.15s, background 0.15s;
 }
 .nav-login-btn:hover {
-  color: var(--text-primary);
-  background: var(--hover-bg);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
 }
 .nav-cta {
   font-size: 0.78rem !important;
@@ -310,119 +327,188 @@ function goChat() {
 /* ═══ Hero ═══ */
 .hero-section {
   position: relative;
-  padding: 140px 24px 80px;
+  padding: 150px 24px 90px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: linear-gradient(180deg, #050510 0%, #0a0a20 40%, #0d0820 70%, #050510 100%);
 }
 .hero-bg {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  overflow: hidden;
 }
-.hero-glow {
+
+/* Animated floating orbs */
+.hero-orb {
   position: absolute;
-  width: 700px;
-  height: 700px;
   border-radius: 50%;
-  top: -300px;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+.orb-1 {
+  width: 600px;
+  height: 600px;
+  top: -200px;
   left: 50%;
   transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.35) 0%, rgba(99, 102, 241, 0.1) 50%, transparent 70%);
+  animation: orbFloat1 8s ease-in-out infinite;
 }
+.orb-2 {
+  width: 400px;
+  height: 400px;
+  top: 20%;
+  right: -100px;
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.25) 0%, transparent 70%);
+  animation: orbFloat2 10s ease-in-out infinite;
+}
+.orb-3 {
+  width: 350px;
+  height: 350px;
+  bottom: -50px;
+  left: -80px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%);
+  animation: orbFloat3 12s ease-in-out infinite;
+}
+
+@keyframes orbFloat1 {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(30px); }
+}
+@keyframes orbFloat2 {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-25px) translateX(-15px); }
+}
+@keyframes orbFloat3 {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-20px) translateX(20px); }
+}
+
 .hero-grid {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
-  -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
+    linear-gradient(rgba(139, 92, 246, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 30%, transparent 85%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 30%, transparent 85%);
 }
+
+.hero-noise {
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.4;
+}
+
 .hero-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   text-align: center;
-  max-width: 680px;
+  max-width: 700px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 20px;
 }
 .hero-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
+  padding: 7px 18px;
   border-radius: 100px;
-  background: var(--active-bg);
-  border: 1px solid var(--card-border);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--active-color);
+  color: var(--lp-accent);
+  backdrop-filter: blur(8px);
 }
 .hero-badge i { font-size: 0.7rem; }
 .hero-title {
-  font-size: 3rem;
+  font-size: 3.2rem;
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1.08;
   letter-spacing: -0.03em;
   margin: 0;
+  color: #fff;
 }
 .hero-highlight {
-  background: linear-gradient(135deg, #6366f1, #a78bfa, #c084fc);
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa, #c084fc, #e879f9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .hero-sub {
-  font-size: 1rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
+  font-size: 1.05rem;
+  color: var(--lp-text-dim);
+  line-height: 1.7;
   margin: 0;
-  max-width: 520px;
+  max-width: 540px;
 }
 .hero-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 14px;
+  margin-top: 10px;
 }
 .hero-btn-primary {
-  font-size: 0.88rem !important;
+  font-size: 0.9rem !important;
   font-weight: 700 !important;
   border-radius: 12px !important;
-  padding: 10px 28px !important;
+  padding: 11px 30px !important;
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.3) !important;
+  transition: box-shadow 0.2s, transform 0.2s !important;
+}
+.hero-btn-primary:hover {
+  box-shadow: 0 0 36px rgba(139, 92, 246, 0.5) !important;
+  transform: translateY(-1px) !important;
 }
 .hero-btn-secondary {
-  font-size: 0.88rem !important;
+  font-size: 0.9rem !important;
   font-weight: 600 !important;
   border-radius: 12px !important;
-  padding: 10px 28px !important;
+  padding: 11px 30px !important;
+  color: var(--lp-text-dim) !important;
+  border-color: rgba(139, 92, 246, 0.25) !important;
+  background: rgba(139, 92, 246, 0.06) !important;
+}
+.hero-btn-secondary:hover {
+  background: rgba(139, 92, 246, 0.12) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
+  color: #fff !important;
 }
 
 /* Hero preview card */
 .hero-preview {
   position: relative;
-  z-index: 1;
-  margin-top: 48px;
+  z-index: 2;
+  margin-top: 50px;
   width: 100%;
-  max-width: 540px;
+  max-width: 560px;
 }
 .preview-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
+  background: rgba(12, 12, 30, 0.7);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08), 0 0 80px rgba(99, 102, 241, 0.06);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.3),
+    0 0 80px rgba(139, 92, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .preview-header {
   display: flex;
   gap: 6px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--card-border);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
 }
 .preview-dot {
   width: 10px;
@@ -443,13 +529,14 @@ function goChat() {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: var(--hover-bg);
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.1);
   border-radius: 10px;
   font-size: 0.82rem;
-  color: var(--text-secondary);
+  color: var(--lp-text-dim);
 }
 .preview-prompt i {
-  color: var(--active-color);
+  color: var(--lp-accent);
   font-size: 0.9rem;
 }
 .preview-result {
@@ -461,11 +548,12 @@ function goChat() {
   width: 100px;
   height: 100px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(167, 139, 250, 0.1));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(192, 132, 252, 0.1));
+  border: 1px solid rgba(139, 92, 246, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--active-color);
+  color: var(--lp-accent);
   font-size: 1.6rem;
   flex-shrink: 0;
 }
@@ -479,7 +567,7 @@ function goChat() {
 .gen-bar {
   height: 10px;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--hover-bg) 25%, var(--card-border) 50%, var(--hover-bg) 75%);
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.08) 25%, rgba(139, 92, 246, 0.18) 50%, rgba(139, 92, 246, 0.08) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
@@ -491,7 +579,9 @@ function goChat() {
 
 /* ═══ Features ═══ */
 .features-section {
-  padding: 80px 24px;
+  padding: 90px 24px;
+  background: var(--lp-bg);
+  position: relative;
 }
 .section-inner {
   max-width: 1000px;
@@ -503,12 +593,13 @@ function goChat() {
   text-align: center;
   letter-spacing: -0.02em;
   margin: 0 0 8px;
+  color: #fff;
 }
 .section-sub {
   text-align: center;
   font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin: 0 0 40px;
+  color: var(--lp-text-dim);
+  margin: 0 0 44px;
 }
 .features-grid {
   display: grid;
@@ -517,43 +608,46 @@ function goChat() {
 }
 .feature-card {
   padding: 28px 24px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 14px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-card-border);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 .feature-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 32px rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.25);
 }
 .feature-icon {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   margin-bottom: 14px;
 }
 .feature-title {
   font-size: 1rem;
   font-weight: 700;
   margin: 0 0 6px;
+  color: #fff;
 }
 .feature-desc {
   font-size: 0.82rem;
-  color: var(--text-secondary);
+  color: var(--lp-text-dim);
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 /* ═══ How It Works ═══ */
 .how-section {
-  padding: 80px 24px;
-  background: var(--card-bg);
-  border-top: 1px solid var(--card-border);
-  border-bottom: 1px solid var(--card-border);
+  padding: 90px 24px;
+  background: var(--lp-surface);
+  border-top: 1px solid var(--lp-card-border);
+  border-bottom: 1px solid var(--lp-card-border);
 }
 .steps-grid {
   display: grid;
@@ -563,12 +657,11 @@ function goChat() {
 .step-card {
   text-align: center;
   padding: 32px 20px;
-  position: relative;
 }
 .step-num {
   font-size: 2.5rem;
   font-weight: 900;
-  background: linear-gradient(135deg, #6366f1, #a78bfa);
+  background: linear-gradient(135deg, #8b5cf6, #c084fc);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -576,34 +669,37 @@ function goChat() {
   margin-bottom: 14px;
 }
 .step-icon-wrap {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
-  background: var(--active-bg);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 14px;
-  color: var(--active-color);
+  color: var(--lp-accent);
   font-size: 1.1rem;
 }
 .step-title {
   font-size: 1.05rem;
   font-weight: 700;
   margin: 0 0 6px;
+  color: #fff;
 }
 .step-desc {
   font-size: 0.82rem;
-  color: var(--text-secondary);
+  color: var(--lp-text-dim);
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 /* ═══ CTA ═══ */
 .cta-section {
-  padding: 80px 24px;
+  padding: 90px 24px;
   position: relative;
   overflow: hidden;
+  background: var(--lp-bg);
 }
 .cta-inner {
   max-width: 600px;
@@ -620,7 +716,7 @@ function goChat() {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
   pointer-events: none;
 }
 .cta-title {
@@ -628,10 +724,11 @@ function goChat() {
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0 0 10px;
+  color: #fff;
 }
 .cta-sub {
   font-size: 0.92rem;
-  color: var(--text-secondary);
+  color: var(--lp-text-dim);
   margin: 0 0 28px;
   line-height: 1.6;
 }
@@ -640,12 +737,19 @@ function goChat() {
   font-weight: 700 !important;
   border-radius: 12px !important;
   padding: 12px 32px !important;
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.3) !important;
+}
+.cta-btn:hover {
+  box-shadow: 0 0 36px rgba(139, 92, 246, 0.5) !important;
 }
 
 /* ═══ Footer ═══ */
 .landing-footer {
-  border-top: 1px solid var(--card-border);
+  border-top: 1px solid var(--lp-card-border);
   padding: 24px;
+  background: var(--lp-bg);
 }
 .footer-inner {
   max-width: 1100px;
@@ -660,6 +764,7 @@ function goChat() {
   gap: 8px;
   font-weight: 700;
   font-size: 0.9rem;
+  color: #fff;
 }
 .footer-logo {
   width: 24px;
@@ -667,16 +772,16 @@ function goChat() {
 }
 .footer-rights {
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--lp-text-muted);
 }
 
 /* ═══ Responsive ═══ */
 @media (max-width: 768px) {
   .hero-title {
-    font-size: 2rem;
+    font-size: 2.1rem;
   }
   .hero-sub {
-    font-size: 0.88rem;
+    font-size: 0.9rem;
   }
   .hero-actions {
     flex-direction: column;
@@ -709,6 +814,7 @@ function goChat() {
   .hero-preview {
     max-width: 100%;
   }
+  .orb-2 { display: none; }
 }
 
 @media (max-width: 480px) {
@@ -716,7 +822,7 @@ function goChat() {
     padding: 120px 16px 60px;
   }
   .hero-title {
-    font-size: 1.7rem;
+    font-size: 1.75rem;
   }
 }
 </style>
