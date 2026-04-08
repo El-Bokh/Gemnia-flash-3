@@ -1,1 +1,0 @@
-import{C as e,S as t,b as n,y as r}from"./router-DuPm4qza.js";var i=`/admin/users`;function a(e){return n(i,{params:e})}function o(e){return n(`${i}/${e}`)}function s(e){return t(`${i}`,e)}function c(t,n){return e(`${i}/${t}`,n)}function l(e){return r(`${i}/${e}`)}function u(e,n){return t(`${i}/${e}/reset-password`,n)}export{u as a,a as i,l as n,c as o,o as r,s as t};
