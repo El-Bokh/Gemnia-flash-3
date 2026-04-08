@@ -59,5 +59,5 @@ export function isAdminUser(user: Pick<StoredAuthUser, 'roles'> | null | undefin
 }
 
 export function getAuthenticatedHome(user: Pick<StoredAuthUser, 'roles'> | null | undefined): string {
-  return isAdminUser(user) ? '/admin' : '/profile'
+  return isAdminUser(user) ? '/admin' : '/chat'
 }

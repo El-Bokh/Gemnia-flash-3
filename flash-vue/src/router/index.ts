@@ -4,15 +4,22 @@ import ClientLayout from '@/layouts/ClientLayout.vue'
 import { getAuthenticatedHome, getStoredAuthUser, isAdminUser } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
-  // ── Client (public) ──────────────────────────
+  // ── Landing page (standalone) ──────────────────
+  {
+    path: '/',
+    name: 'landing',
+    component: () => import('@/views/LandingView.vue'),
+  },
+  // ── Client (authenticated) ─────────────────────
   {
     path: '/',
     component: ClientLayout,
     children: [
       {
-        path: '',
-        name: 'home',
+        path: 'chat',
+        name: 'chat',
         component: () => import('@/views/client/HomeView.vue'),
+        meta: { requiresAuth: true },
       },
       {
         path: 'pricing',
@@ -38,6 +45,11 @@ const routes: RouteRecordRaw[] = [
     name: 'register',
     component: () => import('@/views/RegisterView.vue'),
     meta: { guest: true },
+  },
+  {
+    path: '/auth/google/callback',
+    name: 'google-callback',
+    component: () => import('@/views/GoogleCallbackView.vue'),
   },
   {
     path: '/admin',
@@ -107,7 +119,8 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/',
+    name: 'not-found',
+    component: () => import('@/views/NotFoundView.vue'),
   },
 ]
 

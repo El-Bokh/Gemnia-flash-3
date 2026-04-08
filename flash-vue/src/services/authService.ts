@@ -81,3 +81,10 @@ export function getMe() {
 export function getSubscription() {
   return apiGet<ApiResponse<QuotaInfo>>('/subscription')
 }
+
+// ─── Google OAuth ───────────────────────────────────────────
+
+export function getGoogleRedirectUrl(): string {
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'https://klek.studio/api').replace(/\/api\/?$/, '')
+  return `${baseUrl}/auth/google/redirect`
+}

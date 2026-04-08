@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
 import { useLayoutStore } from '@/stores/layout'
+import { useSeo } from '@/composables/useSeo'
 import Button from 'primevue/button'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
@@ -18,6 +19,26 @@ const router = useRouter()
 const chat = useChatStore()
 const auth = useAuthStore()
 const layout = useLayoutStore()
+
+useSeo({
+  title: computed(() => t('seo.homeTitle')),
+  description: computed(() => t('seo.homeDescription')),
+  path: '/',
+  jsonLd: {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Klek AI',
+    url: 'https://klek.studio',
+    applicationCategory: 'DesignApplication',
+    operatingSystem: 'Web',
+    description: 'AI-powered platform for generating stunning images, creative designs, and visual content.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+  },
+})
 
 const messagesContainerRef = ref<HTMLDivElement | null>(null)
 const showStyles = ref(false)

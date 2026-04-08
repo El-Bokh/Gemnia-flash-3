@@ -56,13 +56,13 @@ function toggleMobileSidebar() {
 
 function newChat() {
   chat.setActiveConversation(null)
-  void router.push({ name: 'home' })
+  void router.push({ name: 'chat' })
   mobileSidebarOpen.value = false
 }
 
 function openConversation(id: string) {
   chat.setActiveConversation(id)
-  void router.push({ name: 'home' })
+  void router.push({ name: 'chat' })
   mobileSidebarOpen.value = false
 }
 
@@ -384,7 +384,7 @@ onBeforeUnmount(() => {
       <header class="client-topbar">
         <div class="topbar-start">
           <Button icon="pi pi-bars" severity="secondary" text rounded size="small" class="mobile-menu-btn" @click="toggleMobileSidebar" />
-          <router-link :to="{ name: 'home' }" class="topbar-brand mobile-brand">
+          <router-link :to="{ name: 'chat' }" class="topbar-brand mobile-brand">
             <span class="brand-icon-sm"><i class="pi pi-sparkles" /></span>
             <span class="brand-label">Klek AI</span>
           </router-link>
@@ -396,7 +396,7 @@ onBeforeUnmount(() => {
         </div>
 
         <nav class="topbar-nav">
-          <router-link :to="{ name: 'home' }" class="nav-link" :class="{ active: route.name === 'home' }">
+          <router-link :to="{ name: 'chat' }" class="nav-link" :class="{ active: route.name === 'chat' }">
             {{ t('client.home') }}
           </router-link>
           <router-link :to="{ name: 'pricing' }" class="nav-link" :class="{ active: route.name === 'pricing' }">

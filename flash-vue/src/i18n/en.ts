@@ -1,4 +1,20 @@
 export default {
+  // ── SEO Meta ─────────────────────────────────────────────
+  seo: {
+    homeTitle: 'AI Image Generation & Creative Design',
+    homeDescription: 'Klek AI is a powerful AI-powered platform for generating stunning images, creative designs, and visual content. Transform your ideas into art with cutting-edge artificial intelligence.',
+    pricingTitle: 'Plans & Pricing',
+    pricingDescription: 'Choose the perfect Klek AI plan for your creative needs. From free starter plans to professional packages with unlimited AI image generation.',
+    loginTitle: 'Sign In',
+    loginDescription: 'Sign in to your Klek AI account to access AI image generation, creative tools, and your personal workspace.',
+    registerTitle: 'Create Account',
+    registerDescription: 'Join Klek AI and start creating stunning AI-generated images and designs. Sign up for free and unleash your creativity.',
+    profileTitle: 'My Account',
+    profileDescription: 'Manage your Klek AI profile, subscription, and account settings.',
+    notFoundTitle: 'Page Not Found',
+    notFoundDescription: 'The page you are looking for does not exist or has been moved.',
+  },
+
   // ── Common / Shared ─────────────────────────────────────
   common: {
     user: 'User',
@@ -103,6 +119,12 @@ export default {
     loginFailed: 'Login failed. Please try again.',
     networkError: 'Unable to connect to server. Please check if the backend is running.',
     unexpectedError: 'An unexpected error occurred. Please try again.',
+    orContinueWith: 'or continue with',
+    googleSignIn: 'Sign in with Google',
+    googleAuthFailed: 'Google authentication failed. Please try again.',
+    accountInactive: 'Your account is not active.',
+    signingIn: 'Signing you in...',
+    redirecting: 'Redirecting to login...',
   },
 
   // ── Dashboard ───────────────────────────────────────────
@@ -951,6 +973,40 @@ export default {
     allActions: 'All Actions',
   },
 
+  // ── Landing Page ────────────────────────────────────
+  landing: {
+    heroTitle: 'Create Stunning Images',
+    heroTitleHighlight: 'with AI',
+    heroSub: 'Transform your ideas into breathtaking visual art in seconds. Powered by the latest artificial intelligence technology.',
+    getStarted: 'Get Started Free',
+    viewPricing: 'View Pricing',
+    trustedBy: 'Trusted by creators worldwide',
+    featuresTitle: 'Everything You Need to Create',
+    featuresSub: 'Powerful AI tools designed for creators, designers, and businesses.',
+    feature1Title: 'AI Image Generation',
+    feature1Desc: 'Generate stunning, high-quality images from text descriptions in seconds.',
+    feature2Title: 'Multiple Art Styles',
+    feature2Desc: 'Choose from dozens of art styles — realistic, anime, watercolor, 3D, and more.',
+    feature3Title: 'Fast & Easy',
+    feature3Desc: 'No design skills needed. Just describe what you want and let AI do the rest.',
+    feature4Title: 'Commercial License',
+    feature4Desc: 'Use your AI-generated images for any personal or commercial project.',
+    howTitle: 'How It Works',
+    howSub: 'Create professional images in three simple steps.',
+    step1Title: 'Describe',
+    step1Desc: 'Write a description of the image you want to create.',
+    step2Title: 'Generate',
+    step2Desc: 'Our AI processes your description and creates the image.',
+    step3Title: 'Download',
+    step3Desc: 'Download your image in high quality and use it anywhere.',
+    ctaTitle: 'Ready to Create?',
+    ctaSub: 'Join thousands of creators using Klek AI to bring their ideas to life.',
+    ctaButton: 'Start Creating Now',
+    footerRights: '© 2026 Klek AI. All rights reserved.',
+    login: 'Login',
+    register: 'Register',
+  },
+
   // ── Client ─────────────────────────────────────────
   client: {
     home: 'Home',
@@ -1034,6 +1090,8 @@ export default {
     secureConnection: 'Secured with SSL encryption',
     networkError: 'Network error. Please check your connection.',
     unexpectedError: 'Something went wrong. Please try again.',
+    orContinueWith: 'or continue with',
+    googleSignUp: 'Sign up with Google',
   },
 
   // ── Profile ──────────────────────────────────────────────
@@ -1160,5 +1218,13 @@ export default {
     installTitle: 'Install Klek AI',
     installDesc: 'Add to your home screen for a better experience.',
     install: 'Install',
+  },
+
+  // ── 404 Not Found ───────────────────────────────────────
+  notFound: {
+    title: 'Page Not Found',
+    subtitle: 'The page you are looking for does not exist or has been moved.',
+    backHome: 'Back to Home',
+    errorCode: '404',
   },
 }

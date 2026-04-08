@@ -30,6 +30,8 @@ class User extends Authenticatable
         'last_login_ip',
         'locale',
         'timezone',
+        'google_id',
+        'provider',
     ];
 
     protected $hidden = [

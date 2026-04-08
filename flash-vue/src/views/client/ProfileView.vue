@@ -9,6 +9,7 @@ import {
   changePassword as changePasswordApi,
   type ProfileData,
 } from '@/services/profileService'
+import { useSeo } from '@/composables/useSeo'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
@@ -22,6 +23,13 @@ import Message from 'primevue/message'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+
+useSeo({
+  title: computed(() => t('seo.profileTitle')),
+  description: computed(() => t('seo.profileDescription')),
+  path: '/profile',
+  noindex: true,
+})
 
 const activeTab = ref('profile')
 const saving = ref(false)

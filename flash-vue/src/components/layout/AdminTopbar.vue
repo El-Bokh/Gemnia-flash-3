@@ -28,7 +28,7 @@ const profileItems = computed(() => [
   {
     label: t('topbar.goToPlatform'),
     icon: 'pi pi-external-link',
-    command: () => void router.push({ name: 'home' }),
+    command: () => void router.push({ name: 'chat' }),
   },
   {
     label: t('topbar.settings'),

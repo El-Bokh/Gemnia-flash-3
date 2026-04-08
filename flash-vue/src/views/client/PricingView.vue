@@ -7,10 +7,29 @@ import Tag from 'primevue/tag'
 import SelectButton from 'primevue/selectbutton'
 import { getPlans, upgradeSubscription } from '@/services/subscriptionService'
 import { useAuthStore } from '@/stores/auth'
+import { useSeo } from '@/composables/useSeo'
 
 const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+
+useSeo({
+  title: computed(() => t('seo.pricingTitle')),
+  description: computed(() => t('seo.pricingDescription')),
+  path: '/pricing',
+  jsonLd: {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: 'Plans & Pricing - Klek AI',
+    url: 'https://klek.studio/pricing',
+    description: 'Choose the perfect Klek AI plan for your creative needs.',
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'Klek AI',
+      url: 'https://klek.studio',
+    },
+  },
+})
 
 const loading = ref(true)
 const upgrading = ref<number | null>(null)
