@@ -198,14 +198,14 @@ onBeforeUnmount(() => {
           <span class="brand-text">Klek AI</span>
         </div>
         <Button
-          :icon=\"sidebarOpen ? 'pi pi-chevron-right' : 'pi pi-chevron-left'\"
-          severity=\"secondary\"
+          :icon="sidebarOpen ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"
+          severity="secondary"
           text
           rounded
-          size=\"small\"
-          class=\"collapse-btn desktop-only\"
-          @click=\"toggleSidebar\"
-          v-tooltip.left=\"sidebarOpen ? t('client.collapseSidebar') : t('client.expandSidebar')\"
+          size="small"
+          class="collapse-btn desktop-only"
+          @click="toggleSidebar"
+          v-tooltip.left="sidebarOpen ? t('client.collapseSidebar') : t('client.expandSidebar')"
         />
       </div>
 
