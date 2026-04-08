@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <!-- Cosmic deep gradient -->
+    <radialGradient id="bg" cx="60" cy="60" r="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#312E81"/>
+      <stop offset="100%" stop-color="#1E1B4B"/>
+    </radialGradient>
+
+    <!-- Neon accent gradient -->
+    <linearGradient id="neon" x1="28" y1="24" x2="92" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#818CF8"/>
+      <stop offset="40%" stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#C084FC"/>
+    </linearGradient>
+
+    <!-- Gold spark gradient -->
+    <radialGradient id="spark" cx="86" cy="30" r="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE68A"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </radialGradient>
+
+    <!-- Outer glow filter -->
+    <filter id="outer-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.51  0 0 0 0 0.55  0 0 0 0 0.97  0 0 0 0.6 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Inner letter glow -->
+    <filter id="letter-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Spark glow -->
+    <filter id="spark-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.99  0 0 0 0 0.83  0 0 0 0 0.15  0 0 0 0.7 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Orbit ring gradient -->
+    <linearGradient id="ring-grad" x1="10" y1="60" x2="110" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#818CF8" stop-opacity="0"/>
+      <stop offset="30%" stop-color="#A78BFA" stop-opacity="0.6"/>
+      <stop offset="70%" stop-color="#C084FC" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- === BACKGROUND === -->
+  <!-- Outer subtle glow halo -->
+  <circle cx="60" cy="60" r="56" fill="url(#bg)" filter="url(#outer-glow)" />
+
+  <!-- Ambient light ring -->
+  <circle cx="60" cy="60" r="48" stroke="url(#ring-grad)" stroke-width="1" fill="none" opacity="0.5"/>
+
+  <!-- Float particles (stars) -->
+  <circle cx="22" cy="38" r="1" fill="#C4B5FD" opacity="0.5"/>
+  <circle cx="98" cy="72" r="1.2" fill="#C4B5FD" opacity="0.4"/>
+  <circle cx="76" cy="18" r="0.8" fill="#DDD6FE" opacity="0.6"/>
+  <circle cx="40" cy="96" r="1" fill="#DDD6FE" opacity="0.3"/>
+  <circle cx="18" cy="76" r="0.7" fill="#EDE9FE" opacity="0.4"/>
+
+  <!-- === THE LETTER K === -->
+  <g filter="url(#letter-glow)">
+    <!-- Vertical stem -->
+    <path d="M38 30 L38 90" stroke="url(#neon)" stroke-width="9" stroke-linecap="round"/>
+
+    <!-- Upper arm  -->
+    <path d="M42 58 L72 30" stroke="url(#neon)" stroke-width="8" stroke-linecap="round"/>
+
+    <!-- Lower arm -->
+    <path d="M42 62 L74 92" stroke="url(#neon)" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <!-- Bright accents at endpoints -->
+  <circle cx="38" cy="30" r="3" fill="white" opacity="0.8"/>
+  <circle cx="38" cy="90" r="3" fill="white" opacity="0.8"/>
+  <circle cx="72" cy="30" r="2.5" fill="white" opacity="0.7"/>
+  <circle cx="74" cy="92" r="2.5" fill="white" opacity="0.7"/>
+
+  <!-- === AI SPARK (Top-Right) === -->
+  <g filter="url(#spark-glow)">
+    <circle cx="86" cy="28" r="6" fill="url(#spark)"/>
+    <!-- Four-point star rays -->
+    <path d="M86 18 L86 22" stroke="#FDE68A" stroke-width="2" stroke-linecap="round"/>
+    <path d="M86 34 L86 38" stroke="#FDE68A" stroke-width="2" stroke-linecap="round"/>
+    <path d="M76 28 L80 28" stroke="#FDE68A" stroke-width="2" stroke-linecap="round"/>
+    <path d="M92 28 L96 28" stroke="#FDE68A" stroke-width="2" stroke-linecap="round"/>
+    <!-- Diagonal mini rays -->
+    <path d="M80 22 L82 24" stroke="#FDE68A" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M92 22 L90 24" stroke="#FDE68A" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M80 34 L82 32" stroke="#FDE68A" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M92 34 L90 32" stroke="#FDE68A" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+</svg>

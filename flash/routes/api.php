@@ -47,6 +47,12 @@ Route::prefix('auth')->name('auth.')->group(function () {
 });
 
 // ──────────────────────────────────────────────
+//  Public Routes (no auth required)
+// ──────────────────────────────────────────────
+
+Route::get('/plans/public', [SubscriptionController::class, 'plans'])->name('plans.public');
+
+// ──────────────────────────────────────────────
 //  Client Routes (authenticated)
 // ──────────────────────────────────────────────
 
@@ -68,7 +74,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Subscription & Quota
     Route::get('/subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
-    Route::get('/plans/public',  [SubscriptionController::class, 'plans'])->name('plans.public');
     Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])->name('subscription.upgrade');
     Route::post('/subscription/cancel',  [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
 
