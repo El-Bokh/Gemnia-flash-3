@@ -35,7 +35,7 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const userMenuRef = ref<HTMLElement | null>(null)
 const notificationMenuRef = ref<HTMLElement | null>(null)
 
-const isHome = computed(() => route.name === 'home' && !chat.activeConversationId)
+const isHome = computed(() => route.name === 'chat' && !chat.activeConversationId)
 
 const notifications = computed(() => notificationStore.notifications)
 const unreadCount = computed(() => notificationStore.unreadCount)
