@@ -43,6 +43,12 @@ BLADE_COMMENT
 cat "$LARAVEL_DIR/resources/views/spa.blade.php" >> "$TEMP_FILE"
 mv "$TEMP_FILE" "$LARAVEL_DIR/resources/views/spa.blade.php"
 
+# Wrap JSON-LD blocks in @verbatim so Blade ignores @context/@type/@graph
+SPA_FILE="$LARAVEL_DIR/resources/views/spa.blade.php"
+sed -i 's|<script type="application/ld+json">|@verbatim\n    <script type="application/ld+json">|' "$SPA_FILE"
+# Find the closing </script> tag right after the ld+json block and add @endverbatim
+awk '/@verbatim/{v=1} v && /<\/script>/{print; print "    @endverbatim"; v=0; next} 1' "$SPA_FILE" > "${SPA_FILE}.tmp" && mv "${SPA_FILE}.tmp" "$SPA_FILE"
+
 echo ""
 echo "══════════════════════════════════════════"
 echo "  🚀 Optimizing Laravel for production..."

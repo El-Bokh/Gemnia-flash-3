@@ -37,35 +37,6 @@
     <link rel="manifest" href="/manifest.json">
 
     <title>Klek AI - AI Image Generation & Creative Design</title>
-
-    <!-- Structured Data (Organization + WebSite) -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "Organization",
-          "name": "Klek AI",
-          "url": "https://klek.studio",
-          "logo": "https://klek.studio/icons/icon-512x512.png",
-          "description": "AI-powered platform for generating stunning images, creative designs, and visual content.",
-          "sameAs": []
-        },
-        {
-          "@type": "WebSite",
-          "name": "Klek AI",
-          "alternateName": ["كلك اي آي", "Klek Studio"],
-          "url": "https://klek.studio",
-          "inLanguage": ["en", "ar"],
-          "potentialAction": {
-            "@type": "SearchAction",
-            "target": "https://klek.studio/?q={search_term_string}",
-            "query-input": "required name=search_term_string"
-          }
-        }
-      ]
-    }
-    </script>
     <script type="module" crossorigin src="/assets/index-PbOyk_DG.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/_plugin-vue_export-helper-BQA7LogN.js">
     <link rel="stylesheet" crossorigin href="/assets/index-B8DlfLBc.css">
