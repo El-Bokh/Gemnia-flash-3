@@ -1,4 +1,19 @@
 import { createI18n } from 'vue-i18n'
+// Force-register the message compiler — vue-i18n v12 alpha marks
+// sideEffects:false, so Vite tree-shakes the auto-registration.
+import {
+  registerMessageCompiler,
+  compile,
+  registerMessageResolver,
+  resolveValue,
+  registerLocaleFallbacker,
+  fallbackWithLocaleChain,
+} from '@intlify/core-base'
+
+registerMessageCompiler(compile)
+registerMessageResolver(resolveValue)
+registerLocaleFallbacker(fallbackWithLocaleChain)
+
 import en from './en'
 import ar from './ar'
 
