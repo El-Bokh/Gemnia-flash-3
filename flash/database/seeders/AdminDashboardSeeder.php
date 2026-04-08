@@ -30,10 +30,10 @@ class AdminDashboardSeeder extends Seeder
 
         // ── Admin User ──
         $admin = User::firstOrCreate(
-            ['email' => 'admin@flash.test'],
+            ['email' => env('ADMIN_EMAIL', 'admin@klek.studio')],
             [
-                'name'     => 'Flash Admin',
-                'password' => Hash::make('password'),
+                'name'     => env('ADMIN_NAME', 'Klek Admin'),
+                'password' => Hash::make(env('ADMIN_PASSWORD', 'Admin@123!')),
                 'status'   => 'active',
                 'locale'   => 'en',
                 'timezone' => 'UTC',
