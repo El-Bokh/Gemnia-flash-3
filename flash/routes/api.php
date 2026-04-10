@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Admin\SettingsController;
 use App\Http\Controllers\Api\Admin\SupportTicketController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VisualStyleController as AdminVisualStyleController;
+use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MaintenanceController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\VisualStyleController;
+use App\Http\Controllers\Api\ProductController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -70,9 +72,15 @@ Route::middleware(['auth:sanctum', 'platform.maintenance'])->group(function () {
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage'])
         ->name('conversations.messages')
         ->middleware('throttle:20,1');
+    Route::post('/conversations/{conversation}/messages/{message}/regenerate', [ConversationController::class, 'regenerateMessage'])
+        ->name('conversations.messages.regenerate')
+        ->middleware('throttle:10,1');
 
     // Visual Styles
     Route::get('/styles', [VisualStyleController::class, 'index'])->name('styles.index');
+
+    // Products
+    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
     // Subscription & Quota
     Route::get('/subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
@@ -335,6 +343,23 @@ Route::prefix('admin')
             Route::post('/{style}/duplicate',          [AdminVisualStyleController::class, 'duplicate'])->name('duplicate');
             Route::post('/{style}/toggle-active',      [AdminVisualStyleController::class, 'toggleActive'])->name('toggle-active');
             Route::post('/{style}/upload-thumbnail',   [AdminVisualStyleController::class, 'uploadThumbnailEndpoint'])->name('upload-thumbnail');
+        });
+
+        // Products Management
+        Route::prefix('products')->name('products.')->group(function () {
+            Route::post('/reorder', [AdminProductController::class, 'reorder'])->name('reorder');
+
+            Route::get('/',              [AdminProductController::class, 'index'])->name('index');
+            Route::post('/',             [AdminProductController::class, 'store'])->name('store');
+            Route::get('/{product}',     [AdminProductController::class, 'show'])->name('show');
+            Route::put('/{product}',     [AdminProductController::class, 'update'])->name('update');
+            Route::delete('/{product}',  [AdminProductController::class, 'destroy'])->name('destroy');
+
+            Route::delete('/{product}/force',            [AdminProductController::class, 'forceDelete'])->name('force-delete');
+            Route::post('/{product}/restore',            [AdminProductController::class, 'restore'])->name('restore');
+            Route::post('/{product}/duplicate',          [AdminProductController::class, 'duplicate'])->name('duplicate');
+            Route::post('/{product}/toggle-active',      [AdminProductController::class, 'toggleActive'])->name('toggle-active');
+            Route::post('/{product}/upload-thumbnail',   [AdminProductController::class, 'uploadThumbnailEndpoint'])->name('upload-thumbnail');
         });
 
     });

@@ -42,6 +42,7 @@ const navigation: NavGroup[] = [
       { labelKey: 'sidebar.aiRequests', icon: 'pi pi-microchip-ai', to: '/admin/ai-requests' },
       { labelKey: 'sidebar.plansFeatures', icon: 'pi pi-box', to: '/admin/plans' },
       { labelKey: 'sidebar.visualStyles', icon: 'pi pi-palette', to: '/admin/styles' },
+      { labelKey: 'sidebar.products', icon: 'pi pi-shopping-bag', to: '/admin/products' },
     ],
   },
   {

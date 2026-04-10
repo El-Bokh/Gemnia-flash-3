@@ -68,11 +68,12 @@ function handleRegenerate() {
           </button>
           <button
             v-if="message.role === 'assistant'"
-            class="action-btn"
+            class="action-btn regen-btn"
             @click="handleRegenerate"
-            :title="t('chat.regenerate')"
+            :title="t('chat.regenerateWithSame')"
           >
             <i class="pi pi-refresh" />
+            <span class="regen-label">{{ t('chat.regenerate') }}</span>
           </button>
         </div>
       </Transition>
@@ -239,6 +240,31 @@ function handleRegenerate() {
   background: var(--hover-bg);
 }
 
+.regen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.regen-label {
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.regen-btn:hover {
+  color: var(--active-color);
+  background: var(--active-bg);
+}
+
+.regen-btn:hover i {
+  animation: spin 0.5s ease-in-out;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ─── Time ───────────────────────────────────── */
 .msg-time {
   display: block;
@@ -285,6 +311,18 @@ function handleRegenerate() {
 
   .msg-text {
     font-size: 0.78rem;
+  }
+
+  .msg-actions {
+    flex-wrap: wrap;
+  }
+
+  .regen-label {
+    display: none;
+  }
+
+  .msg-image {
+    max-width: 100%;
   }
 }
 </style>

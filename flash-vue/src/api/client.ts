@@ -11,11 +11,25 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://klek.studio/a
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30_000,
+  withCredentials: true,
+  withXSRFToken: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
   },
 })
+
+// ─── CSRF Cookie ────────────────────────────────────────────
+
+const BACKEND_URL = API_BASE_URL.replace(/\/api\/?$/, '')
+
+export async function fetchCsrfCookie(): Promise<void> {
+  await axios.get(`${BACKEND_URL}/sanctum/csrf-cookie`, {
+    withCredentials: true,
+  })
+}
 
 // ─── Request Interceptor ────────────────────────────────────
 

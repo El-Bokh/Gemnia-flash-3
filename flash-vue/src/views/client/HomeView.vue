@@ -10,6 +10,7 @@ import Button from 'primevue/button'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
 import ImageStyleSelector from '@/components/chat/ImageStyleSelector.vue'
+import ProductGallery from '@/components/chat/ProductGallery.vue'
 import TypingIndicator from '@/components/chat/TypingIndicator.vue'
 import QuotaBar from '@/components/chat/QuotaBar.vue'
 import QuotaExhaustedModal from '@/components/chat/QuotaExhaustedModal.vue'
@@ -44,6 +45,11 @@ const messagesContainerRef = ref<HTMLDivElement | null>(null)
 const showStyles = ref(false)
 const selectedStyle = ref('')
 const selectedStyleName = ref('')
+const selectedStyleThumb = ref<string | null>(null)
+const showProducts = ref(false)
+const selectedProduct = ref('')
+const selectedProductName = ref('')
+const selectedProductThumb = ref<string | null>(null)
 const showScrollBtn = ref(false)
 const showQuotaModal = ref(false)
 
@@ -58,11 +64,49 @@ const hasActiveChat = computed(() => !!chat.activeConversation)
 const messages = computed(() => chat.activeConversation?.messages ?? [])
 
 const suggestions = computed(() => [
-  { icon: 'pi pi-image', label: t('client.suggestDesign'), color: '#8b5cf6' },
-  { icon: 'pi pi-pencil', label: t('client.suggestEdit'), color: '#0ea5e9' },
-  { icon: 'pi pi-palette', label: t('client.suggestStyle'), color: '#f59e0b' },
-  { icon: 'pi pi-sparkles', label: t('client.suggestCreate'), color: '#10b981' },
+  {
+    icon: 'pi pi-image', label: t('client.suggestDesign'), color: '#8b5cf6',
+    subs: [
+      t('chat.suggestLogoMinimalist'),
+      t('chat.suggestLogoVintage'),
+      t('chat.suggestLogoBold'),
+      t('chat.suggestLogoElegant'),
+    ],
+  },
+  {
+    icon: 'pi pi-pencil', label: t('client.suggestEdit'), color: '#0ea5e9',
+    subs: [
+      t('chat.suggestEditBackground'),
+      t('chat.suggestEditLighting'),
+      t('chat.suggestEditFilters'),
+      t('chat.suggestEditResize'),
+    ],
+  },
+  {
+    icon: 'pi pi-palette', label: t('client.suggestStyle'), color: '#f59e0b',
+    subs: [
+      t('chat.suggestStyleOil'),
+      t('chat.suggestStyleWatercolor'),
+      t('chat.suggestStyleComic'),
+      t('chat.suggestStylePixel'),
+    ],
+  },
+  {
+    icon: 'pi pi-sparkles', label: t('client.suggestCreate'), color: '#10b981',
+    subs: [
+      t('chat.suggestCreateForest'),
+      t('chat.suggestCreateCity'),
+      t('chat.suggestCreateCharacter'),
+      t('chat.suggestCreateProduct'),
+    ],
+  },
 ])
+
+const activeSuggestionIndex = ref<number | null>(null)
+
+function toggleSuggestionPanel(index: number) {
+  activeSuggestionIndex.value = activeSuggestionIndex.value === index ? null : index
+}
 
 function scrollToBottom(smooth = true) {
   nextTick(() => {
@@ -111,9 +155,15 @@ function handleSend(content: string, image?: File) {
   }
 
   const isNewChat = !chat.activeConversationId
-  chat.sendMessage(content, selectedStyle.value || undefined, image)
+  chat.sendMessage(content, selectedStyle.value || undefined, image, selectedProduct.value || undefined)
   selectedStyle.value = ''
+  selectedStyleName.value = ''
+  selectedStyleThumb.value = null
+  selectedProduct.value = ''
+  selectedProductName.value = ''
+  selectedProductThumb.value = null
   showStyles.value = false
+  showProducts.value = false
   if (isNewChat) {
     layout.sidebarCollapsed = true
     const title = content.slice(0, 40) + (content.length > 40 ? '…' : '')
@@ -153,11 +203,22 @@ function useSuggestion(text: string) {
   }
 }
 
-function handleStyleSelect(style: string) {
-  selectedStyle.value = style
-  selectedStyleName.value = style
-    ? style.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    : ''
+function handleStyleSelect(info: { slug: string; name: string; thumbnail: string | null }) {
+  selectedStyle.value = info.slug
+  selectedStyleName.value = info.name
+  selectedStyleThumb.value = info.thumbnail
+    if (info.slug) {
+      showStyles.value = false
+    }
+}
+
+function handleProductSelect(info: { slug: string; name: string; thumbnail: string | null }) {
+  selectedProduct.value = info.slug
+  selectedProductName.value = info.name
+  selectedProductThumb.value = info.thumbnail
+    if (info.slug) {
+      showProducts.value = false
+    }
 }
 
 function handleCopy(content: string) {
@@ -169,13 +230,36 @@ function handleCopy(content: string) {
   )
 }
 
-function handleRegenerate(_messageId: string) {
-  // Future: regenerate
+function handleRegenerate(messageId: string) {
+  chat.regenerateMessage(messageId)
   window.dispatchEvent(
     new CustomEvent('app-toast', {
       detail: { type: 'info', message: t('chat.regenerating') },
     }),
   )
+}
+
+function handleSendProducts(content: string, images: File[]) {
+  if (!auth.isAuthenticated) {
+    void router.push({ name: 'login', query: { redirect: '/' } })
+    return
+  }
+  if (auth.noSubscription) {
+    void router.push({ name: 'pricing' })
+    return
+  }
+
+  const isNewChat = !chat.activeConversationId
+  chat.sendProductMessage(content, images)
+  if (isNewChat) {
+    layout.sidebarCollapsed = true
+    const title = content.slice(0, 40) + (content.length > 40 ? '…' : '')
+    window.dispatchEvent(
+      new CustomEvent('app-toast', {
+        detail: { type: 'info', message: `${t('chat.newChatStarted')}: ${title}` },
+      }),
+    )
+  }
 }
 </script>
 
@@ -199,10 +283,32 @@ function handleRegenerate(_messageId: string) {
       <h1 class="hero-title">{{ t('client.heroTitle') }}</h1>
       <p class="hero-sub">{{ t('client.heroSub') }}</p>
 
+      <!-- Selected style badge -->
+      <div v-if="selectedStyle" class="selected-badge">
+        <img v-if="selectedStyleThumb" :src="selectedStyleThumb" class="badge-thumb" :alt="selectedStyleName" />
+        <i v-else class="pi pi-palette badge-icon" />
+        <span class="badge-name">{{ selectedStyleName }}</span>
+        <button class="badge-remove" @click="selectedStyle = ''; selectedStyleThumb = null">
+          <i class="pi pi-times" />
+        </button>
+      </div>
+
+      <!-- Selected product badge -->
+      <div v-if="selectedProduct" class="selected-badge">
+        <img v-if="selectedProductThumb" :src="selectedProductThumb" class="badge-thumb" :alt="selectedProductName" />
+        <i v-else class="pi pi-shopping-bag badge-icon" />
+        <span class="badge-name">{{ selectedProductName }}</span>
+        <button class="badge-remove" @click="selectedProduct = ''; selectedProductThumb = null">
+          <i class="pi pi-times" />
+        </button>
+      </div>
+
       <!-- Prompt box for empty state -->
       <ChatInput
         @send="handleSend"
+        @send-products="handleSendProducts"
         @toggle-styles="showStyles = !showStyles"
+        @toggle-products="showProducts = !showProducts"
       />
 
       <!-- Style selector -->
@@ -214,18 +320,47 @@ function handleRegenerate(_messageId: string) {
         />
       </Transition>
 
+      <!-- Product gallery -->
+      <Transition name="slide-up">
+        <ProductGallery
+          v-if="showProducts"
+          @select="handleProductSelect"
+          @close="showProducts = false"
+        />
+      </Transition>
+
       <!-- Suggestions -->
       <div class="suggestions">
         <button
           v-for="(s, i) in suggestions"
           :key="i"
           class="suggestion-chip"
-          @click="useSuggestion(s.label)"
+          :class="{ active: activeSuggestionIndex === i }"
+          @click="toggleSuggestionPanel(i)"
         >
           <i :class="s.icon" :style="{ color: s.color }" />
           <span>{{ s.label }}</span>
+          <i class="pi pi-chevron-down chip-arrow" :class="{ rotated: activeSuggestionIndex === i }" />
         </button>
       </div>
+
+      <!-- Sub-suggestions panel -->
+      <Transition name="slide-up">
+        <div v-if="activeSuggestionIndex !== null" class="sub-suggestions-panel">
+          <p class="sub-suggestions-label">{{ t('chat.trySuggestion') }}</p>
+          <div class="sub-suggestions-grid">
+            <button
+              v-for="(sub, si) in suggestions[activeSuggestionIndex].subs"
+              :key="si"
+              class="sub-suggestion-chip"
+              @click="useSuggestion(sub); activeSuggestionIndex = null"
+            >
+              <i class="pi pi-arrow-up-right" />
+              <span>{{ sub }}</span>
+            </button>
+          </div>
+        </div>
+      </Transition>
 
       <!-- Footer -->
       <footer class="home-footer">
@@ -295,11 +430,31 @@ function handleRegenerate(_messageId: string) {
           />
         </Transition>
 
+        <!-- Product gallery -->
+        <Transition name="slide-up">
+          <ProductGallery
+            v-if="showProducts"
+            @select="handleProductSelect"
+            @close="showProducts = false"
+          />
+        </Transition>
+
         <!-- Selected style badge -->
-        <div v-if="selectedStyle && !showStyles" class="selected-style-badge">
-          <i class="pi pi-palette" />
-          <span>{{ selectedStyleName }}</span>
-          <button class="badge-remove" @click="selectedStyle = ''">
+        <div v-if="selectedStyle" class="selected-badge">
+          <img v-if="selectedStyleThumb" :src="selectedStyleThumb" class="badge-thumb" :alt="selectedStyleName" />
+          <i v-else class="pi pi-palette badge-icon" />
+          <span class="badge-name">{{ selectedStyleName }}</span>
+          <button class="badge-remove" @click="selectedStyle = ''; selectedStyleThumb = null">
+            <i class="pi pi-times" />
+          </button>
+        </div>
+
+        <!-- Selected product badge -->
+        <div v-if="selectedProduct" class="selected-badge">
+          <img v-if="selectedProductThumb" :src="selectedProductThumb" class="badge-thumb" :alt="selectedProductName" />
+          <i v-else class="pi pi-shopping-bag badge-icon" />
+          <span class="badge-name">{{ selectedProductName }}</span>
+          <button class="badge-remove" @click="selectedProduct = ''; selectedProductThumb = null">
             <i class="pi pi-times" />
           </button>
         </div>
@@ -307,7 +462,9 @@ function handleRegenerate(_messageId: string) {
         <ChatInput
           :disabled="chat.isAiTyping || auth.quotaDepleted"
           @send="handleSend"
+          @send-products="handleSendProducts"
           @toggle-styles="showStyles = !showStyles"
+          @toggle-products="showProducts = !showProducts"
         />
 
         <div class="chat-footer-disclaimer">
@@ -338,6 +495,7 @@ function handleRegenerate(_messageId: string) {
   margin: 0 auto;
   gap: 16px;
   padding: 24px 16px;
+  padding-top: 12vh;
 }
 
 .hero-logo {
@@ -417,6 +575,72 @@ function handleRegenerate(_messageId: string) {
 
 .suggestion-chip i {
   font-size: 0.76rem;
+}
+
+.chip-arrow {
+  font-size: 0.6rem;
+  transition: transform 0.2s;
+  opacity: 0.5;
+}
+
+.chip-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.suggestion-chip.active {
+  border-color: var(--active-color);
+  background: var(--active-bg);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Sub-suggestions panel */
+.sub-suggestions-panel {
+  width: 100%;
+  max-width: 780px;
+  padding: 0 16px;
+}
+
+.sub-suggestions-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.sub-suggestions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.sub-suggestion-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: start;
+}
+
+.sub-suggestion-chip:hover {
+  border-color: var(--active-color);
+  background: var(--active-bg);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+}
+
+.sub-suggestion-chip i {
+  font-size: 0.68rem;
+  color: var(--active-color);
+  flex-shrink: 0;
 }
 
 .home-footer {
@@ -519,35 +743,65 @@ function handleRegenerate(_messageId: string) {
   padding-top: 8px;
 }
 
-.selected-style-badge {
+.selected-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 10px;
+  padding: 6px 12px 6px 6px;
   margin: 0 auto 8px;
   max-width: 780px;
   margin-inline-start: calc((100% - min(780px, 100%)) / 2 + 16px);
-  background: var(--active-bg);
-  border: 1px solid var(--active-color);
-  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--active-color);
+  border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 600;
+  color: var(--text-primary);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.1);
+}
+
+.badge-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.badge-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--active-bg);
   color: var(--active-color);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.badge-name {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .badge-remove {
   border: none;
   background: none;
-  color: var(--active-color);
+  color: var(--text-muted);
   cursor: pointer;
-  padding: 2px;
+  padding: 4px;
   font-size: 0.6rem;
   opacity: 0.7;
   transition: opacity 0.14s;
+  margin-inline-start: auto;
 }
 
 .badge-remove:hover {
   opacity: 1;
+  color: var(--text-primary);
 }
 
 .chat-footer-disclaimer {
@@ -606,6 +860,15 @@ function handleRegenerate(_messageId: string) {
 
   .suggestion-chip {
     padding: 8px 14px;
+    font-size: 0.74rem;
+  }
+
+  .sub-suggestions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sub-suggestion-chip {
+    padding: 10px 12px;
     font-size: 0.74rem;
   }
 

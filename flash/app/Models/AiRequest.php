@@ -18,6 +18,7 @@ class AiRequest extends Model
         'user_id',
         'subscription_id',
         'visual_style_id',
+        'product_id',
         'type',
         'status',
         'user_prompt',
@@ -93,6 +94,11 @@ class AiRequest extends Model
     public function visualStyle(): BelongsTo
     {
         return $this->belongsTo(VisualStyle::class);
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 
     public function generatedImages(): HasMany

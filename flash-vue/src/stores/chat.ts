@@ -7,6 +7,8 @@ import {
   updateConversation as updateConversationApi,
   deleteConversation as deleteConversationApi,
   sendMessage as sendMessageApi,
+  regenerateMessage as regenerateMessageApi,
+  sendProductMessage as sendProductMessageApi,
 } from '@/services/chatService'
 import type { ConversationData, MessageData } from '@/services/chatService'
 import { useAuthStore } from '@/stores/auth'
@@ -194,7 +196,7 @@ export const useChatStore = defineStore('chat', () => {
     editingConversationId.value = null
   }
 
-  async function sendMessage(content: string, imageStyle?: string, image?: File) {
+  async function sendMessage(content: string, imageStyle?: string, image?: File, product?: string) {
     if (!activeConversationId.value) {
       await createConversation()
     }
@@ -243,7 +245,7 @@ export const useChatStore = defineStore('chat', () => {
     isAiTyping.value = true
     quotaError.value = null
     try {
-      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode) as any
+      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product) as any
       if (res.success && res.data) {
         // Replace temp user message with real one
         const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
@@ -294,6 +296,124 @@ export const useChatStore = defineStore('chat', () => {
     quotaError.value = null
   }
 
+  async function regenerateMessage(messageId: string) {
+    const conv = conversations.value.find(c => c.id === activeConversationId.value)
+    if (!conv || !conv.serverId) return
+
+    // Find the AI message to regenerate
+    const aiMsgIdx = conv.messages.findIndex(m => m.id === messageId && m.role === 'assistant')
+    if (aiMsgIdx === -1) return
+
+    // Remove old AI response
+    conv.messages.splice(aiMsgIdx, 1)
+
+    isAiTyping.value = true
+    quotaError.value = null
+    try {
+      const res = await regenerateMessageApi(conv.serverId, Number(messageId)) as any
+      if (res.success && res.data) {
+        // Add new AI message
+        conv.messages.push(apiMsgToLocal(res.data.ai_message))
+
+        // Update quota
+        if (res.quota) {
+          const auth = useAuthStore()
+          auth.quota.credits_remaining = res.quota.remaining
+          auth.quota.warning_level = res.quota.warning
+        }
+      }
+    } catch (err: unknown) {
+      if (isAxiosError(err) && err.response?.status === 402) {
+        const body = err.response.data
+        quotaError.value = {
+          code: body.error_code ?? 'insufficient_credits',
+          message: body.message ?? 'Credits exhausted',
+        }
+        const auth = useAuthStore()
+        await auth.refreshQuota()
+      }
+    } finally {
+      isAiTyping.value = false
+    }
+  }
+
+  async function sendProductMessage(content: string, images: File[]) {
+    if (!activeConversationId.value) {
+      await createConversation()
+    }
+
+    const conv = conversations.value.find(c => c.id === activeConversationId.value)
+    if (!conv) return
+
+    // Optimistic user message
+    const tempUserMsgId = 'tmp-' + Date.now()
+    const userMsg: ChatMessage = {
+      id: tempUserMsgId,
+      role: 'user',
+      content,
+      timestamp: new Date(),
+      status: 'sending',
+    }
+    conv.messages.push(userMsg)
+    conv.updatedAt = new Date()
+
+    if (conv.messages.filter(m => m.role === 'user').length === 1) {
+      conv.title = content.slice(0, 40) + (content.length > 40 ? '…' : '')
+    }
+
+    // Ensure server conversation
+    if (!conv.serverId) {
+      try {
+        const res = await createConversationApi(conv.title)
+        if (res.success && res.data) {
+          conv.serverId = res.data.id
+          conv.id = String(res.data.id)
+          activeConversationId.value = conv.id
+        }
+      } catch {
+        userMsg.status = 'error'
+        return
+      }
+    }
+
+    isAiTyping.value = true
+    quotaError.value = null
+    try {
+      const res = await sendProductMessageApi(conv.serverId!, content, images) as any
+      if (res.success && res.data) {
+        const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+        if (idx !== -1) {
+          conv.messages[idx] = apiMsgToLocal(res.data.user_message)
+        }
+        conv.messages.push(apiMsgToLocal(res.data.ai_message))
+        if (res.data.conversation) {
+          conv.title = res.data.conversation.title
+        }
+        if (res.quota) {
+          const auth = useAuthStore()
+          auth.quota.credits_remaining = res.quota.remaining
+          auth.quota.warning_level = res.quota.warning
+        }
+      }
+    } catch (err: unknown) {
+      if (isAxiosError(err) && err.response?.status === 402) {
+        const body = err.response.data
+        quotaError.value = {
+          code: body.error_code ?? 'insufficient_credits',
+          message: body.message ?? 'Credits exhausted',
+        }
+        const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+        if (idx !== -1) conv.messages.splice(idx, 1)
+        const auth = useAuthStore()
+        await auth.refreshQuota()
+      } else {
+        userMsg.status = 'error'
+      }
+    } finally {
+      isAiTyping.value = false
+    }
+  }
+
   function $reset() {
     conversations.value = []
     activeConversationId.value = null
@@ -323,6 +443,8 @@ export const useChatStore = defineStore('chat', () => {
     startEditing,
     cancelEditing,
     sendMessage,
+    regenerateMessage,
+    sendProductMessage,
     clearQuotaError,
     $reset,
   }

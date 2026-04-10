@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { getStyles } from '@/services/chatService'
-import type { StyleData } from '@/services/chatService'
+import { getProducts } from '@/services/chatService'
+import type { ProductData } from '@/services/chatService'
 
 const { t } = useI18n()
 
@@ -11,35 +11,28 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const selectedStyle = ref<string | null>(null)
-const styles = ref<StyleData[]>([])
+const selectedProduct = ref<string | null>(null)
+const products = ref<ProductData[]>([])
 const loading = ref(false)
 
 const categoryIcons: Record<string, string> = {
-  photography: 'pi pi-camera',
-  illustration: 'pi pi-star',
-  art: 'pi pi-palette',
-  digital: 'pi pi-bolt',
-  design: 'pi pi-objects-column',
+  electronics: 'pi pi-microchip-ai',
+  clothing: 'pi pi-tag',
+  food: 'pi pi-apple',
+  beauty: 'pi pi-sparkles',
+  home: 'pi pi-home',
+  sports: 'pi pi-heart',
+  toys: 'pi pi-gift',
 }
 
 const categoryGradients: Record<string, string> = {
-  photography: 'linear-gradient(135deg, #10b981, #059669)',
-  illustration: 'linear-gradient(135deg, #a855f7, #d946ef)',
-  art: 'linear-gradient(135deg, #f59e0b, #d97706)',
-  digital: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
-  design: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-}
-
-const styleThumbnailMap: Record<string, string> = {
-  realistic: '/style-gallery/realistic.jpg',
-  anime: '/style-gallery/anime.jpg',
-  watercolor: '/style-gallery/watercolor.jpg',
-  'oil-painting': '/style-gallery/oil-painting.jpg',
-  'digital-art': '/style-gallery/digital-art.jpg',
-  cyberpunk: '/style-gallery/cyberpunk.jpg',
-  minimalist: '/style-gallery/minimalist.jpg',
-  'pop-art': '/style-gallery/pop-art.jpg',
+  electronics: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+  clothing: 'linear-gradient(135deg, #a855f7, #d946ef)',
+  food: 'linear-gradient(135deg, #10b981, #059669)',
+  beauty: 'linear-gradient(135deg, #f59e0b, #d97706)',
+  home: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+  sports: 'linear-gradient(135deg, #ef4444, #dc2626)',
+  toys: 'linear-gradient(135deg, #ec4899, #f43f5e)',
 }
 
 const apiOrigin = (import.meta.env.VITE_API_BASE_URL || 'https://klek.studio/api').replace(/\/api\/?$/, '')
@@ -47,9 +40,9 @@ const apiOrigin = (import.meta.env.VITE_API_BASE_URL || 'https://klek.studio/api
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await getStyles()
+    const res = await getProducts()
     if (res.success && res.data) {
-      styles.value = res.data
+      products.value = res.data
     }
   } catch {
     // Fallback — keep empty
@@ -58,90 +51,88 @@ onMounted(async () => {
   }
 })
 
-function getIcon(style: StyleData) {
-  return categoryIcons[style.category ?? ''] ?? 'pi pi-image'
+function getIcon(product: ProductData) {
+  return categoryIcons[product.category ?? ''] ?? 'pi pi-shopping-bag'
 }
 
-function getGradient(style: StyleData) {
-  return categoryGradients[style.category ?? ''] ?? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+function getGradient(product: ProductData) {
+  return categoryGradients[product.category ?? ''] ?? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
 }
 
-function resolveThumbnail(style: StyleData) {
-  const thumbnail = style.thumbnail ?? styleThumbnailMap[style.slug] ?? null
+function resolveThumbnail(product: ProductData) {
+  const thumbnail = product.thumbnail ?? null
   if (!thumbnail) return null
   if (/^https?:\/\//i.test(thumbnail)) return thumbnail
 
   const normalizedPath = thumbnail.startsWith('/') ? thumbnail : `/${thumbnail}`
-
   return `${apiOrigin}${normalizedPath}`
 }
 
 function formatCategory(category: string | null) {
   if (!category) return ''
-
   return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-function selectStyle(slug: string) {
-  const style = styles.value.find(s => s.slug === slug)
-  if (selectedStyle.value === slug) {
-    selectedStyle.value = null
+function selectProduct(slug: string) {
+  const product = products.value.find(p => p.slug === slug)
+  if (selectedProduct.value === slug) {
+    selectedProduct.value = null
     emit('select', { slug: '', name: '', thumbnail: null })
   } else {
-    selectedStyle.value = slug
+    selectedProduct.value = slug
     emit('select', {
       slug,
-      name: style?.name ?? slug,
-      thumbnail: style ? resolveThumbnail(style) : null,
+      name: product?.name ?? slug,
+      thumbnail: product ? resolveThumbnail(product) : null,
     })
   }
 }
 </script>
 
 <template>
-  <div class="style-selector">
-    <div class="style-header">
-      <span class="style-label">{{ t('chat.selectStyle') }}</span>
-      <button class="style-close" @click="emit('close')">
+  <div class="product-selector">
+    <div class="product-header">
+      <span class="product-label">{{ t('chat.selectProduct') }}</span>
+      <button class="product-close" @click="emit('close')">
         <i class="pi pi-times" />
       </button>
     </div>
 
-    <div v-if="loading" class="style-loading">
+    <div v-if="loading" class="product-loading">
       <i class="pi pi-spin pi-spinner" />
     </div>
 
-    <div v-else class="style-grid">
+    <div v-else class="product-grid">
       <button
-        v-for="s in styles"
-        :key="s.slug"
+        v-for="p in products"
+        :key="p.slug"
         type="button"
-        class="style-card"
-        :class="{ selected: selectedStyle === s.slug }"
-        @click="selectStyle(s.slug)"
+        class="product-card"
+        :class="{ selected: selectedProduct === p.slug }"
+        @click="selectProduct(p.slug)"
       >
-        <div class="style-preview" :style="{ background: getGradient(s) }">
+        <div class="product-preview" :style="{ background: getGradient(p) }">
           <img
-            v-if="resolveThumbnail(s)"
-            :src="resolveThumbnail(s) || undefined"
-            :alt="s.name"
-            class="style-preview-image"
+            v-if="resolveThumbnail(p)"
+            :src="resolveThumbnail(p) || undefined"
+            :alt="p.name"
+            class="product-preview-image"
             loading="lazy"
             decoding="async"
           >
-          <div v-else class="style-icon">
-            <i :class="getIcon(s)" />
+          <div v-else class="product-icon">
+            <i :class="getIcon(p)" />
           </div>
-          <div class="style-preview-scrim" />
-          <span v-if="formatCategory(s.category)" class="style-category">{{ formatCategory(s.category) }}</span>
-          <span v-if="s.is_premium" class="style-premium">PRO</span>
-          <div v-if="selectedStyle === s.slug" class="style-check">
+          <div class="product-preview-scrim" />
+          <span v-if="formatCategory(p.category)" class="product-category">{{ formatCategory(p.category) }}</span>
+          <span v-if="p.is_premium" class="product-premium">PRO</span>
+          <div v-if="selectedProduct === p.slug" class="product-check">
             <i class="pi pi-check" />
           </div>
         </div>
-        <div class="style-meta">
-          <span class="style-name">{{ s.name }}</span>
-          <span v-if="s.description" class="style-description">{{ s.description }}</span>
+        <div class="product-meta">
+          <span class="product-name">{{ p.name }}</span>
+          <span v-if="p.description" class="product-description">{{ p.description }}</span>
         </div>
       </button>
     </div>
@@ -149,21 +140,21 @@ function selectStyle(slug: string) {
 </template>
 
 <style scoped>
-.style-selector {
+.product-selector {
   width: 100%;
   max-width: 780px;
   margin: 0 auto;
   padding: 0 16px 8px;
 }
 
-.style-header {
+.product-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
 }
 
-.style-label {
+.product-label {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-secondary);
@@ -171,7 +162,7 @@ function selectStyle(slug: string) {
   letter-spacing: 0.04em;
 }
 
-.style-close {
+.product-close {
   border: none;
   background: none;
   color: var(--text-muted);
@@ -182,18 +173,18 @@ function selectStyle(slug: string) {
   font-size: 0.8rem;
 }
 
-.style-close:hover {
+.product-close:hover {
   color: var(--text-primary);
   background: var(--hover-bg);
 }
 
-.style-grid {
+.product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(152px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: 12px;
 }
 
-.style-card {
+.product-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -209,22 +200,22 @@ function selectStyle(slug: string) {
   transition: border-color 0.2s, transform 0.18s, box-shadow 0.2s;
 }
 
-.style-card:hover {
+.product-card:hover {
   border-color: rgba(99, 102, 241, 0.26);
   transform: translateY(-3px);
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
 }
 
-.style-card.selected {
+.product-card.selected {
   border-color: var(--active-color);
   background: var(--active-bg);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14), 0 16px 30px rgba(99, 102, 241, 0.14);
 }
 
-.style-preview {
+.product-preview {
   position: relative;
   width: 100%;
-  aspect-ratio: 9 / 16;
+  aspect-ratio: 4 / 3;
   border-radius: 14px;
   overflow: hidden;
   display: flex;
@@ -233,7 +224,7 @@ function selectStyle(slug: string) {
   background: #dbeafe;
 }
 
-.style-preview-image {
+.product-preview-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -241,18 +232,18 @@ function selectStyle(slug: string) {
   transition: transform 0.28s ease;
 }
 
-.style-card:hover .style-preview-image {
+.product-card:hover .product-preview-image {
   transform: scale(1.05);
 }
 
-.style-preview-scrim {
+.product-preview-scrim {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.12) 58%, rgba(15, 23, 42, 0.72) 100%);
   pointer-events: none;
 }
 
-.style-icon {
+.product-icon {
   width: 52px;
   height: 52px;
   border-radius: 16px;
@@ -265,21 +256,21 @@ function selectStyle(slug: string) {
   backdrop-filter: blur(10px);
 }
 
-.style-meta {
+.product-meta {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 56px;
 }
 
-.style-name {
+.product-name {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.25;
 }
 
-.style-description {
+.product-description {
   font-size: 0.66rem;
   line-height: 1.45;
   color: var(--text-muted);
@@ -289,7 +280,7 @@ function selectStyle(slug: string) {
   overflow: hidden;
 }
 
-.style-check {
+.product-check {
   position: absolute;
   top: 8px;
   inset-inline-end: 8px;
@@ -306,7 +297,7 @@ function selectStyle(slug: string) {
   box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
 }
 
-.style-premium {
+.product-premium {
   position: absolute;
   top: 8px;
   inset-inline-start: 8px;
@@ -320,7 +311,7 @@ function selectStyle(slug: string) {
   z-index: 1;
 }
 
-.style-category {
+.product-category {
   position: absolute;
   inset-inline-start: 8px;
   inset-block-end: 8px;
@@ -336,7 +327,7 @@ function selectStyle(slug: string) {
   backdrop-filter: blur(10px);
 }
 
-.style-loading {
+.product-loading {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -351,24 +342,24 @@ function selectStyle(slug: string) {
 }
 
 @media (max-width: 640px) {
-  .style-selector {
+  .product-selector {
     padding: 0 8px 8px;
   }
 
-  .style-grid {
+  .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
-  .style-card {
+  .product-card {
     padding: 8px;
   }
 
-  .style-name {
+  .product-name {
     font-size: 0.76rem;
   }
 
-  .style-description {
+  .product-description {
     font-size: 0.62rem;
   }
 }

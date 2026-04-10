@@ -1,4 +1,4 @@
-import { apiPost, apiGet } from '@/api/client'
+import { apiPost, apiGet, fetchCsrfCookie } from '@/api/client'
 import type { ApiResponse } from '@/api/client'
 
 // ─── Types ──────────────────────────────────────────────────
@@ -62,11 +62,13 @@ export interface MeResponse {
 
 // ─── Service ────────────────────────────────────────────────
 
-export function login(credentials: LoginCredentials) {
+export async function login(credentials: LoginCredentials) {
+  await fetchCsrfCookie()
   return apiPost<ApiResponse<LoginResponse>>('/auth/login', credentials)
 }
 
-export function register(payload: RegisterPayload) {
+export async function register(payload: RegisterPayload) {
+  await fetchCsrfCookie()
   return apiPost<ApiResponse<LoginResponse>>('/auth/register', payload)
 }
 

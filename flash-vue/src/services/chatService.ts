@@ -53,11 +53,12 @@ export function deleteConversation(id: number) {
   return apiDelete<ApiResponse<null>>(`/conversations/${id}`)
 }
 
-export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File, mode?: 'text' | 'image') {
+export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File, mode?: 'text' | 'image', product?: string) {
   if (image) {
     const form = new FormData()
     form.append('content', content)
     if (imageStyle) form.append('image_style', imageStyle)
+    if (product) form.append('product', product)
     if (mode) form.append('mode', mode)
     form.append('image', image)
     return apiPost<ApiResponse<SendMessageResponse>>(
@@ -68,7 +69,26 @@ export function sendMessage(conversationId: number, content: string, imageStyle?
   }
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,
-    { content, image_style: imageStyle, mode: mode ?? 'text' },
+    { content, image_style: imageStyle, product, mode: mode ?? 'text' },
+  )
+}
+
+export function regenerateMessage(conversationId: number, messageId: number) {
+  return apiPost<ApiResponse<SendMessageResponse>>(
+    `/conversations/${conversationId}/messages/${messageId}/regenerate`,
+    {},
+  )
+}
+
+export function sendProductMessage(conversationId: number, content: string, images: File[]) {
+  const form = new FormData()
+  form.append('content', content)
+  form.append('mode', 'product')
+  images.forEach((img, i) => form.append(`images[${i}]`, img))
+  return apiPost<ApiResponse<SendMessageResponse>>(
+    `/conversations/${conversationId}/messages`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
   )
 }
 
@@ -87,4 +107,21 @@ export interface StyleData {
 
 export function getStyles() {
   return apiGet<ApiResponse<StyleData[]>>('/styles')
+}
+
+// ─── Products ───────────────────────────────────────────────
+
+export interface ProductData {
+  id: number
+  name: string
+  slug: string
+  description: string | null
+  thumbnail: string | null
+  category: string | null
+  is_premium: boolean
+  sort_order: number
+}
+
+export function getProducts() {
+  return apiGet<ApiResponse<ProductData[]>>('/products')
 }

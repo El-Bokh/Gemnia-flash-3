@@ -169,7 +169,9 @@ class ConversationController extends Controller
             'content'     => ['required', 'string', 'max:5000'],
             'image_style' => ['nullable', 'string', 'max:100'],
             'image'       => ['nullable', 'image', 'max:10240'], // 10MB
-            'mode'        => ['nullable', 'string', 'in:text,image'],
+            'images'      => ['nullable', 'array', 'max:10'],
+            'images.*'    => ['image', 'max:10240'],
+            'mode'        => ['nullable', 'string', 'in:text,image,product'],
         ]);
 
         $mode = $data['mode'] ?? 'text';
@@ -198,6 +200,38 @@ class ConversationController extends Controller
             $imageUrl = '/storage/' . $path;
             $imageBase64 = base64_encode(file_get_contents($file->getRealPath()));
             $imageMime = $file->getMimeType();
+        }
+
+        // Handle multiple product images
+        $productImagesData = [];
+        if ($mode === 'product' && $request->hasFile('images')) {
+            $uploadedImages = $request->file('images');
+            foreach ($uploadedImages as $file) {
+                $path = $file->store('chat-uploads/' . $request->user()->id, 'public');
+
+                MediaFile::create([
+                    'user_id'       => $request->user()->id,
+                    'file_name'     => basename($path),
+                    'original_name' => $file->getClientOriginalName(),
+                    'file_path'     => $path,
+                    'disk'          => 'public',
+                    'mime_type'     => $file->getMimeType(),
+                    'file_size'     => $file->getSize(),
+                    'collection'    => 'chat',
+                    'purpose'       => 'input',
+                ]);
+
+                $productImagesData[] = [
+                    'url'    => '/storage/' . $path,
+                    'base64' => base64_encode(file_get_contents($file->getRealPath())),
+                    'mime'   => $file->getMimeType(),
+                ];
+            }
+
+            // Use first image URL for the message display
+            if (! empty($productImagesData)) {
+                $imageUrl = $productImagesData[0]['url'];
+            }
         }
 
         // Store user message
@@ -284,6 +318,18 @@ class ConversationController extends Controller
                     'data'      => $imageBase64,
                 ],
             ];
+        }
+
+        // Product mode: include all product images as inline data
+        if ($mode === 'product' && ! empty($productImagesData)) {
+            foreach ($productImagesData as $pImg) {
+                $currentParts[] = [
+                    'inline_data' => [
+                        'mime_type' => $pImg['mime'],
+                        'data'      => $pImg['base64'],
+                    ],
+                ];
+            }
         }
 
         $gemini = new GeminiService($mode);
@@ -385,6 +431,197 @@ class ConversationController extends Controller
             'data'    => [
                 'user_message' => $userMsg,
                 'ai_message'   => $aiMsg,
+                'conversation' => $conversation->fresh(),
+            ],
+            'quota' => [
+                'remaining' => $consumption['remaining'],
+                'warning'   => $quotaStats,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/conversations/{conversation}/messages/{message}/regenerate
+     *
+     * Regenerate the AI response for a given assistant message.
+     * Finds the original user prompt and re-sends to AI.
+     */
+    public function regenerateMessage(Request $request, Conversation $conversation, $messageId): JsonResponse
+    {
+        if ($conversation->user_id !== $request->user()->id) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        // Find the AI message
+        $aiMessage = $conversation->messages()->where('id', $messageId)->where('role', 'assistant')->first();
+        if (! $aiMessage) {
+            return response()->json(['success' => false, 'message' => 'Message not found.'], 404);
+        }
+
+        // Find the user message before this AI response
+        $userMessage = $conversation->messages()
+            ->where('role', 'user')
+            ->where('id', '<', $aiMessage->id)
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $userMessage) {
+            return response()->json(['success' => false, 'message' => 'Original prompt not found.'], 404);
+        }
+
+        // ── Quota enforcement ──
+        $usageService = new UsageService();
+
+        $featureSlug = 'text_to_image';
+        $featureCheck = $usageService->checkFeatureLimit($request->user(), $featureSlug);
+        if (! $featureCheck['allowed']) {
+            return response()->json([
+                'success'    => false,
+                'message'    => 'Feature limit reached.',
+                'error_code' => $featureCheck['reason'],
+            ], 402);
+        }
+
+        $consumption = $usageService->consume($request->user(), 1, 'regenerate');
+        if (! $consumption['success']) {
+            $code = $consumption['reason'] === 'no_subscription' ? 'no_subscription' : 'insufficient_credits';
+            return response()->json([
+                'success'    => false,
+                'message'    => 'Credits exhausted.',
+                'error_code' => $code,
+                'quota'      => ['remaining' => $consumption['remaining']],
+            ], 402);
+        }
+
+        // Rebuild prompt
+        $content = $userMessage->content;
+        $imageStyle = $userMessage->image_style;
+        $mode = $aiMessage->image_url ? 'image' : 'text';
+        $geminiPrompt = $content;
+
+        $basePrompt = 'portrait of a young man, looking straight at the camera, centered composition, neutral background, soft studio lighting, 50mm lens, high quality, clean face, no accessories, same face, same pose, same framing, consistent character';
+
+        $style = null;
+        if ($mode === 'image') {
+            $parts = [$basePrompt];
+            if ($imageStyle) {
+                $style = VisualStyle::where('slug', $imageStyle)->where('is_active', true)->first();
+                if ($style && $style->prompt_prefix) {
+                    $parts[] = $style->prompt_prefix;
+                }
+            }
+            $parts[] = $content;
+            if ($style && $style->prompt_suffix) {
+                $parts[] = $style->prompt_suffix;
+            }
+            $geminiPrompt = implode(', ', $parts);
+        }
+
+        // Build history (exclude the AI message being regenerated)
+        $history = $conversation->messages()
+            ->whereIn('role', ['user', 'assistant'])
+            ->where('id', '<', $aiMessage->id)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
+            ->toArray();
+
+        $currentParts = [['text' => $geminiPrompt]];
+
+        // If user had uploaded an image, re-include it
+        if ($userMessage->image_url) {
+            $imagePath = str_replace('/storage/', '', $userMessage->image_url);
+            $fullPath = Storage::disk('public')->path($imagePath);
+            if (file_exists($fullPath)) {
+                $currentParts[] = [
+                    'inline_data' => [
+                        'mime_type' => mime_content_type($fullPath),
+                        'data'      => base64_encode(file_get_contents($fullPath)),
+                    ],
+                ];
+            }
+        }
+
+        $gemini = new GeminiService($mode);
+        $startedAt = now();
+        $result = $gemini->chatWithParts($history, $currentParts);
+        $completedAt = now();
+        $processingTimeMs = (int) round($startedAt->diffInMilliseconds($completedAt));
+
+        $aiRequest = AiRequest::create([
+            'user_id'            => $request->user()->id,
+            'subscription_id'    => $consumption['subscription']?->id,
+            'visual_style_id'    => $style?->id,
+            'type'               => 'regenerate',
+            'status'             => $result['success'] ? 'completed' : 'failed',
+            'user_prompt'        => $content,
+            'processed_prompt'   => $geminiPrompt !== $content ? $geminiPrompt : null,
+            'model_used'         => $gemini->getModel(),
+            'engine_provider'    => 'gemini',
+            'credits_consumed'   => 1,
+            'processing_time_ms' => $processingTimeMs,
+            'ip_address'         => $request->ip(),
+            'user_agent'         => $request->userAgent(),
+            'error_message'      => $result['success'] ? null : ($result['error'] ?? 'Unknown error'),
+            'started_at'         => $startedAt,
+            'completed_at'       => $completedAt,
+        ]);
+
+        // Delete old AI message
+        $aiMessage->delete();
+
+        if ($result['success']) {
+            $generatedImageUrl = null;
+            if (! empty($result['images'])) {
+                $firstImage = $result['images'][0];
+                $ext = str_contains($firstImage['mime_type'], 'png') ? 'png' : 'jpg';
+                $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $ext;
+                Storage::disk('public')->put($fileName, base64_decode($firstImage['data']));
+
+                MediaFile::create([
+                    'user_id'       => $request->user()->id,
+                    'file_name'     => basename($fileName),
+                    'original_name' => 'generated-image.' . $ext,
+                    'file_path'     => $fileName,
+                    'disk'          => 'public',
+                    'mime_type'     => $firstImage['mime_type'],
+                    'file_size'     => strlen(base64_decode($firstImage['data'])),
+                    'collection'    => 'chat',
+                    'purpose'       => 'output',
+                ]);
+
+                $generatedImageUrl = '/storage/' . $fileName;
+            }
+
+            $newAiMsg = $conversation->messages()->create([
+                'role'      => 'assistant',
+                'content'   => $result['content'],
+                'image_url' => $generatedImageUrl,
+                'status'    => 'sent',
+            ]);
+        } else {
+            $usageService->refund($request->user(), 1, 'ai_failure', [
+                'ai_request_id' => $aiRequest->id,
+            ]);
+            $consumption['remaining']++;
+            $aiRequest->update(['credits_consumed' => 0]);
+
+            $newAiMsg = $conversation->messages()->create([
+                'role'    => 'assistant',
+                'content' => 'عذراً، حدث خطأ أثناء إعادة التوليد. يرجى المحاولة مرة أخرى.',
+                'status'  => 'error',
+            ]);
+        }
+
+        $quotaStats = $usageService->computeWarningLevel(
+            $consumption['remaining'],
+            $consumption['subscription']->credits_total ?? 0
+        );
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'ai_message'   => $newAiMsg,
                 'conversation' => $conversation->fresh(),
             ],
             'quota' => [

@@ -14,7 +14,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [content: string, image?: File]
+  sendProducts: [content: string, images: File[]]
   toggleStyles: []
+  toggleProducts: []
   openUpload: []
 }>()
 
@@ -33,6 +35,9 @@ const imageInputRef = ref<HTMLInputElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const showLinkInput = ref(false)
 const linkUrl = ref('')
+const productMode = ref(false)
+const productImages = ref<AttachedFile[]>([])
+const productInputRef = ref<HTMLInputElement | null>(null)
 
 function autoResize() {
   const el = textareaRef.value
@@ -47,6 +52,20 @@ watch(message, () => {
 
 function handleSend() {
   const text = message.value.trim()
+
+  // Product mode
+  if (productMode.value) {
+    if (productImages.value.length < 2) return
+    if (!text) return
+    const files = productImages.value.map(af => af.file)
+    emit('sendProducts', text, files)
+    message.value = ''
+    productImages.value = []
+    productMode.value = false
+    nextTick(autoResize)
+    return
+  }
+
   if (!text && attachedFiles.value.length === 0) return
   if (props.disabled) return
 
@@ -82,7 +101,39 @@ function handleToolClick(tool: string) {
     })
   } else if (tool === 'styles') {
     emit('toggleStyles')
+  } else if (tool === 'productGallery') {
+    emit('toggleProducts')
+  } else if (tool === 'products') {
+    productMode.value = true
+    nextTick(() => productInputRef.value?.click())
   }
+}
+
+function handleProductSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files) return
+  for (const file of Array.from(input.files)) {
+    if (!file.type.startsWith('image/')) continue
+    const preview = URL.createObjectURL(file)
+    productImages.value.push({ file, preview, type: 'image' })
+  }
+  input.value = ''
+}
+
+function removeProductImage(index: number) {
+  productImages.value.splice(index, 1)
+  if (productImages.value.length === 0) {
+    productMode.value = false
+  }
+}
+
+function addMoreProductImages() {
+  productInputRef.value?.click()
+}
+
+function cancelProductMode() {
+  productMode.value = false
+  productImages.value = []
 }
 
 function handleImageSelect(e: Event) {
@@ -196,6 +247,14 @@ function formatSize(bytes: number): string {
       style="display: none"
       @change="handleFileSelect"
     />
+    <input
+      ref="productInputRef"
+      type="file"
+      accept="image/*"
+      multiple
+      style="display: none"
+      @change="handleProductSelect"
+    />
 
     <!-- Drag overlay -->
     <Transition name="fade">
@@ -236,6 +295,42 @@ function formatSize(bytes: number): string {
         <Button icon="pi pi-times" severity="secondary" text rounded size="small" @click="showLinkInput = false; linkUrl = ''" />
       </div>
 
+      <!-- Product upload panel -->
+      <div v-if="productMode" class="product-upload-panel">
+        <div class="product-header">
+          <div class="product-header-info">
+            <i class="pi pi-box product-icon" />
+            <div>
+              <span class="product-title">{{ t('chat.productUploadTitle') }}</span>
+              <span class="product-desc">{{ t('chat.productUploadDesc') }}</span>
+            </div>
+          </div>
+          <button class="product-close" @click="cancelProductMode">
+            <i class="pi pi-times" />
+          </button>
+        </div>
+
+        <div class="product-images-grid">
+          <div v-for="(img, idx) in productImages" :key="idx" class="product-image-item">
+            <img v-if="img.preview" :src="img.preview" class="product-thumb" />
+            <div v-else class="product-thumb-placeholder">
+              <i class="pi pi-image" />
+            </div>
+            <button class="product-img-remove" @click="removeProductImage(idx)">
+              <i class="pi pi-times" />
+            </button>
+          </div>
+          <button class="product-add-btn" @click="addMoreProductImages">
+            <i class="pi pi-plus" />
+          </button>
+        </div>
+
+        <div v-if="productImages.length < 2" class="product-min-warning">
+          <i class="pi pi-info-circle" />
+          <span>{{ t('chat.productMinImages') }}</span>
+        </div>
+      </div>
+
       <div class="input-row">
         <!-- Tools button -->
         <div class="tools-container">
@@ -263,9 +358,17 @@ function formatSize(bytes: number): string {
                 <i class="pi pi-link" />
                 <span>{{ t('chat.pasteLink') }}</span>
               </button>
+              <button class="tool-item" @click="handleToolClick('products')">
+                <i class="pi pi-box" />
+                <span>{{ t('chat.uploadProducts') }}</span>
+              </button>
               <button class="tool-item" @click="handleToolClick('styles')">
                 <i class="pi pi-palette" />
                 <span>{{ t('chat.imageStyles') }}</span>
+              </button>
+              <button class="tool-item" @click="handleToolClick('productGallery')">
+                <i class="pi pi-shopping-bag" />
+                <span>{{ t('chat.productGallery') }}</span>
               </button>
             </div>
           </Transition>
@@ -288,7 +391,7 @@ function formatSize(bytes: number): string {
           v-model="message"
           rows="1"
           class="chat-textarea"
-          :placeholder="t('chat.placeholder')"
+          :placeholder="productMode ? t('chat.productPromptPlaceholder') : t('chat.placeholder')"
           :disabled="disabled"
           @keydown="handleKeydown"
         />
@@ -307,7 +410,7 @@ function formatSize(bytes: number): string {
           rounded
           size="small"
           class="send-btn"
-          :disabled="(!message.trim() && !attachedFiles.length) || disabled"
+          :disabled="productMode ? (productImages.length < 2 || !message.trim()) : ((!message.trim() && !attachedFiles.length) || disabled)"
           @click="handleSend"
         />
       </div>
@@ -655,6 +758,155 @@ function formatSize(bytes: number): string {
   transform: scale(0.95) translateY(4px);
 }
 
+/* ── Product Upload Panel ── */
+.product-upload-panel {
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 4px;
+  animation: attachPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.product-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.product-header-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-icon {
+  font-size: 1rem;
+  color: var(--active-color);
+  background: var(--active-bg);
+  padding: 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.product-title {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.product-desc {
+  display: block;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.product-close {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  transition: color 0.14s, background 0.14s;
+}
+
+.product-close:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.product-images-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.product-image-item {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  animation: attachPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.product-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--hover-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+}
+
+.product-img-remove {
+  position: absolute;
+  top: 3px;
+  inset-inline-end: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+
+.product-image-item:hover .product-img-remove {
+  opacity: 1;
+}
+
+.product-add-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  border: 2px dashed var(--card-border);
+  background: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.14s, color 0.14s, background 0.14s;
+}
+
+.product-add-btn:hover {
+  border-color: var(--active-color);
+  color: var(--active-color);
+  background: var(--active-bg);
+}
+
+.product-min-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.68rem;
+  color: #f59e0b;
+}
+
+.product-min-warning i {
+  font-size: 0.72rem;
+}
+
 @media (max-width: 640px) {
   .chat-input-wrapper {
     padding: 0 8px 12px;
@@ -662,6 +914,20 @@ function formatSize(bytes: number): string {
 
   .chat-input-box {
     border-radius: 16px;
+  }
+
+  .product-image-item,
+  .product-add-btn {
+    width: 60px;
+    height: 60px;
+  }
+
+  .product-img-remove {
+    opacity: 1;
+  }
+
+  .tools-menu {
+    min-width: 180px;
   }
 }
 </style>
