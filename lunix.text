@@ -13,3 +13,5 @@ sudo lsof -i -P -n | grep LISTEN
 scp "D:\Gemnia flash 3\flash\.env" root@72.61.192.23:/var/www/Gemnia-flash-3/flash
 
 php artisan migrate:fresh --seed
+
+scp "D:\Gemnia flash 3\project-1c28556b-fd90-4d6b-a4f-a1db7dec9316.json" root@72.61.192.23:/var/www/Gemnia-flash-3/flash/storage/app/google/service-account.json

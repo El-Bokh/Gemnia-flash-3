@@ -112,10 +112,26 @@ class SettingsController extends Controller
             'integration' => 'required|string|in:gemini',
         ]);
 
-        $result = $this->settings->testIntegration(
-            $request->input('integration'),
-            auth()->id()
-        );
+        try {
+            $result = $this->settings->testIntegration(
+                $request->input('integration'),
+                auth()->id()
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('AI integration test failed', [
+                'integration' => $request->input('integration'),
+                'error'       => $e->getMessage(),
+                'trace'       => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'data'    => [
+                    'success' => false,
+                    'message' => 'Internal error: ' . $e->getMessage(),
+                ],
+            ]);
+        }
 
         return response()->json([
             'success' => $result['success'],
