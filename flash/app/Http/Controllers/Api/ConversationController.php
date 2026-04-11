@@ -119,6 +119,25 @@ class ConversationController extends Controller
             return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
         }
 
+        try {
+            return $this->processSendMessage($request, $conversation);
+        } catch (\Throwable $e) {
+            Log::error('sendMessage unhandled error', [
+                'conversation_id' => $conversation->id,
+                'user_id'         => $request->user()->id,
+                'error'           => $e->getMessage(),
+                'file'            => $e->getFile() . ':' . $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Internal server error: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function processSendMessage(Request $request, Conversation $conversation): JsonResponse
+    {
         // ── Quota enforcement (concurrency-safe) ──
         $usageService = new UsageService();
 
