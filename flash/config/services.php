@@ -42,9 +42,7 @@ return [
     ],
 
     'vertex_ai' => [
-        'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS')
-            ? base_path(env('GOOGLE_APPLICATION_CREDENTIALS'))
-            : storage_path('app/google/service-account.json'),
+        'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS') ?: storage_path('app/google/service-account.json'),
         'project_id' => env('VERTEX_AI_PROJECT_ID', ''),
         'region' => env('VERTEX_AI_REGION', 'us-central1'),
     ],

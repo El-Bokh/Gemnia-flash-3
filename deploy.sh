@@ -79,7 +79,27 @@ fi
 
 echo ""
 echo "══════════════════════════════════════════"
-echo "  🚀 Optimizing Laravel for production..."
+echo "  � Ensuring service account credentials..."
+echo "══════════════════════════════════════════"
+SA_DIR="$LARAVEL_DIR/storage/app/google"
+SA_FILE="$SA_DIR/service-account.json"
+SA_SOURCE="$SCRIPT_DIR/project-1c28556b-fd90-4d6b-a4f-a1db7dec9316.json"
+
+mkdir -p "$SA_DIR"
+if [ -f "$SA_SOURCE" ]; then
+	cp -f "$SA_SOURCE" "$SA_FILE"
+	chmod 600 "$SA_FILE"
+	echo "  ✓ Service account copied to $SA_FILE"
+elif [ -f "$SA_FILE" ]; then
+	echo "  ✓ Service account already exists at $SA_FILE"
+else
+	echo "  ⚠ WARNING: No service account found! AI features will not work."
+	echo "    Expected: $SA_SOURCE or $SA_FILE"
+fi
+
+echo ""
+echo "══════════════════════════════════════════"
+echo "  �🚀 Optimizing Laravel for production..."
 echo "══════════════════════════════════════════"
 php artisan optimize:clear
 php artisan package:discover --ansi
