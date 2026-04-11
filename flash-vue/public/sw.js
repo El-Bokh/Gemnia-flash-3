@@ -1,13 +1,13 @@
-const CACHE_NAME = 'klek-ai-v1';
+// __DEPLOY_TIMESTAMP__ is replaced by deploy.sh on each deploy
+const CACHE_NAME = 'klek-ai-v2-__DEPLOY_TIMESTAMP__';
 
 const PRECACHE_URLS = [
   '/',
-  '/index.html',
   '/manifest.json',
   '/klek-ai-mark.svg',
 ];
 
-// Install — precache shell
+// Install — precache shell & force activate
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
@@ -15,7 +15,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate — clean old caches
+// Activate — delete ALL old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch — network-first for navigation, cache-first for assets
+// Fetch — network-first for everything (prevents stale deploys)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
@@ -35,7 +35,7 @@ self.addEventListener('fetch', (event) => {
   // Skip chrome-extension and other non-http(s) requests
   if (!request.url.startsWith('http')) return;
 
-  // Navigation requests — network first
+  // Navigation requests — network first, fallback to cache
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -44,22 +44,21 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match('/'))
     );
     return;
   }
 
-  // Static assets — cache first
+  // Static assets — network first, fallback to cache
   if (request.url.match(/\.(js|css|png|jpg|jpeg|svg|gif|woff2?|ttf|ico)$/)) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
+      fetch(request)
+        .then((response) => {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
-        });
-      })
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }

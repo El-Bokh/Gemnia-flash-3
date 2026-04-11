@@ -11,11 +11,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VUE_DIR="$SCRIPT_DIR/flash-vue"
 LARAVEL_DIR="$SCRIPT_DIR/flash"
+DEPLOY_TS=$(date +%s)
 
 echo "══════════════════════════════════════════"
 echo "  🔨 Building Vue SPA..."
 echo "══════════════════════════════════════════"
 cd "$VUE_DIR"
+
+# Clean old build output first
+rm -rf dist
+
 npm run build
 
 echo ""
@@ -23,14 +28,19 @@ echo "════════════════════════�
 echo "  📦 Syncing build to Laravel public/..."
 echo "══════════════════════════════════════════"
 
-# Copy static assets (JS, CSS, fonts)
+# Remove ALL old frontend assets to prevent stale cache
 rm -rf "$LARAVEL_DIR/public/assets"
+rm -rf "$LARAVEL_DIR/public/build"
 cp -r "$VUE_DIR/dist/assets" "$LARAVEL_DIR/public/assets"
 
 # Copy icons & favicon
 cp -f "$VUE_DIR/dist/favicon.ico" "$LARAVEL_DIR/public/favicon.ico" 2>/dev/null || true
 cp -f "$VUE_DIR/dist/klek-ai-mark.svg" "$LARAVEL_DIR/public/klek-ai-mark.svg" 2>/dev/null || true
 cp -f "$VUE_DIR/dist/flash-ai-mark.svg" "$LARAVEL_DIR/public/flash-ai-mark.svg" 2>/dev/null || true
+
+# Copy & stamp the service worker with deploy timestamp to bust SW cache
+cp -f "$VUE_DIR/dist/sw.js" "$LARAVEL_DIR/public/sw.js" 2>/dev/null || true
+sed -i "s/__DEPLOY_TIMESTAMP__/$DEPLOY_TS/g" "$LARAVEL_DIR/public/sw.js"
 
 # Copy index.html as Blade template
 cp -f "$VUE_DIR/dist/index.html" "$LARAVEL_DIR/resources/views/spa.blade.php"
