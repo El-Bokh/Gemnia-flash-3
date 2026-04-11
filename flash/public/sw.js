@@ -1,5 +1,5 @@
-// __DEPLOY_TIMESTAMP__ is replaced by deploy.sh on each deploy
-const CACHE_NAME = 'klek-ai-v2-__DEPLOY_TIMESTAMP__';
+// 1775877383 is replaced by deploy.sh on each deploy
+const CACHE_NAME = 'klek-ai-v2-1775877383';
 
 const PRECACHE_URLS = [
   '/',
@@ -63,6 +63,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls — network only
-  event.respondWith(fetch(request));
+  // API calls — network only (with fallback for offline)
+  event.respondWith(
+    fetch(request).catch(() =>
+      new Response(JSON.stringify({ success: false, message: 'Network unavailable' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+  );
 });

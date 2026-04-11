@@ -36,6 +36,7 @@ onMounted(async () => {
     const userData = JSON.parse(atob(userBase64))
     localStorage.setItem('auth_token', token)
     auth.setUser(userData)
+    await auth.fetchUser()
     await router.replace(getAuthenticatedHome(userData))
   } catch {
     errorMsg.value = t('login.googleAuthFailed')

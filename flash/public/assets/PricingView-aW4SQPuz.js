@@ -1,0 +1,164 @@
+import{m as e}from"./auth-Dg_EUHBp.js";import{B as t,Ft as n,G as r,H as i,L as a,Lt as o,M as s,Rt as c,T as l,U as u,W as d,_ as f,et as p,f as m,g as h,gt as g,h as _,r as ee,t as v,tt as y,ut as b,v as x,w as S,x as C,y as w}from"./_plugin-vue_export-helper-BbkqAYWm.js";import{bt as T,ht as E,i as D,vt as O}from"./basedirective-BDDZpS3a.js";import{n as k,s as A,t as te}from"./button-B0wO-jXr.js";import{l as j,s as M,t as N}from"./index-rGDHNSRY.js";import{t as ne}from"./useSeo-CO6AhhN_.js";import{t as P}from"./baseeditableholder-BZR-cE1H.js";import{t as F}from"./tag-Bm6dcsW4.js";var re=D.extend({name:`togglebutton`,style:`
+    .p-togglebutton {
+        display: inline-flex;
+        cursor: pointer;
+        user-select: none;
+        overflow: hidden;
+        position: relative;
+        color: dt('togglebutton.color');
+        background: dt('togglebutton.background');
+        border: 1px solid dt('togglebutton.border.color');
+        padding: dt('togglebutton.padding');
+        font-size: 1rem;
+        font-family: inherit;
+        font-feature-settings: inherit;
+        transition:
+            background dt('togglebutton.transition.duration'),
+            color dt('togglebutton.transition.duration'),
+            border-color dt('togglebutton.transition.duration'),
+            outline-color dt('togglebutton.transition.duration'),
+            box-shadow dt('togglebutton.transition.duration');
+        border-radius: dt('togglebutton.border.radius');
+        outline-color: transparent;
+        font-weight: dt('togglebutton.font.weight');
+    }
+
+    .p-togglebutton-content {
+        display: inline-flex;
+        flex: 1 1 auto;
+        align-items: center;
+        justify-content: center;
+        gap: dt('togglebutton.gap');
+        padding: dt('togglebutton.content.padding');
+        background: transparent;
+        border-radius: dt('togglebutton.content.border.radius');
+        transition:
+            background dt('togglebutton.transition.duration'),
+            color dt('togglebutton.transition.duration'),
+            border-color dt('togglebutton.transition.duration'),
+            outline-color dt('togglebutton.transition.duration'),
+            box-shadow dt('togglebutton.transition.duration');
+    }
+
+    .p-togglebutton:not(:disabled):not(.p-togglebutton-checked):hover {
+        background: dt('togglebutton.hover.background');
+        color: dt('togglebutton.hover.color');
+    }
+
+    .p-togglebutton.p-togglebutton-checked {
+        background: dt('togglebutton.checked.background');
+        border-color: dt('togglebutton.checked.border.color');
+        color: dt('togglebutton.checked.color');
+    }
+
+    .p-togglebutton-checked .p-togglebutton-content {
+        background: dt('togglebutton.content.checked.background');
+        box-shadow: dt('togglebutton.content.checked.shadow');
+    }
+
+    .p-togglebutton:focus-visible {
+        box-shadow: dt('togglebutton.focus.ring.shadow');
+        outline: dt('togglebutton.focus.ring.width') dt('togglebutton.focus.ring.style') dt('togglebutton.focus.ring.color');
+        outline-offset: dt('togglebutton.focus.ring.offset');
+    }
+
+    .p-togglebutton.p-invalid {
+        border-color: dt('togglebutton.invalid.border.color');
+    }
+
+    .p-togglebutton:disabled {
+        opacity: 1;
+        cursor: default;
+        background: dt('togglebutton.disabled.background');
+        border-color: dt('togglebutton.disabled.border.color');
+        color: dt('togglebutton.disabled.color');
+    }
+
+    .p-togglebutton-label,
+    .p-togglebutton-icon {
+        position: relative;
+        transition: none;
+    }
+
+    .p-togglebutton-icon {
+        color: dt('togglebutton.icon.color');
+    }
+
+    .p-togglebutton:not(:disabled):not(.p-togglebutton-checked):hover .p-togglebutton-icon {
+        color: dt('togglebutton.icon.hover.color');
+    }
+
+    .p-togglebutton.p-togglebutton-checked .p-togglebutton-icon {
+        color: dt('togglebutton.icon.checked.color');
+    }
+
+    .p-togglebutton:disabled .p-togglebutton-icon {
+        color: dt('togglebutton.icon.disabled.color');
+    }
+
+    .p-togglebutton-sm {
+        padding: dt('togglebutton.sm.padding');
+        font-size: dt('togglebutton.sm.font.size');
+    }
+
+    .p-togglebutton-sm .p-togglebutton-content {
+        padding: dt('togglebutton.content.sm.padding');
+    }
+
+    .p-togglebutton-lg {
+        padding: dt('togglebutton.lg.padding');
+        font-size: dt('togglebutton.lg.font.size');
+    }
+
+    .p-togglebutton-lg .p-togglebutton-content {
+        padding: dt('togglebutton.content.lg.padding');
+    }
+
+    .p-togglebutton-fluid {
+        width: 100%;
+    }
+`,classes:{root:function(e){var t=e.instance,n=e.props;return[`p-togglebutton p-component`,{"p-togglebutton-checked":t.active,"p-invalid":t.$invalid,"p-togglebutton-fluid":n.fluid,"p-togglebutton-sm p-inputfield-sm":n.size===`small`,"p-togglebutton-lg p-inputfield-lg":n.size===`large`}]},content:`p-togglebutton-content`,icon:`p-togglebutton-icon`,label:`p-togglebutton-label`}}),I={name:`BaseToggleButton`,extends:P,props:{onIcon:String,offIcon:String,onLabel:{type:String,default:`Yes`},offLabel:{type:String,default:`No`},readonly:{type:Boolean,default:!1},tabindex:{type:Number,default:null},ariaLabelledby:{type:String,default:null},ariaLabel:{type:String,default:null},size:{type:String,default:null},fluid:{type:Boolean,default:null}},style:re,provide:function(){return{$pcToggleButton:this,$parentInstance:this}}};function L(e){"@babel/helpers - typeof";return L=typeof Symbol==`function`&&typeof Symbol.iterator==`symbol`?function(e){return typeof e}:function(e){return e&&typeof Symbol==`function`&&e.constructor===Symbol&&e!==Symbol.prototype?`symbol`:typeof e},L(e)}function R(e,t,n){return(t=z(t))in e?Object.defineProperty(e,t,{value:n,enumerable:!0,configurable:!0,writable:!0}):e[t]=n,e}function z(e){var t=B(e,`string`);return L(t)==`symbol`?t:t+``}function B(e,t){if(L(e)!=`object`||!e)return e;var n=e[Symbol.toPrimitive];if(n!==void 0){var r=n.call(e,t);if(L(r)!=`object`)return r;throw TypeError(`@@toPrimitive must return a primitive value.`)}return(t===`string`?String:Number)(e)}var V={name:`ToggleButton`,extends:I,inheritAttrs:!1,emits:[`change`],methods:{getPTOptions:function(e){return(e===`root`?this.ptmi:this.ptm)(e,{context:{active:this.active,disabled:this.disabled}})},onChange:function(e){!this.disabled&&!this.readonly&&(this.writeValue(!this.d_value,e),this.$emit(`change`,e))},onBlur:function(e){var t,n;(t=(n=this.formField).onBlur)==null||t.call(n,e)}},computed:{active:function(){return this.d_value===!0},hasLabel:function(){return T(this.onLabel)&&T(this.offLabel)},label:function(){return this.hasLabel?this.d_value?this.onLabel:this.offLabel:`\xA0`},dataP:function(){return A(R({checked:this.active,invalid:this.$invalid},this.size,this.size))}},directives:{ripple:k}},H=[`tabindex`,`disabled`,`aria-pressed`,`aria-label`,`aria-labelledby`,`data-p-checked`,`data-p-disabled`,`data-p`],U=[`data-p`];function W(e,i,a,o,l,d){var f=r(`ripple`);return y((t(),w(`button`,s({type:`button`,class:e.cx(`root`),tabindex:e.tabindex,disabled:e.disabled,"aria-pressed":e.d_value,onClick:i[0]||=function(){return d.onChange&&d.onChange.apply(d,arguments)},onBlur:i[1]||=function(){return d.onBlur&&d.onBlur.apply(d,arguments)}},d.getPTOptions(`root`),{"aria-label":e.ariaLabel,"aria-labelledby":e.ariaLabelledby,"data-p-checked":d.active,"data-p-disabled":e.disabled,"data-p":d.dataP}),[h(`span`,s({class:e.cx(`content`)},d.getPTOptions(`content`),{"data-p":d.dataP}),[u(e.$slots,`default`,{},function(){return[u(e.$slots,`icon`,{value:e.d_value,class:n(e.cx(`icon`))},function(){return[e.onIcon||e.offIcon?(t(),w(`span`,s({key:0,class:[e.cx(`icon`),e.d_value?e.onIcon:e.offIcon]},d.getPTOptions(`icon`)),null,16)):x(``,!0)]}),h(`span`,s({class:e.cx(`label`)},d.getPTOptions(`label`)),c(d.label),17)]})],16,U)],16,H)),[[f]])}V.render=W;var G=D.extend({name:`selectbutton`,style:`
+    .p-selectbutton {
+        display: inline-flex;
+        user-select: none;
+        vertical-align: bottom;
+        outline-color: transparent;
+        border-radius: dt('selectbutton.border.radius');
+    }
+
+    .p-selectbutton .p-togglebutton {
+        border-radius: 0;
+        border-width: 1px 1px 1px 0;
+    }
+
+    .p-selectbutton .p-togglebutton:focus-visible {
+        position: relative;
+        z-index: 1;
+    }
+
+    .p-selectbutton .p-togglebutton:first-child {
+        border-inline-start-width: 1px;
+        border-start-start-radius: dt('selectbutton.border.radius');
+        border-end-start-radius: dt('selectbutton.border.radius');
+    }
+
+    .p-selectbutton .p-togglebutton:last-child {
+        border-start-end-radius: dt('selectbutton.border.radius');
+        border-end-end-radius: dt('selectbutton.border.radius');
+    }
+
+    .p-selectbutton.p-invalid {
+        outline: 1px solid dt('selectbutton.invalid.border.color');
+        outline-offset: 0;
+    }
+
+    .p-selectbutton-fluid {
+        width: 100%;
+    }
+    
+    .p-selectbutton-fluid .p-togglebutton {
+        flex: 1 1 0;
+    }
+`,classes:{root:function(e){var t=e.props,n=e.instance;return[`p-selectbutton p-component`,{"p-invalid":n.$invalid,"p-selectbutton-fluid":t.fluid}]}}}),K={name:`BaseSelectButton`,extends:P,props:{options:Array,optionLabel:null,optionValue:null,optionDisabled:null,multiple:Boolean,allowEmpty:{type:Boolean,default:!0},dataKey:null,ariaLabelledby:{type:String,default:null},size:{type:String,default:null},fluid:{type:Boolean,default:null}},style:G,provide:function(){return{$pcSelectButton:this,$parentInstance:this}}};function q(e,t){var n=typeof Symbol<`u`&&e[Symbol.iterator]||e[`@@iterator`];if(!n){if(Array.isArray(e)||(n=X(e))||t){n&&(e=n);var r=0,i=function(){};return{s:i,n:function(){return r>=e.length?{done:!0}:{done:!1,value:e[r++]}},e:function(e){throw e},f:i}}throw TypeError(`Invalid attempt to iterate non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}var a,o=!0,s=!1;return{s:function(){n=n.call(e)},n:function(){var e=n.next();return o=e.done,e},e:function(e){s=!0,a=e},f:function(){try{o||n.return==null||n.return()}finally{if(s)throw a}}}}function J(e){return ae(e)||ie(e)||X(e)||Y()}function Y(){throw TypeError(`Invalid attempt to spread non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}function X(e,t){if(e){if(typeof e==`string`)return Z(e,t);var n={}.toString.call(e).slice(8,-1);return n===`Object`&&e.constructor&&(n=e.constructor.name),n===`Map`||n===`Set`?Array.from(e):n===`Arguments`||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?Z(e,t):void 0}}function ie(e){if(typeof Symbol<`u`&&e[Symbol.iterator]!=null||e[`@@iterator`]!=null)return Array.from(e)}function ae(e){if(Array.isArray(e))return Z(e)}function Z(e,t){(t==null||t>e.length)&&(t=e.length);for(var n=0,r=Array(t);n<t;n++)r[n]=e[n];return r}var Q={name:`SelectButton`,extends:K,inheritAttrs:!1,emits:[`change`],methods:{getOptionLabel:function(e){return this.optionLabel?O(e,this.optionLabel):e},getOptionValue:function(e){return this.optionValue?O(e,this.optionValue):e},getOptionRenderKey:function(e){return this.dataKey?O(e,this.dataKey):this.getOptionLabel(e)},isOptionDisabled:function(e){return this.optionDisabled?O(e,this.optionDisabled):!1},isOptionReadonly:function(e){if(this.allowEmpty)return!1;var t=this.isSelected(e);return this.multiple?t&&this.d_value.length===1:t},onOptionSelect:function(e,t,n){var r=this;if(!(this.disabled||this.isOptionDisabled(t)||this.isOptionReadonly(t))){var i=this.isSelected(t),a=this.getOptionValue(t),o;if(this.multiple)if(i){if(o=this.d_value.filter(function(e){return!E(e,a,r.equalityKey)}),!this.allowEmpty&&o.length===0)return}else o=this.d_value?[].concat(J(this.d_value),[a]):[a];else{if(i&&!this.allowEmpty)return;o=i?null:a}this.writeValue(o,e),this.$emit(`change`,{originalEvent:e,value:o})}},isSelected:function(e){var t=!1,n=this.getOptionValue(e);if(this.multiple){if(this.d_value){var r=q(this.d_value),i;try{for(r.s();!(i=r.n()).done;){var a=i.value;if(E(a,n,this.equalityKey)){t=!0;break}}}catch(e){r.e(e)}finally{r.f()}}}else t=E(this.d_value,n,this.equalityKey);return t}},computed:{equalityKey:function(){return this.optionValue?null:this.dataKey},dataP:function(){return A({invalid:this.$invalid})}},directives:{ripple:k},components:{ToggleButton:V}},oe=[`aria-labelledby`,`data-p`];function se(e,n,r,a,o,l){var g=d(`ToggleButton`);return t(),w(`div`,s({class:e.cx(`root`),role:`group`,"aria-labelledby":e.ariaLabelledby},e.ptmi(`root`),{"data-p":l.dataP}),[(t(!0),w(m,null,i(e.options,function(n,r){return t(),f(g,{key:l.getOptionRenderKey(n),modelValue:l.isSelected(n),onLabel:l.getOptionLabel(n),offLabel:l.getOptionLabel(n),disabled:e.disabled||l.isOptionDisabled(n),unstyled:e.unstyled,size:e.size,readonly:l.isOptionReadonly(n),onChange:function(e){return l.onOptionSelect(e,n,r)},pt:e.ptm(`pcToggleButton`)},C({_:2},[e.$slots.option?{name:`default`,fn:p(function(){return[u(e.$slots,`option`,{option:n,index:r},function(){return[h(`span`,s({ref_for:!0},e.ptm(`pcToggleButton`).label),c(l.getOptionLabel(n)),17)]})]}),key:`0`}:void 0]),1032,[`modelValue`,`onLabel`,`offLabel`,`disabled`,`unstyled`,`size`,`readonly`,`onChange`,`pt`])}),128))],16,oe)}Q.render=se;function ce(){return M(`/plans/public`)}function le(e,t){return j(`/subscription/upgrade`,{plan_id:e,billing_cycle:t})}var ue={class:`pricing-page`},de={class:`pricing-header`},fe={class:`pricing-title`},pe={class:`pricing-sub`},me={class:`cycle-toggle`},he={key:0,class:`save-badge`},ge={key:0,class:`loading-state`},_e={key:1,class:`plans-grid`},ve={key:0,class:`popular-badge`},ye={key:1,class:`current-badge`},be={class:`plan-head`},$={class:`plan-desc`},xe={class:`plan-price`},Se={class:`price-amount`},Ce={class:`price-period`},we={class:`plan-credits`},Te={class:`credits-amount`},Ee={class:`credits-label`},De={class:`plan-features`},Oe={class:`pricing-footer`},ke=v(l({__name:`PricingView`,setup(r){let{t:s}=ee(),l=e(),u=N();ne({title:_(()=>s(`seo.pricingTitle`)),description:_(()=>s(`seo.pricingDescription`)),path:`/pricing`,jsonLd:{"@context":`https://schema.org`,"@type":`WebPage`,name:`Plans & Pricing - Klek AI`,url:`https://klek.studio/pricing`,description:`Choose the perfect Klek AI plan for your creative needs.`,isPartOf:{"@type":`WebSite`,name:`Klek AI`,url:`https://klek.studio`}}});let d=b(!0),f=b(null),p=b(`monthly`),v=b([]),y=_(()=>[{label:s(`client.monthly`),value:`monthly`},{label:s(`client.yearly`),value:`yearly`}]),C={free:`#64748b`,starter:`#0ea5e9`,pro:`#8b5cf6`,professional:`#8b5cf6`,enterprise:`#f59e0b`},T=_(()=>(v.value??[]).map(e=>({id:e.id,name:e.name,slug:e.slug,price:p.value===`yearly`?e.price_yearly:e.price_monthly,credits:p.value===`yearly`?e.credits_yearly:e.credits_monthly,currency:e.currency??`USD`,description:e.description??``,is_free:e.is_free,is_featured:e.is_featured,features:(e.features??[]).map(e=>e.name),tone:C[e.slug]??`#64748b`,isCurrent:u.isAuthenticated&&u.quota?.plan_slug===e.slug})));a(async()=>{try{v.value=(await ce()).data??[]}catch{v.value=[]}finally{d.value=!1}});async function E(e){if(!u.isAuthenticated){l.push({name:`login`});return}if(!(e.isCurrent||e.is_free)){f.value=e.id;try{await le(e.id,p.value),await u.refreshQuota()}catch{}finally{f.value=null}}}return(e,r)=>(t(),w(`div`,ue,[h(`div`,de,[h(`h1`,fe,c(g(s)(`client.pricingTitle`)),1),h(`p`,pe,c(g(s)(`client.pricingSub`)),1),h(`div`,me,[S(g(Q),{modelValue:p.value,"onUpdate:modelValue":r[0]||=e=>p.value=e,options:y.value,optionLabel:`label`,optionValue:`value`,allowEmpty:!1},null,8,[`modelValue`,`options`]),p.value===`yearly`?(t(),w(`span`,he,c(g(s)(`client.save20`)),1)):x(``,!0)])]),d.value?(t(),w(`div`,ge,[...r[1]||=[h(`i`,{class:`pi pi-spin pi-spinner`,style:{"font-size":`2rem`,color:`var(--text-muted)`}},null,-1)]])):(t(),w(`div`,_e,[(t(!0),w(m,null,i(T.value,e=>(t(),w(`article`,{key:e.slug,class:n([`plan-card`,{popular:e.is_featured,current:e.isCurrent}])},[e.is_featured?(t(),w(`div`,ve,[S(g(F),{value:g(s)(`client.mostPopular`),severity:`contrast`,class:`pop-tag`},null,8,[`value`])])):x(``,!0),e.isCurrent?(t(),w(`div`,ye,[S(g(F),{value:g(s)(`client.currentPlan`),severity:`success`,class:`pop-tag`},null,8,[`value`])])):x(``,!0),h(`div`,be,[h(`h3`,{class:`plan-name`,style:o({color:e.tone})},c(e.name),5),h(`p`,$,c(e.description),1)]),h(`div`,xe,[h(`span`,Se,`$`+c(e.price),1),h(`span`,Ce,`/ `+c(p.value===`yearly`?g(s)(`client.perYear`):g(s)(`client.perMonth`)),1)]),h(`div`,we,[h(`span`,Te,c(e.credits?.toLocaleString()),1),h(`span`,Ee,c(g(s)(`client.credits`)),1)]),h(`ul`,De,[(t(!0),w(m,null,i(e.features,(n,r)=>(t(),w(`li`,{key:r,class:`feature-item`},[h(`i`,{class:`pi pi-check-circle feature-check`,style:o({color:e.tone})},null,4),h(`span`,null,c(n),1)]))),128))]),S(g(te),{label:e.isCurrent?g(s)(`client.currentPlan`):e.is_free?g(s)(`client.startFree`):g(s)(`client.subscribe`),outlined:!e.is_featured,severity:e.is_featured?void 0:`secondary`,disabled:e.isCurrent||f.value!==null,loading:f.value===e.id,size:`small`,class:`plan-cta`,onClick:t=>E(e)},null,8,[`label`,`outlined`,`severity`,`disabled`,`loading`,`onClick`])],2))),128))])),h(`div`,Oe,[h(`p`,null,c(g(s)(`client.pricingFooter`)),1)])]))}}),[[`__scopeId`,`data-v-df5f083f`]]);export{ke as default};

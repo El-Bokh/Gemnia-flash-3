@@ -40,6 +40,8 @@ async function bootstrap() {
 
 	if (hasToken && !hasStoredUser) {
 		await auth.fetchUser()
+	} else if (hasToken && hasStoredUser) {
+		auth.fetchUser()
 	}
 
 	await router.isReady()

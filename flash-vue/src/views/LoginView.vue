@@ -53,6 +53,7 @@ async function handleLogin() {
     if (res.success && res.data) {
       localStorage.setItem('auth_token', res.data.token)
       auth.setUser(res.data.user)
+      await auth.fetchUser()
       await router.replace(getAuthenticatedHome(res.data.user))
     } else {
       errorMsg.value = res.message || t('login.loginFailed')
