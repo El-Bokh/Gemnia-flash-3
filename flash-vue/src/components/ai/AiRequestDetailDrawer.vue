@@ -212,6 +212,7 @@ function buildMockRequest(requestId: number): AiRequestDetail {
     num_images: 4,
     denoising_strength: null,
     input_image_path: null,
+    output_image_path: null,
     mask_image_path: null,
     credits_consumed: 12,
     processing_time_ms: 4200,

@@ -180,6 +180,7 @@ export interface UserDetail {
   stats: UserDetailStats
   recent_ai_requests: UserRecentAiRequest[]
   recent_generated_images: UserRecentGeneratedImage[]
+  recent_output_images: UserRecentGeneratedImage[]
   recent_payments: UserRecentPayment[]
   credit_ledger: UserCreditLedger
 }

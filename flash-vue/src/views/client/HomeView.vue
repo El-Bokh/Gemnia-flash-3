@@ -350,7 +350,7 @@ function handleSendProducts(content: string, images: File[]) {
           <p class="sub-suggestions-label">{{ t('chat.trySuggestion') }}</p>
           <div class="sub-suggestions-grid">
             <button
-              v-for="(sub, si) in suggestions[activeSuggestionIndex].subs"
+              v-for="(sub, si) in suggestions[activeSuggestionIndex]?.subs"
               :key="si"
               class="sub-suggestion-chip"
               @click="useSuggestion(sub); activeSuggestionIndex = null"
