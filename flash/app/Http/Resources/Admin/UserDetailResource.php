@@ -63,7 +63,7 @@ class UserDetailResource extends JsonResource
                 'ai_requests_completed' => $this->ai_requests_completed_count ?? 0,
                 'ai_requests_failed'    => $this->ai_requests_failed_count ?? 0,
                 'ai_requests_pending'   => $this->ai_requests_pending_count ?? 0,
-                'generated_images'      => $this->generated_images_count ?? 0,
+                'generated_images'      => ($this->output_images_count ?? 0) + ($this->generated_images_count ?? 0),
                 'total_payments'        => (float) ($this->payments_total ?? 0),
                 'payments_count'        => $this->payments_count ?? 0,
                 'credit_balance'        => $this->credit_balance ?? 0,
@@ -88,7 +88,7 @@ class UserDetailResource extends JsonResource
                     ])
             ),
 
-            // ── Recent Generated Images (last 10) ──
+            // ── Recent Generated Images (last 10) — from generated_images table ──
             'recent_generated_images' => $this->whenLoaded('generatedImages', fn () =>
                 $this->generatedImages
                     ->sortByDesc('created_at')
@@ -104,6 +104,22 @@ class UserDetailResource extends JsonResource
                         'file_size'  => $img->file_size,
                         'is_public'  => $img->is_public,
                         'is_nsfw'    => $img->is_nsfw,
+                        'created_at' => $img->created_at?->toIso8601String(),
+                    ])
+            ),
+
+            // ── Recent Output Images (last 10) — from media_files (chat-generated) ──
+            'recent_output_images' => $this->whenLoaded('mediaFiles', fn () =>
+                $this->mediaFiles
+                    ->sortByDesc('created_at')
+                    ->take(10)
+                    ->values()
+                    ->map(fn ($img) => [
+                        'id'         => $img->id,
+                        'file_path'  => $img->file_path,
+                        'file_name'  => $img->file_name,
+                        'mime_type'  => $img->mime_type,
+                        'file_size'  => $img->file_size,
                         'created_at' => $img->created_at?->toIso8601String(),
                     ])
             ),

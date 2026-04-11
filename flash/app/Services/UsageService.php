@@ -228,6 +228,7 @@ class UsageService
                 'used'    => 0,
                 'limit'   => 0,
                 'period'  => null,
+                'credits_per_use' => 1,
             ];
         }
 
@@ -235,7 +236,7 @@ class UsageService
 
         if (! $feature) {
             // Unknown feature — allow (don't block for unconfigured features)
-            return ['allowed' => true, 'reason' => null, 'used' => 0, 'limit' => null, 'period' => null];
+            return ['allowed' => true, 'reason' => null, 'used' => 0, 'limit' => null, 'period' => null, 'credits_per_use' => 1];
         }
 
         $planFeature = PlanFeature::where('plan_id', $subscription->plan_id)
@@ -250,6 +251,7 @@ class UsageService
                 'used'    => 0,
                 'limit'   => 0,
                 'period'  => null,
+                'credits_per_use' => 1,
             ];
         }
 
@@ -261,12 +263,13 @@ class UsageService
                 'used'    => 0,
                 'limit'   => 0,
                 'period'  => $planFeature->limit_period,
+                'credits_per_use' => $planFeature->credits_per_use ?? 1,
             ];
         }
 
         // Unlimited usage
         if ($planFeature->usage_limit === null) {
-            return ['allowed' => true, 'reason' => null, 'used' => 0, 'limit' => null, 'period' => $planFeature->limit_period];
+            return ['allowed' => true, 'reason' => null, 'used' => 0, 'limit' => null, 'period' => $planFeature->limit_period, 'credits_per_use' => $planFeature->credits_per_use ?? 1];
         }
 
         // Count usage within the period
@@ -285,6 +288,7 @@ class UsageService
                 'used'    => $usedCount,
                 'limit'   => $planFeature->usage_limit,
                 'period'  => $planFeature->limit_period,
+                'credits_per_use' => $planFeature->credits_per_use ?? 1,
             ];
         }
 
@@ -294,6 +298,7 @@ class UsageService
             'used'    => $usedCount,
             'limit'   => $planFeature->usage_limit,
             'period'  => $planFeature->limit_period,
+            'credits_per_use' => $planFeature->credits_per_use ?? 1,
         ];
     }
 

@@ -1,0 +1,12 @@
+# Sensitive credentials - service account JSON
+project-*.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

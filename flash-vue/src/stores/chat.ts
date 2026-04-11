@@ -33,12 +33,21 @@ export interface Conversation {
   updatedAt: Date
 }
 
+function resolveStorageUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined
+  if (path.startsWith('http')) return path
+  // Strip /api suffix to get the backend origin
+  const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+  const origin = apiBase.replace(/\/api\/?$/, '')
+  return origin + path
+}
+
 function apiMsgToLocal(m: MessageData): ChatMessage {
   return {
     id: String(m.id),
     role: m.role,
     content: m.content,
-    imageUrl: m.image_url ?? undefined,
+    imageUrl: resolveStorageUrl(m.image_url),
     imageStyle: m.image_style ?? undefined,
     timestamp: new Date(m.created_at),
     status: m.status === 'sent' ? 'sent' : 'sent',

@@ -18,6 +18,26 @@ const emit = defineEmits<{
 
 const showActions = ref(false)
 const copied = ref(false)
+const showFullscreen = ref(false)
+
+function handleDownloadImage() {
+  if (!props.message.imageUrl) return
+  const link = document.createElement('a')
+  link.href = props.message.imageUrl
+  link.download = `generated-image-${props.message.id}.png`
+  link.target = '_blank'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+function handleExpandImage() {
+  showFullscreen.value = true
+}
+
+function closeFullscreen() {
+  showFullscreen.value = false
+}
 
 function handleCopy() {
   const text = props.message.content
@@ -54,11 +74,22 @@ function handleRegenerate() {
         <div v-if="message.imageUrl" class="msg-image-wrap">
           <img :src="message.imageUrl" alt="Generated image" class="msg-image" loading="lazy" />
           <div class="image-overlay">
-            <Button icon="pi pi-download" severity="secondary" text rounded size="small" />
-            <Button icon="pi pi-expand" severity="secondary" text rounded size="small" />
+            <Button icon="pi pi-download" severity="secondary" text rounded size="small" @click="handleDownloadImage" />
+            <Button icon="pi pi-expand" severity="secondary" text rounded size="small" @click="handleExpandImage" />
           </div>
         </div>
       </div>
+
+    <!-- Fullscreen overlay -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showFullscreen" class="fullscreen-overlay" @click="closeFullscreen">
+          <img :src="message.imageUrl" alt="Generated image" class="fullscreen-image" @click.stop />
+          <Button icon="pi pi-times" severity="secondary" text rounded class="fullscreen-close" @click="closeFullscreen" />
+          <Button icon="pi pi-download" severity="secondary" text rounded class="fullscreen-download" @click.stop="handleDownloadImage" />
+        </div>
+      </Transition>
+    </Teleport>
 
       <!-- Actions -->
       <Transition name="fade-slide">
@@ -286,6 +317,54 @@ function handleRegenerate() {
 .fade-slide-enter-from {
   opacity: 0;
   transform: translateY(4px);
+}
+
+/* ─── Fullscreen overlay ─────────────────────── */
+.fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.fullscreen-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.fullscreen-close {
+  position: absolute;
+  top: 16px;
+  inset-inline-end: 16px;
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(4px);
+}
+
+.fullscreen-download {
+  position: absolute;
+  bottom: 24px;
+  inset-inline-end: 24px;
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(4px);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .fade-slide-leave-to {

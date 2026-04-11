@@ -7,7 +7,10 @@ const { t } = useI18n()
 const auth = useAuthStore()
 
 const q = computed(() => auth.quota)
-const barWidth = computed(() => Math.min(q.value.usage_percentage, 100))
+const barWidth = computed(() => {
+  if (q.value.credits_total <= 0) return 0
+  return Math.min(Math.round((q.value.credits_remaining / q.value.credits_total) * 100), 100)
+})
 const barColor = computed(() => {
   if (q.value.warning_level === 'depleted') return '#ef4444'
   if (q.value.warning_level === 'critical') return '#f97316'

@@ -298,6 +298,17 @@ function canRetry(status: string) {
 function canCancel(status: string) {
   return ['pending', 'processing'].includes(status)
 }
+
+function resolveImageUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined
+  if (path.startsWith('http')) return path
+  const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+  const origin = apiBase.replace(/\/api\/?$/, '')
+  if (!path.startsWith('/')) return `${origin}/storage/${path}`
+  return origin + path
+}
+
+const expandedImage = ref<string | null>(null)
 </script>
 
 <template>
@@ -348,7 +359,7 @@ function canCancel(status: string) {
           </article>
           <article class="stat-card">
             <span class="stat-k">{{ t('aiDetail.images') }}</span>
-            <strong>{{ detail.stats.generated_images_count }}</strong>
+            <strong>{{ detail.output_image_path ? 1 : detail.stats.generated_images_count }}</strong>
             <small>{{ t('aiDetail.requested', { count: detail.num_images }) }}</small>
           </article>
           <article class="stat-card">
@@ -437,10 +448,25 @@ function canCancel(status: string) {
           <TabPanel value="outputs">
             <section class="info-card">
               <h3 class="section-title">{{ t('aiDetail.generatedImages') }}</h3>
-              <div class="image-grid">
-                <article v-for="image in detail.generated_images || []" :key="image.id" class="image-card">
+
+              <!-- Output image from output_image_path -->
+              <div v-if="detail.output_image_path" class="image-grid">
+                <article class="image-card" @click="expandedImage = resolveImageUrl(detail.output_image_path) || null" style="cursor: pointer">
                   <div class="image-preview">
-                    <img v-if="image.file_path" :src="image.file_path" :alt="image.file_name" />
+                    <img :src="resolveImageUrl(detail.output_image_path)" alt="Generated image" loading="lazy" />
+                  </div>
+                  <div class="image-copy">
+                    <span class="image-name">Generated Output</span>
+                    <span class="image-meta">{{ detail.width || '—' }}×{{ detail.height || '—' }}</span>
+                  </div>
+                </article>
+              </div>
+
+              <!-- Legacy generated_images -->
+              <div v-else-if="(detail.generated_images || []).length" class="image-grid">
+                <article v-for="image in detail.generated_images" :key="image.id" class="image-card" @click="expandedImage = resolveImageUrl(image.file_path) || null" style="cursor: pointer">
+                  <div class="image-preview">
+                    <img v-if="image.file_path" :src="resolveImageUrl(image.file_path)" :alt="image.file_name" loading="lazy" />
                     <span v-else>{{ image.file_name }}</span>
                   </div>
                   <div class="image-copy">
@@ -450,9 +476,22 @@ function canCancel(status: string) {
                   </div>
                 </article>
               </div>
+
+              <div v-else class="empty-outputs">
+                <i class="pi pi-image" />
+                <span>No images generated</span>
+              </div>
             </section>
 
-            <section class="info-card">
+            <!-- Text output (processed prompt / response) -->
+            <section v-if="detail.response_payload && !detail.output_image_path && !(detail.generated_images || []).length" class="info-card" style="margin-top: 8px">
+              <h3 class="section-title">Text Output</h3>
+              <div class="prompt-block">
+                <pre style="margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.72rem; color: var(--text-primary)">{{ formatJson(detail.response_payload) }}</pre>
+              </div>
+            </section>
+
+            <section class="info-card" style="margin-top: 8px">
               <h3 class="section-title">{{ t('aiDetail.usageLogs') }}</h3>
               <div class="log-list">
                 <div v-for="log in detail.usage_logs || []" :key="log.id" class="log-row">
@@ -526,6 +565,16 @@ function canCancel(status: string) {
       </Tabs>
     </div>
   </Dialog>
+
+  <!-- Fullscreen image overlay -->
+  <Teleport to="body">
+    <div v-if="expandedImage" class="image-overlay" @click="expandedImage = null">
+      <img :src="expandedImage" alt="Expanded image" />
+      <button class="overlay-close" @click.stop="expandedImage = null">
+        <i class="pi pi-times" />
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -789,6 +838,55 @@ function canCancel(status: string) {
 .w-full { width: 100%; }
 .edit-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
 .mini-tag { font-size: 0.56rem !important; padding: 2px 7px !important; }
+
+.empty-outputs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.empty-outputs i { font-size: 1.4rem; }
+
+/* Fullscreen overlay */
+.image-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.image-overlay img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.overlay-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.overlay-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
 
 :deep(.ai-detail-drawer) { margin: 0 !important; border-radius: 0 !important; }
 :deep(.ai-detail-drawer .p-dialog-header) {

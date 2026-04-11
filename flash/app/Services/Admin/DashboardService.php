@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\AiRequest;
 use App\Models\GeneratedImage;
+use App\Models\MediaFile;
 use App\Models\Notification;
 use App\Models\Payment;
 use App\Models\Plan;
@@ -66,7 +67,13 @@ class DashboardService
 
     private function countImagesGenerated(Carbon $since): int
     {
-        return GeneratedImage::where('created_at', '>=', $since)->count();
+        // Count from media_files (where images are actually stored) + generated_images
+        $mediaCount = MediaFile::where('purpose', 'output')
+            ->where('created_at', '>=', $since)
+            ->count();
+        $legacyCount = GeneratedImage::where('created_at', '>=', $since)->count();
+
+        return $mediaCount + $legacyCount;
     }
 
     private function getRevenue(Carbon $since): array
@@ -121,7 +128,9 @@ class DashboardService
     {
         $days = collect(range(6, 0))->map(fn ($i) => Carbon::today()->subDays($i));
 
-        $counts = GeneratedImage::query()
+        // Count from media_files (output images) since that's where images are stored
+        $counts = MediaFile::query()
+            ->where('purpose', 'output')
             ->where('created_at', '>=', Carbon::today()->subDays(6)->startOfDay())
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('COUNT(*) as count'))
             ->groupBy('date')

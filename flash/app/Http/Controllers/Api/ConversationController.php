@@ -123,7 +123,7 @@ class ConversationController extends Controller
         $usageService = new UsageService();
 
         // Check feature-level limits first
-        $featureSlug = ($request->input('mode', 'text') === 'image') ? 'text_to_image' : 'text_to_image';
+        $featureSlug = ($request->input('mode') === 'image') ? 'text_to_image' : 'chat';
         $featureCheck = $usageService->checkFeatureLimit($request->user(), $featureSlug);
 
         if (! $featureCheck['allowed']) {
@@ -147,7 +147,11 @@ class ConversationController extends Controller
             ], 402);
         }
 
-        $consumption = $usageService->consume($request->user(), 1, 'chat_message');
+        $featureModel = \App\Models\Feature::where('slug', $featureSlug)->first();
+        $creditCost = $featureCheck['credits_per_use'] ?? 1;
+        $consumption = $usageService->consume($request->user(), $creditCost, 'chat_message', [
+            'feature_id' => $featureModel?->id,
+        ]);
 
         if (! $consumption['success']) {
             $code    = $consumption['reason'] === 'no_subscription' ? 'no_subscription' : 'insufficient_credits';
@@ -257,12 +261,8 @@ class ConversationController extends Controller
         $styleSlug = $data['image_style'] ?? null;
         $geminiPrompt = $userContent;
 
-        // Hidden master base prompt — always prepended in image mode
-        $basePrompt = 'portrait of a young man, looking straight at the camera, centered composition, neutral background, soft studio lighting, 50mm lens, high quality, clean face, no accessories, same face, same pose, same framing, consistent character';
-
         if ($mode === 'image') {
             $parts = [];
-            $parts[] = $basePrompt;
 
             // Inject hidden style prompt if a style is selected
             $style = null;
@@ -275,6 +275,9 @@ class ConversationController extends Controller
 
             // User prompt
             $parts[] = $userContent;
+
+            // Quality enhancement suffix
+            $parts[] = 'high quality, highly detailed, professional';
 
             // Style suffix (if any)
             if ($style && $style->prompt_suffix) {
@@ -349,7 +352,7 @@ class ConversationController extends Controller
             'processed_prompt' => $geminiPrompt !== $userContent ? $geminiPrompt : null,
             'model_used'       => $gemini->getModel(),
             'engine_provider'  => 'gemini',
-            'credits_consumed' => 1,
+            'credits_consumed' => $creditCost,
             'input_image_path' => $imageUrl,
             'processing_time_ms' => $processingTimeMs,
             'ip_address'       => $request->ip(),
@@ -384,27 +387,29 @@ class ConversationController extends Controller
 
                 $generatedImageUrl = '/storage/' . $fileName;
 
-                // Update AiRequest type when images were generated
+                // Update AiRequest with output image and fix type
+                $updateData = ['output_image_path' => $generatedImageUrl];
                 if ($aiRequest->type === 'chat' || $aiRequest->type === 'styled_chat') {
-                    $aiRequest->update(['type' => 'text_to_image']);
+                    $updateData['type'] = 'text_to_image';
                 }
+                $aiRequest->update($updateData);
             }
 
             $aiMsg = $conversation->messages()->create([
                 'role'      => 'assistant',
-                'content'   => $result['content'],
+                'content'   => $result['content'] ?? ($generatedImageUrl ? '' : 'No response generated.'),
                 'image_url' => $generatedImageUrl,
                 'status'    => 'sent',
             ]);
         } else {
             // ── Refund credit on AI failure ──
-            $usageService->refund($request->user(), 1, 'ai_failure', [
+            $usageService->refund($request->user(), $creditCost, 'ai_failure', [
                 'ai_request_id' => $aiRequest->id,
                 'error'         => $result['error'] ?? 'Unknown error',
             ]);
 
             // Update the consumption remaining after refund
-            $consumption['remaining'] = $consumption['remaining'] + 1;
+            $consumption['remaining'] = $consumption['remaining'] + $creditCost;
 
             $aiRequest->update(['credits_consumed' => 0]);
 
@@ -472,7 +477,7 @@ class ConversationController extends Controller
         // ── Quota enforcement ──
         $usageService = new UsageService();
 
-        $featureSlug = 'text_to_image';
+        $featureSlug = $aiMessage->image_url ? 'text_to_image' : 'chat';
         $featureCheck = $usageService->checkFeatureLimit($request->user(), $featureSlug);
         if (! $featureCheck['allowed']) {
             return response()->json([
@@ -482,7 +487,11 @@ class ConversationController extends Controller
             ], 402);
         }
 
-        $consumption = $usageService->consume($request->user(), 1, 'regenerate');
+        $featureModel = \App\Models\Feature::where('slug', $featureSlug)->first();
+        $creditCost = $featureCheck['credits_per_use'] ?? 1;
+        $consumption = $usageService->consume($request->user(), $creditCost, 'regenerate', [
+            'feature_id' => $featureModel?->id,
+        ]);
         if (! $consumption['success']) {
             $code = $consumption['reason'] === 'no_subscription' ? 'no_subscription' : 'insufficient_credits';
             return response()->json([
@@ -499,11 +508,9 @@ class ConversationController extends Controller
         $mode = $aiMessage->image_url ? 'image' : 'text';
         $geminiPrompt = $content;
 
-        $basePrompt = 'portrait of a young man, looking straight at the camera, centered composition, neutral background, soft studio lighting, 50mm lens, high quality, clean face, no accessories, same face, same pose, same framing, consistent character';
-
         $style = null;
         if ($mode === 'image') {
-            $parts = [$basePrompt];
+            $parts = [];
             if ($imageStyle) {
                 $style = VisualStyle::where('slug', $imageStyle)->where('is_active', true)->first();
                 if ($style && $style->prompt_prefix) {
@@ -511,6 +518,7 @@ class ConversationController extends Controller
                 }
             }
             $parts[] = $content;
+            $parts[] = 'high quality, highly detailed, professional';
             if ($style && $style->prompt_suffix) {
                 $parts[] = $style->prompt_suffix;
             }
@@ -558,7 +566,7 @@ class ConversationController extends Controller
             'processed_prompt'   => $geminiPrompt !== $content ? $geminiPrompt : null,
             'model_used'         => $gemini->getModel(),
             'engine_provider'    => 'gemini',
-            'credits_consumed'   => 1,
+            'credits_consumed'   => $creditCost,
             'processing_time_ms' => $processingTimeMs,
             'ip_address'         => $request->ip(),
             'user_agent'         => $request->userAgent(),
@@ -591,19 +599,24 @@ class ConversationController extends Controller
                 ]);
 
                 $generatedImageUrl = '/storage/' . $fileName;
+
+                $aiRequest->update([
+                    'output_image_path' => $generatedImageUrl,
+                    'type' => 'image_generation',
+                ]);
             }
 
             $newAiMsg = $conversation->messages()->create([
                 'role'      => 'assistant',
-                'content'   => $result['content'],
+                'content'   => $result['content'] ?? ($generatedImageUrl ? '' : 'No response generated.'),
                 'image_url' => $generatedImageUrl,
                 'status'    => 'sent',
             ]);
         } else {
-            $usageService->refund($request->user(), 1, 'ai_failure', [
+            $usageService->refund($request->user(), $creditCost, 'ai_failure', [
                 'ai_request_id' => $aiRequest->id,
             ]);
-            $consumption['remaining']++;
+            $consumption['remaining'] += $creditCost;
             $aiRequest->update(['credits_consumed' => 0]);
 
             $newAiMsg = $conversation->messages()->create([

@@ -95,6 +95,7 @@ class UserManagementService
                 'subscriptions.plan:id,name,slug',
                 'aiRequests' => fn ($q) => $q->with('visualStyle:id,name')->latest()->limit(10),
                 'generatedImages' => fn ($q) => $q->latest()->limit(10),
+                'mediaFiles' => fn ($q) => $q->where('purpose', 'output')->latest()->limit(10),
                 'payments' => fn ($q) => $q->latest()->limit(10),
                 'creditLedgers' => fn ($q) => $q->latest()->limit(10),
             ])
@@ -103,6 +104,7 @@ class UserManagementService
             ->withCount(['aiRequests as ai_requests_failed_count' => fn ($q) => $q->where('status', 'failed')])
             ->withCount(['aiRequests as ai_requests_pending_count' => fn ($q) => $q->where('status', 'pending')])
             ->withCount('generatedImages')
+            ->withCount(['mediaFiles as output_images_count' => fn ($q) => $q->where('purpose', 'output')])
             ->withCount('payments')
             ->withSum(['payments as payments_total' => fn ($q) => $q->where('status', 'completed')], 'net_amount')
             ->addSelect([

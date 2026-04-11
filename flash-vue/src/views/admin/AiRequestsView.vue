@@ -585,7 +585,6 @@ function canCancel(item: AiRequest) {
         @page="onPage"
         stripedRows
         size="small"
-        scrollable
         class="requests-table"
         dataKey="id"
       >
@@ -657,7 +656,7 @@ function canCancel(item: AiRequest) {
           </template>
         </Column>
 
-        <Column header="" style="min-width: 160px; text-align: right" frozen alignFrozen="right">
+        <Column header="" style="min-width: 160px; text-align: right">
           <template #body="{ data }">
             <div class="row-actions">
               <Button icon="pi pi-eye" severity="secondary" text rounded size="small" @click="openDetail(data)" v-tooltip.left="'View'" />
@@ -689,7 +688,7 @@ function canCancel(item: AiRequest) {
 </template>
 
 <style scoped>
-.ai-page { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden; }
+.ai-page { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .page-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .page-title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
 .toolbar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -816,8 +815,8 @@ function canCancel(item: AiRequest) {
 .d-mobile { display: grid; }
 .d-desktop { display: none; }
 @media (min-width: 768px) {
-  .d-mobile { display: none; }
-  .d-desktop { display: block; }
+  .d-mobile { display: none !important; }
+  .d-desktop { display: block !important; }
 }
 
 .cards-list { display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -861,10 +860,10 @@ function canCancel(item: AiRequest) {
   overflow: hidden;
   min-width: 0;
 }
-.requests-table { font-size: 0.75rem; }
+.requests-table { font-size: 0.75rem; width: 100%; }
 :deep(.requests-table .p-datatable-table-container) {
   border-radius: 10px;
-  overflow: hidden;
+  overflow: auto;
   background: var(--card-bg);
 }
 :deep(.requests-table .p-datatable-thead > tr > th) {

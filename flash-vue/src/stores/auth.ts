@@ -54,11 +54,11 @@ export const useAuthStore = defineStore('auth', () => {
     quota.value = data
   }
 
-  /** Deduct 1 credit locally (optimistic) */
-  function deductCredit() {
+  /** Deduct credits locally (optimistic) */
+  function deductCredit(amount = 1) {
     if (quota.value.credits_remaining > 0) {
-      quota.value.credits_remaining -= 1
-      quota.value.credits_used += 1
+      quota.value.credits_remaining = Math.max(0, quota.value.credits_remaining - amount)
+      quota.value.credits_used += amount
       quota.value.usage_percentage = quota.value.credits_total > 0
         ? Math.round((quota.value.credits_used / quota.value.credits_total) * 1000) / 10
         : 100

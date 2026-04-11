@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedInteger('width')->nullable();
             $table->unsignedInteger('height')->nullable();
             $table->string('collection')->default('uploads');
-            $table->enum('purpose', ['input', 'reference', 'mask', 'avatar', 'other'])->default('input');
+            $table->enum('purpose', ['input', 'reference', 'mask', 'avatar', 'output', 'other'])->default('input');
             $table->string('thumbnail_path')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();

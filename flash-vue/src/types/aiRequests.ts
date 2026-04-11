@@ -135,8 +135,9 @@ export interface AiRequestDetail {
   num_images: number
   denoising_strength: number | null
 
-  // Input Images
+  // Input / Output Images
   input_image_path: string | null
+  output_image_path: string | null
   mask_image_path: string | null
 
   // Credits & Performance

@@ -90,6 +90,7 @@ class SettingsManagementService
     public function getAiIntegrations(): array
     {
         $keys = [
+            'gemini_auth_method',
             'gemini_api_key',
             'gemini_text_model',
             'gemini_image_model',
@@ -117,6 +118,7 @@ class SettingsManagementService
         $errors  = [];
 
         $allowedKeys = [
+            'gemini_auth_method',
             'gemini_api_key',
             'gemini_text_model',
             'gemini_image_model',

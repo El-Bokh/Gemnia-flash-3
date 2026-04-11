@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
@@ -24,6 +24,7 @@ const { t } = useI18n()
 
 const loading = ref(false)
 const user = ref<UserDetail | null>(null)
+const expandedImage = ref<string | null>(null)
 
 // Reset password fields
 const showResetPw = ref(false)
@@ -115,6 +116,42 @@ function close() { emit('update:visible', false) }
 // Helpers
 function statusSev(s: string): 'success' | 'warn' | 'danger' | 'info' | 'secondary' {
   return { active: 'success' as const, suspended: 'warn' as const, banned: 'danger' as const, pending: 'info' as const, completed: 'success' as const, failed: 'danger' as const }[s] || 'secondary'
+}
+
+// Merge generated_images + output images from media_files
+const allImages = computed(() => {
+  if (!user.value) return []
+  const legacy = (user.value.recent_generated_images || []).map((img: any) => ({
+    id: img.id,
+    file_name: img.file_name,
+    file_path: img.file_path,
+    width: img.width,
+    height: img.height,
+    file_size: img.file_size,
+    created_at: img.created_at,
+  }))
+  const output = (user.value.recent_output_images || []).map((img: any) => ({
+    id: `m-${img.id}`,
+    file_name: img.file_name,
+    file_path: img.file_path,
+    width: null,
+    height: null,
+    file_size: img.file_size,
+    created_at: img.created_at,
+  }))
+  return [...legacy, ...output]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 10)
+})
+
+function resolveImageUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined
+  if (path.startsWith('http')) return path
+  const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+  const origin = apiBase.replace(/\/api\/?$/, '')
+  // file_path from media_files is like "ai-generated/1/uuid.png", need /storage/ prefix
+  if (!path.startsWith('/')) return `${origin}/storage/${path}`
+  return origin + path
 }
 function fmtDate(d: string | null) {
   if (!d) return '—'
@@ -253,20 +290,26 @@ function initials(name: string) {
 
         <!-- Images -->
         <TabPanel value="images">
-          <DataTable :value="user.recent_generated_images" size="small" stripedRows class="detail-table">
-            <Column field="file_name" :header="t('userDetail.file')" style="min-width: 100px">
-              <template #body="{ data }"><span class="dt-text">{{ data.file_name }}</span></template>
-            </Column>
-            <Column :header="t('userDetail.size')" style="min-width: 60px">
-              <template #body="{ data }"><span class="dt-text">{{ data.width }}×{{ data.height }}</span></template>
-            </Column>
-            <Column :header="t('userDetail.weight')" style="min-width: 50px">
-              <template #body="{ data }"><span class="dt-num">{{ fmtBytes(data.file_size) }}</span></template>
-            </Column>
-            <Column field="created_at" :header="t('common.date')" style="min-width: 80px">
-              <template #body="{ data }"><span class="dt-date">{{ fmtDate(data.created_at) }}</span></template>
-            </Column>
-          </DataTable>
+          <div v-if="allImages.length" class="user-images-grid">
+            <div
+              v-for="img in allImages"
+              :key="img.id"
+              class="user-image-card"
+              @click="expandedImage = resolveImageUrl(img.file_path) || null"
+            >
+              <div class="user-image-thumb">
+                <img :src="resolveImageUrl(img.file_path)" :alt="img.file_name" loading="lazy" />
+              </div>
+              <div class="user-image-info">
+                <span class="user-image-size">{{ fmtBytes(img.file_size) }}</span>
+                <span class="user-image-date">{{ fmtDate(img.created_at) }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-tab">
+            <i class="pi pi-image" style="font-size: 1.5rem; color: var(--text-muted)" />
+            <span style="font-size: 0.72rem; color: var(--text-muted)">No images generated yet</span>
+          </div>
         </TabPanel>
 
         <!-- Payments -->
@@ -324,6 +367,16 @@ function initials(name: string) {
       </div>
     </div>
   </Dialog>
+
+  <!-- Fullscreen image overlay -->
+  <Teleport to="body">
+    <div v-if="expandedImage" class="image-overlay" @click="expandedImage = null">
+      <img :src="expandedImage" alt="Expanded image" />
+      <button class="overlay-close" @click.stop="expandedImage = null">
+        <i class="pi pi-times" />
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -462,5 +515,95 @@ function initials(name: string) {
   color: var(--text-primary);
   padding: 12px 16px;
   overflow-y: auto;
+}
+
+/* User Images Grid */
+.user-images-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.user-image-card {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card-bg);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.user-image-card:hover {
+  border-color: var(--active-color);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--active-color) 25%, transparent);
+}
+.user-image-thumb {
+  aspect-ratio: 1 / 1;
+  background: linear-gradient(135deg, rgba(14,165,233,0.12), rgba(37,99,235,0.08));
+  overflow: hidden;
+}
+.user-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.user-image-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 7px;
+  gap: 4px;
+}
+.user-image-size {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.user-image-date {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+}
+.empty-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 0;
+}
+
+/* Fullscreen overlay */
+.image-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.image-overlay img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.overlay-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.overlay-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>
