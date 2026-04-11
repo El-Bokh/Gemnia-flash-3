@@ -80,6 +80,7 @@ function loadMockDetail() {
       { id: 1, uuid: 'img-001', file_path: '/images/sunset.png', file_name: 'sunset.png', width: 1024, height: 1024, file_size: 245000, is_public: true, is_nsfw: false, created_at: '2026-04-03T14:01:00Z' },
       { id: 2, uuid: 'img-002', file_path: '/images/cyberpunk.png', file_name: 'cyberpunk.png', width: 1024, height: 1024, file_size: 380000, is_public: false, is_nsfw: false, created_at: '2026-04-03T12:31:00Z' },
     ],
+    recent_output_images: [],
     recent_payments: [
       { id: 1, uuid: 'pay-001', amount: 49, net_amount: 46.5, currency: 'USD', status: 'completed', method: 'stripe', paid_at: '2026-03-01T09:00:00Z', created_at: '2026-03-01T09:00:00Z' },
       { id: 2, uuid: 'pay-002', amount: 49, net_amount: 46.5, currency: 'USD', status: 'completed', method: 'stripe', paid_at: '2026-02-01T09:00:00Z', created_at: '2026-02-01T09:00:00Z' },
