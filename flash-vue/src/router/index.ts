@@ -31,6 +31,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/client/ProfileView.vue'),
         meta: { requiresAuth: true },
       },
+      {
+        path: 'support',
+        name: 'support',
+        component: () => import('@/views/client/SupportView.vue'),
+        meta: { requiresAuth: true },
+      },
     ],
   },
   {
@@ -44,6 +50,11 @@ const routes: RouteRecordRaw[] = [
     name: 'register',
     component: () => import('@/views/RegisterView.vue'),
     meta: { guest: true },
+  },
+  {
+    path: '/privacy-policy',
+    name: 'privacy-policy',
+    component: () => import('@/views/PrivacyPolicyView.vue'),
   },
   {
     path: '/maintenance',

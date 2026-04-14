@@ -89,10 +89,10 @@ class SystemSettingsSeeder extends Seeder
             [
                 'group' => 'ai_integrations',
                 'key' => 'gemini_image_model',
-                'value' => 'imagen-3.0-generate-002',
+                'value' => 'gemini-3.1-flash-image-preview',
                 'type' => 'string',
                 'display_name' => 'Image Generation Model',
-                'description' => 'Model used for image generation (Imagen 3.0 on Vertex AI).',
+                'description' => 'Model used for image generation (Gemini 3.1 Flash Image Preview / Nano Banana 2).',
                 'is_public' => false,
                 'is_encrypted' => false,
                 'options' => null,

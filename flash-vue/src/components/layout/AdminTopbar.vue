@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import type { Notification } from '@/types/notifications'
+import { resolveNotificationTarget } from '@/utils/notificationNavigation'
 import Button from 'primevue/button'
 import Badge from 'primevue/badge'
 import Menu from 'primevue/menu'
@@ -56,6 +58,16 @@ function toggleNotifications(event: Event) {
   notifPanel.value.toggle(event)
   if (notificationStore.notifications.length === 0) {
     notificationStore.fetchNotifications()
+  }
+}
+
+async function openNotification(notification: Notification) {
+  await notificationStore.markRead(notification.id)
+  notifPanel.value?.hide?.()
+
+  const target = resolveNotificationTarget(notification.action_url)
+  if (target) {
+    void router.push(target)
   }
 }
 
@@ -167,7 +179,7 @@ onUnmounted(() => {
             :key="n.id"
             class="notif-item"
             :class="{ 'notif-unread': !n.is_read }"
-            @click="notificationStore.markRead(n.id)"
+            @click="openNotification(n)"
           >
             <div class="notif-dot" v-if="!n.is_read" />
             <div class="notif-content">

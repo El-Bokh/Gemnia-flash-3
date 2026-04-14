@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\VisualStyleController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\SupportTicketController as ClientSupportTicketController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -94,6 +95,14 @@ Route::middleware(['auth:sanctum', 'platform.maintenance'])->group(function () {
         Route::post('/read-all',                [NotificationController::class, 'markAllAsRead'])->name('read-all');
         Route::post('/{notification}/read',     [NotificationController::class, 'markAsRead'])->name('read');
         Route::delete('/{notification}',        [NotificationController::class, 'destroy'])->name('destroy');
+    });
+
+    // Support Tickets (client)
+    Route::prefix('support-tickets')->name('support-tickets.')->group(function () {
+        Route::get('/',              [ClientSupportTicketController::class, 'index'])->name('index');
+        Route::post('/',             [ClientSupportTicketController::class, 'store'])->name('store');
+        Route::get('/{ticket}',      [ClientSupportTicketController::class, 'show'])->name('show');
+        Route::post('/{ticket}/reply', [ClientSupportTicketController::class, 'reply'])->name('reply');
     });
 });
 

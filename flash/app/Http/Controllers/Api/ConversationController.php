@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiRequest;
 use App\Models\Conversation;
+use App\Models\ConversationMessage;
 use App\Models\CreditLedger;
 use App\Models\MediaFile;
 use App\Models\VisualStyle;
@@ -199,6 +200,23 @@ class ConversationController extends Controller
 
         $mode = $data['mode'] ?? 'text';
 
+        // Auto-detect: if user sends image-mode text follow-up in a conversation
+        // that has recent product/image uploads, switch to text mode for multimodal context.
+        // This prevents accidental image generation when the user intends to discuss uploaded images.
+        if ($mode === 'image' && ! $request->hasFile('image') && ! $request->hasFile('images')) {
+            $hasRecentImages = $conversation->messages()
+                ->where('role', 'user')
+                ->where(function ($q) {
+                    $q->whereNotNull('image_url')->orWhereNotNull('product_images');
+                })
+                ->where('created_at', '>=', now()->subHours(1))
+                ->exists();
+
+            if ($hasRecentImages) {
+                $mode = 'text';
+            }
+        }
+
         // Handle uploaded image
         $imageUrl = null;
         $imageBase64 = null;
@@ -244,10 +262,13 @@ class ConversationController extends Controller
                     'purpose'       => 'input',
                 ]);
 
+                // Resize for Gemini API to avoid payload-too-large errors
+                $resizedBase64 = $this->resizeImageForApi($file->getRealPath(), $file->getMimeType());
+
                 $productImagesData[] = [
                     'url'    => '/storage/' . $path,
-                    'base64' => base64_encode(file_get_contents($file->getRealPath())),
-                    'mime'   => $file->getMimeType(),
+                    'base64' => $resizedBase64,
+                    'mime'   => 'image/jpeg',
                 ];
             }
 
@@ -257,13 +278,19 @@ class ConversationController extends Controller
             }
         }
 
+        // Collect all product image URLs
+        $productImageUrls = ! empty($productImagesData)
+            ? array_map(fn ($img) => $img['url'], $productImagesData)
+            : null;
+
         // Store user message
         $userMsg = $conversation->messages()->create([
-            'role'        => 'user',
-            'content'     => $data['content'],
-            'image_url'   => $imageUrl,
-            'image_style' => $data['image_style'] ?? null,
-            'status'      => 'sent',
+            'role'           => 'user',
+            'content'        => $data['content'],
+            'image_url'      => $imageUrl,
+            'image_style'    => $data['image_style'] ?? null,
+            'product_images' => $productImageUrls,
+            'status'         => 'sent',
         ]);
 
         // Auto-title from first user message
@@ -292,11 +319,8 @@ class ConversationController extends Controller
                 }
             }
 
-            // User prompt
+            // User prompt (keep it clean - enhancePromptForImagen will handle quality keywords)
             $parts[] = $userContent;
-
-            // Quality enhancement suffix
-            $parts[] = 'high quality, highly detailed, professional';
 
             // Style suffix (if any)
             if ($style && $style->prompt_suffix) {
@@ -320,14 +344,56 @@ class ConversationController extends Controller
             }
         }
 
-        // Build conversation history for Gemini (use raw content for older messages)
-        $history = $conversation->messages()
+        // Build conversation history for Gemini — include recent images for multimodal context
+        $historyMessages = $conversation->messages()
             ->whereIn('role', ['user', 'assistant'])
-            ->where('id', '<', $userMsg->id) // exclude current message
+            ->where('id', '<', $userMsg->id)
             ->orderBy('created_at')
-            ->get()
-            ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
+            ->get();
+
+        // Identify recent user messages with images (last 3) for inline inclusion
+        $recentImageMsgIds = $historyMessages
+            ->filter(fn ($m) => $m->role === 'user' && ($m->image_url || $m->product_images))
+            ->sortByDesc('id')
+            ->take(3)
+            ->pluck('id')
             ->toArray();
+
+        $history = [];
+        foreach ($historyMessages as $m) {
+            $parts = [['text' => $m->content ?? '']];
+
+            // Include images from recent user messages so follow-ups have visual context
+            if (in_array($m->id, $recentImageMsgIds)) {
+                $imagePaths = [];
+                if ($m->product_images && is_array($m->product_images)) {
+                    foreach ($m->product_images as $url) {
+                        $imagePaths[] = str_replace('/storage/', '', $url);
+                    }
+                } elseif ($m->image_url) {
+                    $imagePaths[] = str_replace('/storage/', '', $m->image_url);
+                }
+
+                foreach ($imagePaths as $imgPath) {
+                    $fullPath = Storage::disk('public')->path($imgPath);
+                    if (file_exists($fullPath)) {
+                        $resizedBase64 = $this->resizeImageForApi($fullPath, mime_content_type($fullPath) ?: 'image/jpeg');
+                        $parts[] = [
+                            'inline_data' => [
+                                'mime_type' => 'image/jpeg',
+                                'data'      => $resizedBase64,
+                            ],
+                        ];
+                    }
+                }
+            }
+
+            $history[] = [
+                'role'    => $m->role,
+                'content' => $m->content ?? '',
+                'parts'   => $parts,
+            ];
+        }
 
         // Add current message with enhanced prompt
         $currentParts = [['text' => $geminiPrompt]];
@@ -415,6 +481,7 @@ class ConversationController extends Controller
             }
 
             $aiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
                 'role'      => 'assistant',
                 'content'   => $result['content'] ?? ($generatedImageUrl ? '' : 'No response generated.'),
                 'image_url' => $generatedImageUrl,
@@ -438,11 +505,14 @@ class ConversationController extends Controller
             ]);
 
             $aiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
                 'role'    => 'assistant',
-                'content' => 'عذراً، حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.',
+                'content' => $result['error'] ?? 'Image generation failed.',
                 'status'  => 'error',
             ]);
         }
+
+        $responseConversation = $conversation->fresh()->load('messages');
 
         // Use unified warning level calculation
         $quotaStats = $usageService->computeWarningLevel(
@@ -455,7 +525,7 @@ class ConversationController extends Controller
             'data'    => [
                 'user_message' => $userMsg,
                 'ai_message'   => $aiMsg,
-                'conversation' => $conversation->fresh(),
+                    'conversation' => $responseConversation,
             ],
             'quota' => [
                 'remaining' => $consumption['remaining'],
@@ -521,14 +591,16 @@ class ConversationController extends Controller
             ], 402);
         }
 
-        // Rebuild prompt
+        $originalAiRequest = $this->findRelatedAiRequest($request->user()->id, $userMessage, $aiMessage);
+
+        // Rebuild prompt using the original processed prompt whenever available.
         $content = $userMessage->content;
         $imageStyle = $userMessage->image_style;
-        $mode = $aiMessage->image_url ? 'image' : 'text';
-        $geminiPrompt = $content;
+        $mode = $this->inferRegenerateMode($originalAiRequest, $userMessage, $aiMessage);
+        $geminiPrompt = $originalAiRequest?->processed_prompt ?: $content;
 
         $style = null;
-        if ($mode === 'image') {
+        if ($mode === 'image' && $geminiPrompt === $content) {
             $parts = [];
             if ($imageStyle) {
                 $style = VisualStyle::where('slug', $imageStyle)->where('is_active', true)->first();
@@ -537,17 +609,17 @@ class ConversationController extends Controller
                 }
             }
             $parts[] = $content;
-            $parts[] = 'high quality, highly detailed, professional';
             if ($style && $style->prompt_suffix) {
                 $parts[] = $style->prompt_suffix;
             }
             $geminiPrompt = implode(', ', $parts);
         }
 
-        // Build history (exclude the AI message being regenerated)
+        // Build history exactly like the original send flow.
+        // The original user prompt must not be duplicated in both history and currentParts.
         $history = $conversation->messages()
             ->whereIn('role', ['user', 'assistant'])
-            ->where('id', '<', $aiMessage->id)
+            ->where('id', '<', $userMessage->id)
             ->orderBy('created_at')
             ->get()
             ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
@@ -555,9 +627,10 @@ class ConversationController extends Controller
 
         $currentParts = [['text' => $geminiPrompt]];
 
-        // If user had uploaded an image, re-include it
-        if ($userMessage->image_url) {
-            $imagePath = str_replace('/storage/', '', $userMessage->image_url);
+        // If the original request had an input image, re-include it.
+        $inputImageUrl = $originalAiRequest?->input_image_path ?: $userMessage->image_url;
+        if ($inputImageUrl) {
+            $imagePath = str_replace('/storage/', '', $inputImageUrl);
             $fullPath = Storage::disk('public')->path($imagePath);
             if (file_exists($fullPath)) {
                 $currentParts[] = [
@@ -590,12 +663,14 @@ class ConversationController extends Controller
             'ip_address'         => $request->ip(),
             'user_agent'         => $request->userAgent(),
             'error_message'      => $result['success'] ? null : ($result['error'] ?? 'Unknown error'),
+            'metadata'           => [
+                'source' => 'regenerate',
+                'original_ai_request_id' => $originalAiRequest?->id,
+                'original_message_id' => $aiMessage->id,
+            ],
             'started_at'         => $startedAt,
             'completed_at'       => $completedAt,
         ]);
-
-        // Delete old AI message
-        $aiMessage->delete();
 
         if ($result['success']) {
             $generatedImageUrl = null;
@@ -621,29 +696,36 @@ class ConversationController extends Controller
 
                 $aiRequest->update([
                     'output_image_path' => $generatedImageUrl,
-                    'type' => 'image_generation',
+                    'type' => 'text_to_image',
                 ]);
             }
 
             $newAiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
                 'role'      => 'assistant',
                 'content'   => $result['content'] ?? ($generatedImageUrl ? '' : 'No response generated.'),
                 'image_url' => $generatedImageUrl,
                 'status'    => 'sent',
             ]);
+
+            $aiMessage->delete();
         } else {
             $usageService->refund($request->user(), $creditCost, 'ai_failure', [
                 'ai_request_id' => $aiRequest->id,
+                'error'         => $result['error'] ?? 'Unknown error',
             ]);
             $consumption['remaining'] += $creditCost;
             $aiRequest->update(['credits_consumed' => 0]);
 
             $newAiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
                 'role'    => 'assistant',
-                'content' => 'عذراً، حدث خطأ أثناء إعادة التوليد. يرجى المحاولة مرة أخرى.',
+                'content' => $result['error'] ?? 'عذراً، حدث خطأ أثناء إعادة التوليد. يرجى المحاولة مرة أخرى.',
                 'status'  => 'error',
             ]);
         }
+
+        $responseConversation = $conversation->fresh()->load('messages');
 
         $quotaStats = $usageService->computeWarningLevel(
             $consumption['remaining'],
@@ -654,12 +736,123 @@ class ConversationController extends Controller
             'success' => true,
             'data'    => [
                 'ai_message'   => $newAiMsg,
-                'conversation' => $conversation->fresh(),
+                'conversation' => $responseConversation,
             ],
             'quota' => [
                 'remaining' => $consumption['remaining'],
                 'warning'   => $quotaStats,
             ],
         ]);
+    }
+
+    private function findRelatedAiRequest(int $userId, ConversationMessage $userMessage, ConversationMessage $aiMessage): ?AiRequest
+    {
+        if ($aiMessage->ai_request_id) {
+            return AiRequest::find($aiMessage->ai_request_id);
+        }
+
+        if ($aiMessage->image_url) {
+            $byOutputImage = AiRequest::query()
+                ->where('user_id', $userId)
+                ->where('output_image_path', $aiMessage->image_url)
+                ->latest('id')
+                ->first();
+
+            if ($byOutputImage) {
+                return $byOutputImage;
+            }
+        }
+
+        return AiRequest::query()
+            ->where('user_id', $userId)
+            ->where('user_prompt', $userMessage->content)
+            ->whereBetween('created_at', [
+                $userMessage->created_at->copy()->subMinutes(5),
+                $aiMessage->created_at->copy()->addMinutes(5),
+            ])
+            ->latest('id')
+            ->first();
+    }
+
+    private function inferRegenerateMode(?AiRequest $originalAiRequest, ConversationMessage $userMessage, ConversationMessage $aiMessage): string
+    {
+        if ($originalAiRequest) {
+            if ($originalAiRequest->output_image_path) {
+                return 'image';
+            }
+
+            if (in_array($originalAiRequest->type, ['text_to_image', 'image_to_image'], true)) {
+                return 'image';
+            }
+        }
+
+        if ($aiMessage->image_url || $userMessage->image_style || $userMessage->image_url) {
+            return 'image';
+        }
+
+        return 'text';
+    }
+
+    /**
+     * Resize an image to a max 1024px dimension and return base64-encoded JPEG.
+     * This keeps the Gemini API payload small and prevents request-too-large errors.
+     */
+    private function resizeImageForApi(string $filePath, string $mimeType, int $maxDim = 1024, int $quality = 80): string
+    {
+        $src = null;
+
+        switch (strtolower($mimeType)) {
+            case 'image/jpeg':
+            case 'image/jpg':
+                $src = @imagecreatefromjpeg($filePath);
+                break;
+            case 'image/png':
+                $src = @imagecreatefrompng($filePath);
+                break;
+            case 'image/webp':
+                $src = @imagecreatefromwebp($filePath);
+                break;
+            case 'image/gif':
+                $src = @imagecreatefromgif($filePath);
+                break;
+        }
+
+        if (! $src) {
+            // Fallback: raw base64 if GD can't read it
+            return base64_encode(file_get_contents($filePath));
+        }
+
+        $w = imagesx($src);
+        $h = imagesy($src);
+
+        if ($w <= $maxDim && $h <= $maxDim) {
+            // Already small enough — just re-encode as JPEG
+            ob_start();
+            imagejpeg($src, null, $quality);
+            $data = ob_get_clean();
+            imagedestroy($src);
+            return base64_encode($data);
+        }
+
+        // Scale down proportionally
+        if ($w >= $h) {
+            $newW = $maxDim;
+            $newH = (int) round($h * ($maxDim / $w));
+        } else {
+            $newH = $maxDim;
+            $newW = (int) round($w * ($maxDim / $h));
+        }
+
+        $dst = imagecreatetruecolor($newW, $newH);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $w, $h);
+
+        ob_start();
+        imagejpeg($dst, null, $quality);
+        $data = ob_get_clean();
+
+        imagedestroy($src);
+        imagedestroy($dst);
+
+        return base64_encode($data);
     }
 }

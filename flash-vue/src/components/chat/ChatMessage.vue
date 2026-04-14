@@ -19,11 +19,13 @@ const emit = defineEmits<{
 const showActions = ref(false)
 const copied = ref(false)
 const showFullscreen = ref(false)
+const fullscreenImageSrc = ref('')
 
 function handleDownloadImage() {
-  if (!props.message.imageUrl) return
+  const src = fullscreenImageSrc.value || props.message.imageUrl
+  if (!src) return
   const link = document.createElement('a')
-  link.href = props.message.imageUrl
+  link.href = src
   link.download = `generated-image-${props.message.id}.png`
   link.target = '_blank'
   document.body.appendChild(link)
@@ -31,12 +33,14 @@ function handleDownloadImage() {
   document.body.removeChild(link)
 }
 
-function handleExpandImage() {
+function handleExpandImage(src?: string) {
+  fullscreenImageSrc.value = src || props.message.imageUrl || ''
   showFullscreen.value = true
 }
 
 function closeFullscreen() {
   showFullscreen.value = false
+  fullscreenImageSrc.value = ''
 }
 
 function handleCopy() {
@@ -68,14 +72,26 @@ function handleRegenerate() {
     <!-- Bubble -->
     <div class="msg-bubble">
       <div class="msg-content">
+        <!-- Product images grid -->
+        <div v-if="message.productImages?.length" class="product-images-grid">
+          <div
+            v-for="(img, idx) in message.productImages"
+            :key="idx"
+            class="product-img-item"
+            @click="handleExpandImage(img)"
+          >
+            <img :src="img" :alt="`Product ${idx + 1}`" class="product-img" loading="lazy" />
+          </div>
+        </div>
+
         <p class="msg-text">{{ message.content }}</p>
 
-        <!-- Generated image -->
-        <div v-if="message.imageUrl" class="msg-image-wrap">
+        <!-- Generated image (single) -->
+        <div v-if="message.imageUrl && !message.productImages?.length" class="msg-image-wrap">
           <img :src="message.imageUrl" alt="Generated image" class="msg-image" loading="lazy" />
           <div class="image-overlay">
             <Button icon="pi pi-download" severity="secondary" text rounded size="small" @click="handleDownloadImage" />
-            <Button icon="pi pi-expand" severity="secondary" text rounded size="small" @click="handleExpandImage" />
+            <Button icon="pi pi-expand" severity="secondary" text rounded size="small" @click="handleExpandImage()" />
           </div>
         </div>
       </div>
@@ -84,7 +100,7 @@ function handleRegenerate() {
     <Teleport to="body">
       <Transition name="fade">
         <div v-if="showFullscreen" class="fullscreen-overlay" @click="closeFullscreen">
-          <img :src="message.imageUrl" alt="Generated image" class="fullscreen-image" @click.stop />
+          <img :src="fullscreenImageSrc" alt="Full image" class="fullscreen-image" @click.stop />
           <Button icon="pi pi-times" severity="secondary" text rounded class="fullscreen-close" @click="closeFullscreen" />
           <Button icon="pi pi-download" severity="secondary" text rounded class="fullscreen-download" @click.stop="handleDownloadImage" />
         </div>
@@ -98,7 +114,7 @@ function handleRegenerate() {
             <i :class="copied ? 'pi pi-check' : 'pi pi-copy'" />
           </button>
           <button
-            v-if="message.role === 'assistant'"
+            v-if="message.role === 'assistant' && message.status === 'sent'"
             class="action-btn regen-btn"
             @click="handleRegenerate"
             :title="t('chat.regenerateWithSame')"
@@ -206,6 +222,36 @@ function handleRegenerate() {
 }
 
 /* ─── Image ──────────────────────────────────── */
+.product-images-grid {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.product-img-item {
+  flex: 0 0 auto;
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.product-img-item:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .msg-image-wrap {
   position: relative;
   margin-top: 8px;
@@ -402,6 +448,11 @@ function handleRegenerate() {
 
   .msg-image {
     max-width: 100%;
+  }
+
+  .product-img-item {
+    width: 80px;
+    height: 80px;
   }
 }
 </style>

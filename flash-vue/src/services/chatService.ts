@@ -10,6 +10,7 @@ export interface MessageData {
   content: string
   image_url: string | null
   image_style: string | null
+  product_images: string[] | null
   status: string
   created_at: string
   updated_at: string
@@ -30,6 +31,8 @@ export interface SendMessageResponse {
   ai_message: MessageData
   conversation: ConversationData
 }
+
+const LONG_RUNNING_CHAT_TIMEOUT_MS = 240_000
 
 // ─── Service ────────────────────────────────────────────────
 
@@ -54,6 +57,10 @@ export function deleteConversation(id: number) {
 }
 
 export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File, mode?: 'text' | 'image', product?: string) {
+  const requestConfig = mode === 'image'
+    ? { timeout: LONG_RUNNING_CHAT_TIMEOUT_MS }
+    : undefined
+
   if (image) {
     const form = new FormData()
     form.append('content', content)
@@ -64,12 +71,16 @@ export function sendMessage(conversationId: number, content: string, imageStyle?
     return apiPost<ApiResponse<SendMessageResponse>>(
       `/conversations/${conversationId}/messages`,
       form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
+      {
+        ...requestConfig,
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
     )
   }
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,
     { content, image_style: imageStyle, product, mode: mode ?? 'text' },
+    requestConfig,
   )
 }
 
@@ -77,6 +88,7 @@ export function regenerateMessage(conversationId: number, messageId: number) {
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages/${messageId}/regenerate`,
     {},
+    { timeout: LONG_RUNNING_CHAT_TIMEOUT_MS },
   )
 }
 
@@ -88,7 +100,10 @@ export function sendProductMessage(conversationId: number, content: string, imag
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,
     form,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
+    {
+      timeout: LONG_RUNNING_CHAT_TIMEOUT_MS,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
   )
 }
 

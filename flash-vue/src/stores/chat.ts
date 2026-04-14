@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { isAxiosError } from 'axios'
 import {
   getConversations as fetchConversationsApi,
+  getConversation as getConversationApi,
   createConversation as createConversationApi,
   updateConversation as updateConversationApi,
   deleteConversation as deleteConversationApi,
@@ -19,6 +20,7 @@ export interface ChatMessage {
   content: string
   imageUrl?: string
   imageStyle?: string
+  productImages?: string[]
   timestamp: Date
   status: 'sending' | 'sent' | 'error'
 }
@@ -49,8 +51,9 @@ function apiMsgToLocal(m: MessageData): ChatMessage {
     content: m.content,
     imageUrl: resolveStorageUrl(m.image_url),
     imageStyle: m.image_style ?? undefined,
+    productImages: m.product_images?.map(url => resolveStorageUrl(url)!).filter(Boolean) ?? undefined,
     timestamp: new Date(m.created_at),
-    status: m.status === 'sent' ? 'sent' : 'sent',
+    status: m.status === 'error' ? 'error' : m.status === 'sending' ? 'sending' : 'sent',
   }
 }
 
@@ -64,6 +67,28 @@ function apiConvToLocal(c: ConversationData): Conversation {
     createdAt: new Date(c.created_at),
     updatedAt: new Date(c.updated_at),
   }
+}
+
+function upsertConversationFromApi(conversations: Conversation[], apiConversation: ConversationData): Conversation {
+  const serverConversation = apiConvToLocal(apiConversation)
+  const existingIndex = conversations.findIndex(c => c.serverId === serverConversation.serverId || c.id === serverConversation.id)
+
+  if (existingIndex === -1) {
+    conversations.unshift(serverConversation)
+    return serverConversation
+  }
+
+  const existing = conversations[existingIndex]
+  const merged: Conversation = {
+    ...existing,
+    ...serverConversation,
+    id: serverConversation.id,
+    serverId: serverConversation.serverId,
+    messages: serverConversation.messages,
+  }
+
+  conversations.splice(existingIndex, 1, merged)
+  return merged
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -110,6 +135,23 @@ export const useChatStore = defineStore('chat', () => {
     } catch {
       // Silently fail — user may not be authenticated yet
     }
+  }
+
+  async function refreshConversation(serverId: number): Promise<Conversation | null> {
+    try {
+      const res = await getConversationApi(serverId)
+      if (res.success && res.data) {
+        const conv = upsertConversationFromApi(conversations.value, res.data)
+        if (activeConversationId.value === String(serverId)) {
+          activeConversationId.value = conv.id
+        }
+        return conv
+      }
+    } catch {
+      // Ignore refresh failures and let the original error handling run
+    }
+
+    return null
   }
 
   function setActiveConversation(id: string | null) {
@@ -294,7 +336,10 @@ export const useChatStore = defineStore('chat', () => {
         const auth = useAuthStore()
         await auth.refreshQuota()
       } else {
-        userMsg.status = 'error'
+        const recoveredConv = conv.serverId ? await refreshConversation(conv.serverId) : null
+        if (!recoveredConv) {
+          userMsg.status = 'error'
+        }
       }
     } finally {
       isAiTyping.value = false
@@ -313,16 +358,26 @@ export const useChatStore = defineStore('chat', () => {
     const aiMsgIdx = conv.messages.findIndex(m => m.id === messageId && m.role === 'assistant')
     if (aiMsgIdx === -1) return
 
-    // Remove old AI response
-    conv.messages.splice(aiMsgIdx, 1)
-
     isAiTyping.value = true
     quotaError.value = null
     try {
       const res = await regenerateMessageApi(conv.serverId, Number(messageId)) as any
       if (res.success && res.data) {
-        // Add new AI message
-        conv.messages.push(apiMsgToLocal(res.data.ai_message))
+        if (res.data.conversation) {
+          const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)
+          if (activeConversationId.value === String(conv.serverId)) {
+            activeConversationId.value = updatedConv.id
+          }
+        } else if (res.data.ai_message) {
+          const regeneratedMessage = apiMsgToLocal(res.data.ai_message)
+          if (regeneratedMessage.status === 'sent') {
+            conv.messages.splice(aiMsgIdx, 1, regeneratedMessage)
+          } else {
+            conv.messages.splice(aiMsgIdx + 1, 0, regeneratedMessage)
+          }
+        } else {
+          await refreshConversation(conv.serverId)
+        }
 
         // Update quota
         if (res.quota) {
@@ -340,6 +395,8 @@ export const useChatStore = defineStore('chat', () => {
         }
         const auth = useAuthStore()
         await auth.refreshQuota()
+      } else {
+        await refreshConversation(conv.serverId)
       }
     } finally {
       isAiTyping.value = false
@@ -354,12 +411,14 @@ export const useChatStore = defineStore('chat', () => {
     const conv = conversations.value.find(c => c.id === activeConversationId.value)
     if (!conv) return
 
-    // Optimistic user message
+    // Optimistic user message with product image previews
     const tempUserMsgId = 'tmp-' + Date.now()
+    const optimisticPreviews = images.map(f => URL.createObjectURL(f))
     const userMsg: ChatMessage = {
       id: tempUserMsgId,
       role: 'user',
       content,
+      productImages: optimisticPreviews,
       timestamp: new Date(),
       status: 'sending',
     }
@@ -416,10 +475,15 @@ export const useChatStore = defineStore('chat', () => {
         const auth = useAuthStore()
         await auth.refreshQuota()
       } else {
-        userMsg.status = 'error'
+        const recoveredConv = conv.serverId ? await refreshConversation(conv.serverId) : null
+        if (!recoveredConv) {
+          userMsg.status = 'error'
+        }
       }
     } finally {
       isAiTyping.value = false
+      // Always reset to text mode after product send so follow-ups use multimodal text
+      aiMode.value = 'text'
     }
   }
 

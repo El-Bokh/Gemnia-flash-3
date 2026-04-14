@@ -224,6 +224,11 @@ function goChat() {
           <img src="/klek-ai-mark.svg" alt="Klek AI" class="footer-logo" />
           <span>Klek AI</span>
         </div>
+        <div class="footer-links">
+          <router-link to="/privacy-policy" class="footer-legal-link">Privacy Policy</router-link>
+          <span class="footer-sep">·</span>
+          <a href="mailto:klek.studio@gmail.com" class="footer-legal-link">klek.studio@gmail.com</a>
+        </div>
         <span class="footer-rights">{{ t('landing.footerRights') }}</span>
       </div>
     </footer>
@@ -770,6 +775,24 @@ function goChat() {
 .footer-rights {
   font-size: 0.7rem;
   color: var(--lp-text-muted);
+}
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.footer-legal-link {
+  font-size: 0.75rem;
+  color: var(--lp-text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.footer-legal-link:hover {
+  color: var(--lp-accent);
+}
+.footer-sep {
+  color: var(--lp-text-muted);
+  font-size: 0.7rem;
 }
 
 /* ═══ Responsive ═══ */

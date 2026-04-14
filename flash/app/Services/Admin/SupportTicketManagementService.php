@@ -182,7 +182,7 @@ class SupportTicketManagementService
             type: 'ticket_assigned',
             title: 'Ticket Assigned to You',
             body: "Ticket #{$ticket->ticket_number} — {$ticket->subject} has been assigned to you.",
-            actionUrl: "/admin/support-tickets/{$ticket->id}",
+            actionUrl: "/admin/support?ticket={$ticket->id}",
             data: [
                 'ticket_id'      => $ticket->id,
                 'ticket_number'  => $ticket->ticket_number,
@@ -231,7 +231,7 @@ class SupportTicketManagementService
             type: 'ticket_reply',
             title: 'New Reply on Your Ticket',
             body: "Support has replied to your ticket #{$ticket->ticket_number} — {$ticket->subject}.",
-            actionUrl: "/support-tickets/{$ticket->id}",
+            actionUrl: "/support?ticket={$ticket->id}",
             data: [
                 'ticket_id'     => $ticket->id,
                 'ticket_number' => $ticket->ticket_number,
@@ -271,7 +271,7 @@ class SupportTicketManagementService
             type: 'ticket_closed',
             title: 'Your Ticket Has Been Closed',
             body: "Ticket #{$ticket->ticket_number} — {$ticket->subject} has been closed.",
-            actionUrl: "/support-tickets/{$ticket->id}",
+            actionUrl: "/support?ticket={$ticket->id}",
             data: [
                 'ticket_id'     => $ticket->id,
                 'ticket_number' => $ticket->ticket_number,
@@ -313,7 +313,7 @@ class SupportTicketManagementService
             type: 'ticket_reopened',
             title: 'Your Ticket Has Been Reopened',
             body: "Ticket #{$ticket->ticket_number} — {$ticket->subject} has been reopened.",
-            actionUrl: "/support-tickets/{$ticket->id}",
+            actionUrl: "/support?ticket={$ticket->id}",
             data: [
                 'ticket_id'     => $ticket->id,
                 'ticket_number' => $ticket->ticket_number,
@@ -328,7 +328,7 @@ class SupportTicketManagementService
                 type: 'ticket_reopened',
                 title: 'Assigned Ticket Reopened',
                 body: "Ticket #{$ticket->ticket_number} — {$ticket->subject} has been reopened.",
-                actionUrl: "/admin/support-tickets/{$ticket->id}",
+                actionUrl: "/admin/support?ticket={$ticket->id}",
                 data: [
                     'ticket_id'     => $ticket->id,
                     'ticket_number' => $ticket->ticket_number,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getCouponAggregations, getCoupons, toggleCoupon } from '@/services/couponService'
 import { getSupportTickets, getTicketAggregations } from '@/services/supportTicketService'
@@ -23,6 +24,8 @@ import CouponFormDialog from '@/components/support/CouponFormDialog.vue'
 import CouponDetailDrawer from '@/components/support/CouponDetailDrawer.vue'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 type TicketStatusFilter = 'all' | NonNullable<ListSupportTicketsParams['status']>
 type TicketPriorityFilter = 'all' | NonNullable<ListSupportTicketsParams['priority']>
@@ -176,6 +179,7 @@ async function fetchAggregations() {
 
 onMounted(async () => {
   await Promise.all([fetchTickets(), fetchCoupons(), fetchAggregations()])
+  syncTicketFromRoute(route.query.ticket)
 })
 
 let ticketSearchTimeout: ReturnType<typeof setTimeout>
@@ -235,7 +239,51 @@ function onCouponSort(event: DataTableSortEvent) {
 function openTicketDetail(ticket: SupportTicket) {
   ticketDetailId.value = ticket.id
   showTicketDetail.value = true
+
+  if (route.query.ticket !== String(ticket.id)) {
+    void router.replace({
+      name: 'admin-support',
+      query: { ...route.query, ticket: String(ticket.id) },
+    })
+  }
 }
+
+function handleTicketDrawerVisibility(visible: boolean) {
+  showTicketDetail.value = visible
+
+  if (visible) {
+    if (ticketDetailId.value && route.query.ticket !== String(ticketDetailId.value)) {
+      void router.replace({
+        name: 'admin-support',
+        query: { ...route.query, ticket: String(ticketDetailId.value) },
+      })
+    }
+    return
+  }
+
+  ticketDetailId.value = null
+  const nextQuery = { ...route.query }
+  delete nextQuery.ticket
+  void router.replace({ name: 'admin-support', query: nextQuery })
+}
+
+function syncTicketFromRoute(ticketQuery: unknown) {
+  const ticketId = typeof ticketQuery === 'string' ? Number(ticketQuery) : NaN
+
+  if (Number.isInteger(ticketId) && ticketId > 0) {
+    activeTab.value = 'tickets'
+    ticketDetailId.value = ticketId
+    showTicketDetail.value = true
+    return
+  }
+
+  showTicketDetail.value = false
+  ticketDetailId.value = null
+}
+
+watch(() => route.query.ticket, ticketQuery => {
+  syncTicketFromRoute(ticketQuery)
+})
 
 function openCouponDetail(coupon: Coupon) {
   couponDetailId.value = coupon.id
@@ -808,7 +856,7 @@ function capitalize(value: string) {
       </TabPanels>
     </Tabs>
 
-    <SupportTicketDetailDrawer v-model:visible="showTicketDetail" :ticket-id="ticketDetailId" @updated="onEntityUpdated" />
+    <SupportTicketDetailDrawer :visible="showTicketDetail" :ticket-id="ticketDetailId" @update:visible="handleTicketDrawerVisibility" @updated="onEntityUpdated" />
     <CouponFormDialog v-model:visible="showCouponForm" :coupon-id="couponFormId" @saved="handleCouponSaved" />
     <CouponDetailDrawer v-model:visible="showCouponDetail" :coupon-id="couponDetailId" @updated="onEntityUpdated" @edit="handleCouponEditFromDrawer" />
   </div>

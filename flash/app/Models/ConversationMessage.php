@@ -9,15 +9,26 @@ class ConversationMessage extends Model
 {
     protected $fillable = [
         'conversation_id',
+        'ai_request_id',
         'role',
         'content',
         'image_url',
         'image_style',
+        'product_images',
         'status',
+    ];
+
+    protected $casts = [
+        'product_images' => 'array',
     ];
 
     public function conversation(): BelongsTo
     {
         return $this->belongsTo(Conversation::class);
+    }
+
+    public function aiRequest(): BelongsTo
+    {
+        return $this->belongsTo(AiRequest::class);
     }
 }

@@ -84,9 +84,54 @@ const form = ref<{
 const assignForm = ref<{ assigned_to: number | null }>({ assigned_to: null })
 const replyForm = ref<{ message: string }>({ message: '' })
 
+type ConversationEntry = {
+  id: number | string
+  message: string
+  is_staff_reply: boolean
+  attachments: string[] | null
+  created_at: string
+  user: {
+    name: string
+    avatar: string | null
+  }
+  is_opening?: boolean
+}
+
 const stateActionLabel = computed(() => {
   if (!detail.value) return t('ticketDetail.closeTicket')
   return detail.value.status === 'closed' ? t('ticketDetail.reopenTicket') : t('ticketDetail.closeTicket')
+})
+
+const replyDisabled = computed(() => !detail.value || detail.value.status === 'closed' || !!detail.value.deleted_at)
+
+const conversationMessages = computed<ConversationEntry[]>(() => {
+  if (!detail.value) return []
+
+  return [
+    {
+      id: `opening-${detail.value.id}`,
+      message: detail.value.message,
+      is_staff_reply: false,
+      attachments: detail.value.attachments,
+      created_at: detail.value.created_at,
+      user: {
+        name: detail.value.user.name,
+        avatar: detail.value.user.avatar,
+      },
+      is_opening: true,
+    },
+    ...(detail.value.replies ?? []).map(reply => ({
+      id: reply.id,
+      message: reply.message,
+      is_staff_reply: reply.is_staff_reply,
+      attachments: reply.attachments,
+      created_at: reply.created_at,
+      user: {
+        name: reply.user.name,
+        avatar: reply.user.avatar,
+      },
+    })),
+  ]
 })
 
 watch(
@@ -465,23 +510,39 @@ function formatJson(value: Record<string, unknown> | null) {
           </TabPanel>
 
           <TabPanel value="conversation">
-            <div class="thread-list">
-              <article v-for="reply in detail.replies" :key="reply.id" class="thread-item" :class="{ staff: reply.is_staff_reply }">
+            <div class="conversation-panel">
+              <div class="thread-list">
+                <article v-for="entry in conversationMessages" :key="entry.id" class="thread-item" :class="{ staff: entry.is_staff_reply, opening: entry.is_opening }">
                 <div class="thread-head">
                   <div class="thread-user">
-                    <div class="thread-avatar">{{ initials(reply.user.name) }}</div>
+                    <div class="thread-avatar">
+                      <img v-if="entry.user.avatar" :src="entry.user.avatar" :alt="entry.user.name" />
+                      <span v-else>{{ initials(entry.user.name) }}</span>
+                    </div>
                     <div class="thread-copy">
-                      <span class="thread-name">{{ reply.user.name }}</span>
-                      <span class="thread-meta">{{ reply.is_staff_reply ? t('ticketDetail.staffReply') : t('ticketDetail.customerReply') }} · {{ formatDateTime(reply.created_at) }}</span>
+                      <span class="thread-name">{{ entry.user.name }}</span>
+                      <span class="thread-meta">{{ entry.is_opening ? t('ticketDetail.openingMessage') : (entry.is_staff_reply ? t('ticketDetail.staffReply') : t('ticketDetail.customerReply')) }} · {{ formatDateTime(entry.created_at) }}</span>
                     </div>
                   </div>
-                  <Tag :value="reply.is_staff_reply ? t('ticketDetail.staff') : t('ticketDetail.customerTag')" :severity="reply.is_staff_reply ? 'info' : 'secondary'" class="mini-tag" />
+                  <Tag :value="entry.is_staff_reply ? t('ticketDetail.staff') : t('ticketDetail.customerTag')" :severity="entry.is_staff_reply ? 'info' : 'secondary'" class="mini-tag" />
                 </div>
-                <p class="thread-message">{{ reply.message }}</p>
-                <div v-if="reply.attachments?.length" class="attachment-row">
-                  <span v-for="attachment in reply.attachments" :key="attachment" class="attachment-chip">{{ attachment }}</span>
+                <p class="thread-message">{{ entry.message }}</p>
+                <div v-if="entry.attachments?.length" class="attachment-row">
+                  <span v-for="attachment in entry.attachments" :key="attachment" class="attachment-chip">{{ attachment }}</span>
                 </div>
               </article>
+            </div>
+
+              <section class="info-card conversation-reply-card">
+                <h3 class="section-title">{{ t('ticketDetail.reply') }}</h3>
+                <div class="form-field form-field-full">
+                  <label>{{ t('ticketDetail.message') }}</label>
+                  <Textarea v-model="replyForm.message" rows="5" autoResize class="w-full" :placeholder="t('ticketDetail.messagePlaceholder')" :disabled="replyDisabled" />
+                </div>
+                <div class="edit-actions">
+                  <Button :label="t('ticketDetail.sendReply')" size="small" :disabled="replyDisabled || !replyForm.message.trim()" :loading="replying" @click="sendReply" />
+                </div>
+              </section>
             </div>
           </TabPanel>
 
@@ -527,16 +588,6 @@ function formatJson(value: Record<string, unknown> | null) {
               </div>
             </section>
 
-            <section class="info-card">
-              <h3 class="section-title">{{ t('ticketDetail.reply') }}</h3>
-              <div class="form-field form-field-full">
-                <label>{{ t('ticketDetail.message') }}</label>
-                <Textarea v-model="replyForm.message" rows="5" autoResize class="w-full" :placeholder="t('ticketDetail.messagePlaceholder')" />
-              </div>
-              <div class="edit-actions">
-                <Button :label="t('ticketDetail.sendReply')" size="small" :disabled="!replyForm.message.trim()" :loading="replying" @click="sendReply" />
-              </div>
-            </section>
           </TabPanel>
 
           <TabPanel value="payloads">
@@ -589,6 +640,7 @@ function formatJson(value: Record<string, unknown> | null) {
 .user-row,.thread-user { display: flex; align-items: center; gap: 8px; }
 .user-avatar,.thread-avatar { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; overflow: hidden; flex-shrink: 0; }
 .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.thread-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .user-copy,.thread-copy { display: flex; flex-direction: column; gap: 2px; }
 .user-name,.thread-name { font-size: 0.74rem; font-weight: 600; color: var(--text-primary); }
 .user-sub,.thread-meta { font-size: 0.62rem; color: var(--text-muted); }
@@ -597,14 +649,17 @@ function formatJson(value: Record<string, unknown> | null) {
 .meta-row:last-child { border-bottom: none; }
 .meta-row span:first-child { color: var(--text-muted); }
 .meta-row span:last-child { color: var(--text-primary); text-align: right; }
+.conversation-panel { display: flex; flex-direction: column; gap: 10px; }
 .thread-list { display: flex; flex-direction: column; gap: 8px; }
 .thread-item { padding: 10px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--card-bg); }
 .thread-item.staff { background: color-mix(in srgb, var(--card-bg) 88%, rgba(14, 165, 233, 0.08) 12%); }
+.thread-item.opening { border-style: dashed; }
 .thread-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
 .thread-message { margin: 0; font-size: 0.72rem; line-height: 1.5; color: var(--text-primary); }
 .attachment-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .attachment-row.multi-line { margin-top: 0; }
 .attachment-chip { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; background: var(--hover-bg); font-size: 0.62rem; color: var(--text-secondary); }
+.conversation-reply-card { position: sticky; bottom: 0; }
 .form-field { display: flex; flex-direction: column; gap: 4px; }
 .form-field label { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
 .form-field-full { grid-column: 1 / -1; }

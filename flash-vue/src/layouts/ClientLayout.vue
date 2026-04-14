@@ -5,6 +5,8 @@ import { useLayoutStore } from '@/stores/layout'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import type { Notification } from '@/types/notifications'
+import { resolveNotificationTarget } from '@/utils/notificationNavigation'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tooltip from 'primevue/tooltip'
@@ -118,6 +120,11 @@ function goToProfile() {
   void router.push({ name: 'profile' })
 }
 
+function goToSupport() {
+  closeOverlays()
+  void router.push({ name: 'support' })
+}
+
 async function handleLogout() {
   closeOverlays()
   chat.$reset()
@@ -126,6 +133,16 @@ async function handleLogout() {
 
 function markAllRead() {
   notificationStore.markAllRead()
+}
+
+async function openNotification(notif: Notification) {
+  await notificationStore.markRead(notif.id)
+  showNotifications.value = false
+
+  const target = resolveNotificationTarget(notif.action_url)
+  if (target) {
+    void router.push(target)
+  }
 }
 
 function focusSearch() {
@@ -372,9 +389,11 @@ onBeforeUnmount(() => {
       <!-- Footer -->
       <div class="sidebar-footer" v-if="showSidebarContent">
         <Button :label="t('client.pricing')" icon="pi pi-tag" severity="secondary" text size="small" class="footer-link" @click="goToPricing" />
+        <Button :label="t('clientSupport.support')" icon="pi pi-ticket" severity="secondary" text size="small" class="footer-link" @click="goToSupport" />
       </div>
       <div class="sidebar-footer" v-else>
         <Button icon="pi pi-tag" severity="secondary" text rounded size="small" @click="goToPricing" v-tooltip.left="t('client.pricing')" />
+        <Button icon="pi pi-ticket" severity="secondary" text rounded size="small" @click="goToSupport" v-tooltip.left="t('clientSupport.support')" />
       </div>
     </aside>
 
@@ -404,6 +423,9 @@ onBeforeUnmount(() => {
           </router-link>
           <router-link :to="{ name: 'profile' }" class="nav-link" :class="{ active: route.name === 'profile' }">
             {{ t('chat.myProfile') }}
+          </router-link>
+          <router-link :to="{ name: 'support' }" class="nav-link" :class="{ active: route.name === 'support' }">
+            {{ t('clientSupport.support') }}
           </router-link>
         </nav>
 
@@ -443,7 +465,7 @@ onBeforeUnmount(() => {
                     :key="notif.id"
                     class="notif-item"
                     :class="{ unread: !notif.is_read }"
-                    @click="notificationStore.markRead(notif.id)"
+                    @click="openNotification(notif)"
                   >
                     <div class="notif-dot" v-if="!notif.is_read" />
                     <div class="notif-content">
@@ -485,6 +507,10 @@ onBeforeUnmount(() => {
                 <button type="button" class="user-menu-item" @click="goToPricing">
                   <i class="pi pi-tag" />
                   <span>{{ t('client.pricing') }}</span>
+                </button>
+                <button type="button" class="user-menu-item" @click="goToSupport">
+                  <i class="pi pi-ticket" />
+                  <span>{{ t('clientSupport.support') }}</span>
                 </button>
                 <div class="user-menu-divider" />
                 <button type="button" class="user-menu-item danger" @click="handleLogout">
