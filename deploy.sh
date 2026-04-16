@@ -31,10 +31,16 @@ echo "════════════════════════�
 # Remove ALL old frontend assets to prevent stale cache
 rm -rf "$LARAVEL_DIR/public/assets"
 rm -rf "$LARAVEL_DIR/public/build"
+rm -rf "$LARAVEL_DIR/public/icons"
 cp -r "$VUE_DIR/dist/assets" "$LARAVEL_DIR/public/assets"
+cp -r "$VUE_DIR/dist/icons" "$LARAVEL_DIR/public/icons"
 
-# Copy icons & favicon
+# Copy root public files
+cp -f "$VUE_DIR/dist/manifest.json" "$LARAVEL_DIR/public/manifest.json" 2>/dev/null || true
+cp -f "$VUE_DIR/dist/robots.txt" "$LARAVEL_DIR/public/robots.txt" 2>/dev/null || true
+cp -f "$VUE_DIR/dist/sitemap.xml" "$LARAVEL_DIR/public/sitemap.xml" 2>/dev/null || true
 cp -f "$VUE_DIR/dist/favicon.ico" "$LARAVEL_DIR/public/favicon.ico" 2>/dev/null || true
+cp -f "$VUE_DIR/dist/newlogo.png" "$LARAVEL_DIR/public/newlogo.png" 2>/dev/null || true
 cp -f "$VUE_DIR/dist/klek-ai-mark.svg" "$LARAVEL_DIR/public/klek-ai-mark.svg" 2>/dev/null || true
 cp -f "$VUE_DIR/dist/flash-ai-mark.svg" "$LARAVEL_DIR/public/flash-ai-mark.svg" 2>/dev/null || true
 

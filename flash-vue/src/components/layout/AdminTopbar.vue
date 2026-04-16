@@ -11,6 +11,7 @@ import Button from 'primevue/button'
 import Badge from 'primevue/badge'
 import Menu from 'primevue/menu'
 import Popover from 'primevue/popover'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const layout = useLayoutStore()
 const auth = useAuthStore()
@@ -106,7 +107,7 @@ onUnmounted(() => {
       />
 
       <div class="topbar-brand">
-        <img class="brand-logo" src="/klek-ai-mark.svg" alt="Klek AI" />
+        <BrandLogo class="brand-logo" />
         <span class="brand-text">Klek AI</span>
       </div>
     </div>
@@ -260,10 +261,11 @@ onUnmounted(() => {
 }
 
 .brand-logo {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   display: block;
   flex-shrink: 0;
+  object-fit: contain;
   filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.45)) drop-shadow(0 0 4px rgba(167, 139, 250, 0.35));
   animation: topbar-logo-glow 3s ease-in-out infinite;
 }

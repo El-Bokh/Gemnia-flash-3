@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import { useSeo } from '@/composables/useSeo'
 import { getCachedMaintenanceStatus, getPublicMaintenanceStatus } from '@/services/maintenanceService'
 import { getAuthenticatedHome, getStoredAuthUser } from '@/utils/auth'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -66,7 +67,7 @@ void refreshStatus(true)
       <div class="maintenance-card">
         <div class="maintenance-copy">
           <div class="maintenance-brand">
-            <img src="/klek-ai-mark.svg" alt="Klek AI" class="brand-logo" />
+            <BrandLogo class="brand-logo" />
             <span>Klek AI</span>
           </div>
 
@@ -172,8 +173,9 @@ void refreshStatus(true)
 }
 
 .brand-logo {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
 }
 
 .maintenance-pill {

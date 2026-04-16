@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
 import { getAuthenticatedHome } from '@/utils/auth'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -45,7 +46,7 @@ function goRegister() {
     <header class="standalone-topbar">
       <div class="standalone-topbar-shell">
         <button type="button" class="standalone-brand" @click="goRoot">
-          <span class="brand-mark"><i class="pi pi-sparkles" /></span>
+          <BrandLogo class="brand-mark" />
           <span class="brand-copy">
             <strong>Klek AI</strong>
             <small>{{ currentRouteName === 'pricing' ? t('client.pricing') : t('clientSupport.support') }}</small>
@@ -147,15 +148,11 @@ function goRegister() {
 }
 
 .brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.24);
+  width: 46px;
+  height: 46px;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 18px rgba(99, 102, 241, 0.22));
 }
 
 .brand-copy {

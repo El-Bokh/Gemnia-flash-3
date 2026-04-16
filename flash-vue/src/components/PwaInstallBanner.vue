@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const { t } = useI18n()
 
@@ -47,7 +48,7 @@ onBeforeUnmount(() => {
   <Transition name="slide-up">
     <div v-if="showBanner" class="install-banner">
       <div class="install-content">
-        <img class="install-icon" src="/klek-ai-mark.svg" alt="Klek AI" />
+        <BrandLogo class="install-icon" />
         <div class="install-text">
           <span class="install-title">{{ t('pwa.installTitle') }}</span>
           <span class="install-desc">{{ t('pwa.installDesc') }}</span>
@@ -94,9 +95,10 @@ onBeforeUnmount(() => {
 }
 
 .install-icon {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
+  object-fit: contain;
   filter: drop-shadow(0 0 8px rgba(129, 140, 248, 0.4));
 }
 

@@ -10,6 +10,7 @@ import { resolveNotificationTarget } from '@/utils/notificationNavigation'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tooltip from 'primevue/tooltip'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 import NotificationToast from '@/components/chat/NotificationToast.vue'
 
 const vTooltip = Tooltip
@@ -211,7 +212,7 @@ onBeforeUnmount(() => {
       <!-- Header -->
       <div class="sidebar-header">
         <div class="brand" v-if="showSidebarContent">
-          <span class="brand-icon"><i class="pi pi-sparkles" /></span>
+          <BrandLogo class="brand-icon" />
           <span class="brand-text">Klek AI</span>
         </div>
         <Button
@@ -404,7 +405,7 @@ onBeforeUnmount(() => {
         <div class="topbar-start">
           <Button icon="pi pi-bars" severity="secondary" text rounded size="small" class="mobile-menu-btn" @click="toggleMobileSidebar" />
           <router-link :to="{ name: 'chat' }" class="topbar-brand mobile-brand">
-            <span class="brand-icon-sm"><i class="pi pi-sparkles" /></span>
+            <BrandLogo class="brand-icon-sm" />
             <span class="brand-label">Klek AI</span>
           </router-link>
           <!-- Current conversation model indicator -->
@@ -583,16 +584,11 @@ onBeforeUnmount(() => {
 }
 
 .brand-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
+  width: 30px;
+  height: 30px;
+  display: block;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .brand-text {
@@ -916,15 +912,10 @@ html.dark .client-topbar {
 }
 
 .brand-icon-sm {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
+  width: 32px;
+  height: 32px;
+  display: block;
+  object-fit: contain;
 }
 
 .brand-label {

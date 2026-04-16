@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/utils/auth'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 import Tooltip from 'primevue/tooltip'
 
 const vTooltip = Tooltip
@@ -129,7 +130,7 @@ const collapsed = computed(() => layout.sidebarCollapsed)
         <span class="nav-label" v-show="!collapsed">{{ t('topbar.goToPlatform') }}</span>
       </router-link>
       <div class="footer-version" v-show="!collapsed">
-        <img class="footer-logo" src="/klek-ai-mark.svg" alt="Klek AI" />
+        <BrandLogo class="footer-logo" />
         <span>Klek AI v1.0</span>
       </div>
     </div>
@@ -321,10 +322,11 @@ const collapsed = computed(() => layout.sidebarCollapsed)
 }
 
 .footer-logo {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   display: block;
   flex-shrink: 0;
+  object-fit: contain;
   filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.4));
 }
 

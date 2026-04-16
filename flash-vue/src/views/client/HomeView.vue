@@ -14,6 +14,7 @@ import ProductGallery from '@/components/chat/ProductGallery.vue'
 import TypingIndicator from '@/components/chat/TypingIndicator.vue'
 import QuotaBar from '@/components/chat/QuotaBar.vue'
 import QuotaExhaustedModal from '@/components/chat/QuotaExhaustedModal.vue'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -275,9 +276,7 @@ function handleSendProducts(content: string, images: File[]) {
     <!-- ═══════ Empty State / Landing ═══════ -->
     <div v-if="!hasActiveChat" class="home-center">
       <div class="hero-logo">
-        <div class="logo-circle">
-          <i class="pi pi-sparkles" />
-        </div>
+        <BrandLogo class="logo-circle" />
       </div>
 
       <h1 class="hero-title">{{ t('client.heroTitle') }}</h1>
@@ -379,9 +378,7 @@ function handleSendProducts(content: string, images: File[]) {
         <!-- Chat header / conversation info -->
         <div class="chat-header-area">
           <div class="chat-header-content">
-            <div class="chat-header-icon">
-              <i class="pi pi-sparkles" />
-            </div>
+            <BrandLogo class="chat-header-icon" />
             <div>
               <h2 class="chat-header-title">{{ chat.activeConversation?.title }}</h2>
               <p class="chat-header-sub">{{ t('chat.chatHeaderSub') }}</p>
@@ -509,16 +506,11 @@ function handleSendProducts(content: string, images: File[]) {
 }
 
 .logo-circle {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  width: 76px;
+  height: 76px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 1.2rem;
-  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.2);
+  object-fit: contain;
+  filter: drop-shadow(0 8px 20px rgba(99, 102, 241, 0.24));
 }
 
 .hero-title {
@@ -680,16 +672,11 @@ function handleSendProducts(content: string, images: File[]) {
 }
 
 .chat-header-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
+  width: 36px;
+  height: 36px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.78rem;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .chat-header-title {

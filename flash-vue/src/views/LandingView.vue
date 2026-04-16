@@ -6,6 +6,7 @@ import { useLayoutStore } from '@/stores/layout'
 import { useAuthStore } from '@/stores/auth'
 import { useSeo } from '@/composables/useSeo'
 import { getAuthenticatedHome } from '@/utils/auth'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -100,7 +101,7 @@ function goPrimary() {
     <nav class="landing-nav">
       <div class="nav-inner">
         <div class="nav-brand">
-          <img src="/klek-ai-mark.svg" alt="Klek AI" class="nav-logo" />
+          <BrandLogo class="nav-logo" />
           <span class="nav-brand-text">Klek AI</span>
         </div>
         <div class="nav-links">
@@ -172,7 +173,7 @@ function goPrimary() {
     <footer class="landing-footer">
       <div class="footer-inner">
         <div class="footer-brand">
-          <img src="/klek-ai-mark.svg" alt="Klek AI" class="footer-logo" />
+          <BrandLogo class="footer-logo" />
           <span>Klek AI</span>
         </div>
         <div class="footer-links">
@@ -285,8 +286,9 @@ function goPrimary() {
   gap: 10px;
 }
 .nav-logo {
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
   filter: drop-shadow(0 0 8px rgba(149, 128, 255, 0.35));
 }
 .nav-brand-text {
@@ -975,8 +977,9 @@ function goPrimary() {
   color: var(--lp-text);
 }
 .footer-logo {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 .footer-rights {
   font-size: 0.7rem;

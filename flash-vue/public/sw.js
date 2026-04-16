@@ -4,7 +4,7 @@ const CACHE_NAME = 'klek-ai-v2-__DEPLOY_TIMESTAMP__';
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
-  '/klek-ai-mark.svg',
+  '/newlogo.png',
 ];
 
 // Install — precache shell & force activate

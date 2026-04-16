@@ -9,6 +9,7 @@ import { useSeo } from '@/composables/useSeo'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -105,9 +106,7 @@ function handleGoogleLogin() {
       <div class="register-card">
         <!-- Brand -->
         <div class="register-brand">
-          <div class="brand-mark">
-            <i class="pi pi-sparkles" />
-          </div>
+          <BrandLogo class="brand-mark" />
           <h1 class="brand-title">{{ t('register.title') }}</h1>
           <p class="brand-sub">{{ t('register.subtitle') }}</p>
         </div>
@@ -319,16 +318,12 @@ function handleGoogleLogin() {
 }
 
 .brand-mark {
-  width: 50px;
-  height: 50px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
+  width: 72px;
+  height: 72px;
+  display: block;
   margin-bottom: 4px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(129, 140, 248, 0.35)) drop-shadow(0 0 6px rgba(167, 139, 250, 0.28));
 }
 
 .brand-title {

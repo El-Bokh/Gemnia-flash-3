@@ -9,6 +9,7 @@ import { useSeo } from '@/composables/useSeo'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
+import BrandLogo from '@/components/branding/BrandLogo.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -91,7 +92,7 @@ function handleGoogleLogin() {
       <div class="login-card">
         <!-- Brand -->
         <div class="login-brand">
-          <img class="brand-logo-img" src="/klek-ai-mark.svg" alt="Klek AI" />
+          <BrandLogo class="brand-logo-img" />
           <h1 class="brand-title">{{ t('login.title') }}</h1>
           <p class="brand-sub">{{ t('login.subtitle') }}</p>
         </div>
@@ -267,10 +268,11 @@ function handleGoogleLogin() {
   gap: 6px;
 }
 .brand-logo-img {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   display: block;
   margin-bottom: 4px;
+  object-fit: contain;
   filter: drop-shadow(0 0 18px rgba(129, 140, 248, 0.5)) drop-shadow(0 0 6px rgba(167, 139, 250, 0.4));
   animation: logo-pulse 3s ease-in-out infinite;
 }

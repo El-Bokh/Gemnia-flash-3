@@ -3,7 +3,7 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8">
-    <link rel="icon" type="image/svg+xml" href="/klek-ai-mark.svg">
+    <link rel="icon" type="image/png" href="/newlogo.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#09090b">
 
@@ -37,12 +37,13 @@
     <link rel="manifest" href="/manifest.json">
 
     <title>Klek AI - AI Image Generation & Creative Design</title>
-    <script type="module" crossorigin src="/assets/index-rGDHNSRY.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/_plugin-vue_export-helper-BbkqAYWm.js">
-    <link rel="modulepreload" crossorigin href="/assets/auth-Dg_EUHBp.js">
-    <link rel="modulepreload" crossorigin href="/assets/basedirective-BDDZpS3a.js">
-    <link rel="modulepreload" crossorigin href="/assets/utils-BcHHCeDw.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-BhDXvM8K.css">
+    <script type="module" crossorigin src="/assets/index-1-yg3Pqo.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/_plugin-vue_export-helper-D2F7RcU9.js">
+    <link rel="modulepreload" crossorigin href="/assets/auth-DDCY3VWd.js">
+    <link rel="modulepreload" crossorigin href="/assets/vue-i18n-core-DCFtTscT.js">
+    <link rel="modulepreload" crossorigin href="/assets/basedirective-DSF8gHrX.js">
+    <link rel="modulepreload" crossorigin href="/assets/utils-BDYzQurU.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-Dj975j0K.css">
   </head>
   <body>
     <script>
