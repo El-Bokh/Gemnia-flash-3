@@ -83,6 +83,7 @@ function syncAuthUser(profile: ProfileData | MeResponse) {
     email: profile.email,
     avatar: profile.avatar,
     roles: profile.roles,
+    permissions: 'permissions' in profile ? (profile as MeResponse).permissions ?? [] : auth.user.permissions,
   })
 }
 

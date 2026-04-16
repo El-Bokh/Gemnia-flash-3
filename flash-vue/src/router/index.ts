@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { getPublicMaintenanceStatus } from '@/services/maintenanceService'
-import { getAuthenticatedHome, getStoredAuthUser, isAdminUser } from '@/utils/auth'
+import { getAuthenticatedHome, getStoredAuthUser, hasAdminAccess, isAdminUser } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
   // ── Landing page (standalone) ──────────────────
@@ -189,7 +189,7 @@ router.beforeEach(async (to) => {
   }
 
   // Going to an admin-only route with a non-admin account → redirect to profile
-  if (to.matched.some(r => r.meta.requiresAdmin) && isAuthenticated && storedUser && !isAdminUser(storedUser)) {
+  if (to.matched.some(r => r.meta.requiresAdmin) && isAuthenticated && storedUser && !hasAdminAccess(storedUser)) {
     return '/profile'
   }
 

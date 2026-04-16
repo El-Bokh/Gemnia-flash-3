@@ -170,12 +170,21 @@ class GoogleAuthController extends Controller
         ]);
 
         // Redirect to SPA with token
+        $user->loadMissing('roles.permissions');
+
+        $permissions = $user->roles
+            ->flatMap(fn ($role) => $role->permissions->pluck('slug'))
+            ->unique()
+            ->values()
+            ->toArray();
+
         $userData = [
             'id'     => $user->id,
             'name'   => $user->name,
             'email'  => $user->email,
             'avatar' => $user->avatarUrl(),
             'roles'  => $user->roles->pluck('slug')->values()->all(),
+            'permissions' => $permissions,
         ];
 
         $params = http_build_query([

@@ -12,6 +12,7 @@ function emptyAuthUser(): AuthUser {
     email: '',
     avatar: null,
     roles: [],
+    permissions: [],
   }
 }
 
@@ -80,6 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
           email: res.data.email,
           avatar: res.data.avatar,
           roles: res.data.roles,
+          permissions: res.data.permissions ?? [],
         })
         if (res.data.quota) {
           setQuota(res.data.quota)

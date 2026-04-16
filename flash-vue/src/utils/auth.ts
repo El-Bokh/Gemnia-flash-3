@@ -4,6 +4,7 @@ export interface StoredAuthUser {
   email: string
   avatar: string | null
   roles: string[]
+  permissions: string[]
 }
 
 const AUTH_USER_KEY = 'auth_user'
@@ -47,6 +48,9 @@ export function getStoredAuthUser(): StoredAuthUser | null {
       email: parsed.email,
       avatar: typeof parsed.avatar === 'string' || parsed.avatar === null ? parsed.avatar : null,
       roles: parsed.roles.filter((role): role is string => typeof role === 'string'),
+      permissions: Array.isArray(parsed.permissions)
+        ? (parsed.permissions as unknown[]).filter((p): p is string => typeof p === 'string')
+        : [],
     }
   } catch {
     clearStoredAuthUser()
@@ -58,6 +62,28 @@ export function isAdminUser(user: Pick<StoredAuthUser, 'roles'> | null | undefin
   return (user?.roles ?? []).some(role => role === 'admin' || role === 'super_admin')
 }
 
-export function getAuthenticatedHome(user: Pick<StoredAuthUser, 'roles'> | null | undefined): string {
-  return isAdminUser(user) ? '/admin' : '/chat'
+/**
+ * Check if the user has access to the admin panel.
+ * Users with admin/super_admin roles, or any permissions, can access.
+ */
+export function hasAdminAccess(user: Pick<StoredAuthUser, 'roles' | 'permissions'> | null | undefined): boolean {
+  if (!user) return false
+  // Admin / super_admin always have access
+  if ((user.roles ?? []).some(role => role === 'admin' || role === 'super_admin')) return true
+  // Users with any permissions have access (e.g. support role)
+  return (user.permissions ?? []).length > 0
+}
+
+/**
+ * Check if the user has a specific permission.
+ * Admin/super_admin bypass the check.
+ */
+export function hasPermission(user: Pick<StoredAuthUser, 'roles' | 'permissions'> | null | undefined, permission: string): boolean {
+  if (!user) return false
+  if ((user.roles ?? []).some(role => role === 'admin' || role === 'super_admin')) return true
+  return (user.permissions ?? []).includes(permission)
+}
+
+export function getAuthenticatedHome(user: Pick<StoredAuthUser, 'roles' | 'permissions'> | null | undefined): string {
+  return hasAdminAccess(user) ? '/admin' : '/chat'
 }

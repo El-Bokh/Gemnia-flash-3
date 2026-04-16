@@ -3,18 +3,22 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useLayoutStore } from '@/stores/layout'
+import { useAuthStore } from '@/stores/auth'
+import { hasPermission } from '@/utils/auth'
 import Tooltip from 'primevue/tooltip'
 
 const vTooltip = Tooltip
 
 const route = useRoute()
 const layout = useLayoutStore()
+const auth = useAuthStore()
 const { t } = useI18n()
 
 interface NavItem {
   labelKey: string
   icon: string
   to: string
+  permission?: string
 }
 
 interface NavGroup {
@@ -26,39 +30,51 @@ const navigation: NavGroup[] = [
   {
     titleKey: 'sidebar.main',
     items: [
-      { labelKey: 'sidebar.dashboard', icon: 'pi pi-objects-column', to: '/admin' },
+      { labelKey: 'sidebar.dashboard', icon: 'pi pi-objects-column', to: '/admin', permission: 'view_dashboard' },
     ],
   },
   {
     titleKey: 'sidebar.management',
     items: [
-      { labelKey: 'sidebar.users', icon: 'pi pi-users', to: '/admin/users' },
-      { labelKey: 'sidebar.rolesPermissions', icon: 'pi pi-shield', to: '/admin/roles' },
+      { labelKey: 'sidebar.users', icon: 'pi pi-users', to: '/admin/users', permission: 'view_users' },
+      { labelKey: 'sidebar.rolesPermissions', icon: 'pi pi-shield', to: '/admin/roles', permission: 'view_roles' },
     ],
   },
   {
     titleKey: 'sidebar.aiSystem',
     items: [
-      { labelKey: 'sidebar.aiRequests', icon: 'pi pi-microchip-ai', to: '/admin/ai-requests' },
-      { labelKey: 'sidebar.plansFeatures', icon: 'pi pi-box', to: '/admin/plans' },
-      { labelKey: 'sidebar.visualStyles', icon: 'pi pi-palette', to: '/admin/styles' },
-      { labelKey: 'sidebar.products', icon: 'pi pi-shopping-bag', to: '/admin/products' },
+      { labelKey: 'sidebar.aiRequests', icon: 'pi pi-microchip-ai', to: '/admin/ai-requests', permission: 'view_ai_requests' },
+      { labelKey: 'sidebar.plansFeatures', icon: 'pi pi-box', to: '/admin/plans', permission: 'view_plans' },
+      { labelKey: 'sidebar.visualStyles', icon: 'pi pi-palette', to: '/admin/styles', permission: 'view_settings' },
+      { labelKey: 'sidebar.products', icon: 'pi pi-shopping-bag', to: '/admin/products', permission: 'view_settings' },
     ],
   },
   {
     titleKey: 'sidebar.finance',
     items: [
-      { labelKey: 'sidebar.paymentsBilling', icon: 'pi pi-credit-card', to: '/admin/payments' },
+      { labelKey: 'sidebar.paymentsBilling', icon: 'pi pi-credit-card', to: '/admin/payments', permission: 'view_payments' },
     ],
   },
   {
     titleKey: 'sidebar.support',
     items: [
-      { labelKey: 'sidebar.supportTickets', icon: 'pi pi-ticket', to: '/admin/support' },
-      { labelKey: 'sidebar.systemSettings', icon: 'pi pi-cog', to: '/admin/settings' },
+      { labelKey: 'sidebar.supportTickets', icon: 'pi pi-ticket', to: '/admin/support', permission: 'view_tickets' },
+      { labelKey: 'sidebar.systemSettings', icon: 'pi pi-cog', to: '/admin/settings', permission: 'view_settings' },
     ],
   },
 ]
+
+/** Filter navigation to only show items the user has permission for */
+const filteredNavigation = computed(() => {
+  return navigation
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item =>
+        !item.permission || hasPermission(auth.user, item.permission),
+      ),
+    }))
+    .filter(group => group.items.length > 0)
+})
 
 function isActive(to: string): boolean {
   if (to === '/admin') return route.path === '/admin'
@@ -86,7 +102,7 @@ const collapsed = computed(() => layout.sidebarCollapsed)
     }"
   >
     <nav class="sidebar-nav">
-      <div v-for="(group, gi) in navigation" :key="gi" class="nav-group">
+      <div v-for="(group, gi) in filteredNavigation" :key="gi" class="nav-group">
         <div class="nav-group-title" v-show="!collapsed">
           {{ t(group.titleKey) }}
         </div>

@@ -118,7 +118,7 @@ Route::prefix('admin')
     ->group(function () {
 
         // Dashboard
-        Route::prefix('dashboard')->name('dashboard.')->group(function () {
+        Route::prefix('dashboard')->name('dashboard.')->middleware('permission:view_dashboard')->group(function () {
             Route::get('/',                  [DashboardController::class, 'index'])->name('index');
             Route::get('/kpis',              [DashboardController::class, 'kpis'])->name('kpis');
             Route::get('/charts',            [DashboardController::class, 'charts'])->name('charts');
@@ -128,7 +128,7 @@ Route::prefix('admin')
         });
 
         // Users Management
-        Route::prefix('users')->name('users.')->group(function () {
+        Route::prefix('users')->name('users.')->middleware('permission:view_users')->group(function () {
             // Aggregations (before {user} to avoid route conflict)
             Route::get('/aggregations', [UserController::class, 'aggregations'])->name('aggregations');
 
@@ -151,7 +151,7 @@ Route::prefix('admin')
         });
 
         // Roles Management
-        Route::prefix('roles')->name('roles.')->group(function () {
+        Route::prefix('roles')->name('roles.')->middleware('permission:view_roles')->group(function () {
             // Static routes first (before {role} wildcard)
             Route::get('/matrix', [RoleController::class, 'matrix'])->name('matrix');
 
@@ -167,7 +167,7 @@ Route::prefix('admin')
         });
 
         // Permissions Management
-        Route::prefix('permissions')->name('permissions.')->group(function () {
+        Route::prefix('permissions')->name('permissions.')->middleware('permission:view_roles')->group(function () {
             // Static routes first
             Route::get('/grouped', [PermissionController::class, 'grouped'])->name('grouped');
 
@@ -179,7 +179,7 @@ Route::prefix('admin')
         });
 
         // Plans Management
-        Route::prefix('plans')->name('plans.')->group(function () {
+        Route::prefix('plans')->name('plans.')->middleware('permission:view_plans')->group(function () {
             // Static routes first (before {plan} wildcard)
             Route::get('/comparison', [PlanController::class, 'comparison'])->name('comparison');
 
@@ -202,7 +202,7 @@ Route::prefix('admin')
         });
 
         // Features Management
-        Route::prefix('features')->name('features.')->group(function () {
+        Route::prefix('features')->name('features.')->middleware('permission:manage_plans')->group(function () {
             // CRUD
             Route::get('/',              [FeatureController::class, 'index'])->name('index');
             Route::post('/',             [FeatureController::class, 'store'])->name('store');
@@ -216,7 +216,7 @@ Route::prefix('admin')
         });
 
         // AI Requests Management
-        Route::prefix('ai-requests')->name('ai-requests.')->group(function () {
+        Route::prefix('ai-requests')->name('ai-requests.')->middleware('permission:view_ai_requests')->group(function () {
             // Static routes first (before {aiRequest} wildcard)
             Route::get('/aggregations',    [AiRequestController::class, 'aggregations'])->name('aggregations');
             Route::post('/bulk-retry',     [AiRequestController::class, 'bulkRetry'])->name('bulk-retry');
@@ -237,7 +237,7 @@ Route::prefix('admin')
         });
 
         // Payments Management
-        Route::prefix('payments')->name('payments.')->group(function () {
+        Route::prefix('payments')->name('payments.')->middleware('permission:view_payments')->group(function () {
             // Static routes first (before {payment} wildcard)
             Route::get('/aggregations', [PaymentController::class, 'aggregations'])->name('aggregations');
 
@@ -254,7 +254,7 @@ Route::prefix('admin')
         });
 
         // Invoices Management
-        Route::prefix('invoices')->name('invoices.')->group(function () {
+        Route::prefix('invoices')->name('invoices.')->middleware('permission:view_payments')->group(function () {
             // Static routes first
             Route::get('/aggregations',             [InvoiceController::class, 'aggregations'])->name('aggregations');
             Route::post('/generate/{payment}',      [InvoiceController::class, 'generateFromPayment'])->name('generate');
@@ -272,7 +272,7 @@ Route::prefix('admin')
         });
 
         // Coupons Management
-        Route::prefix('coupons')->name('coupons.')->group(function () {
+        Route::prefix('coupons')->name('coupons.')->middleware('permission:view_coupons')->group(function () {
             // Static routes first
             Route::get('/aggregations',    [CouponController::class, 'aggregations'])->name('aggregations');
             Route::post('/validate',       [CouponController::class, 'validateCoupon'])->name('validate');
@@ -292,7 +292,7 @@ Route::prefix('admin')
         });
 
         // Support Tickets Management
-        Route::prefix('support-tickets')->name('support-tickets.')->group(function () {
+        Route::prefix('support-tickets')->name('support-tickets.')->middleware('permission:view_tickets')->group(function () {
             // Static routes first (before {ticket} wildcard)
             Route::get('/aggregations', [SupportTicketController::class, 'aggregations'])->name('aggregations');
 
@@ -313,7 +313,7 @@ Route::prefix('admin')
         });
 
         // Notifications Management
-        Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::prefix('notifications')->name('notifications.')->middleware('permission:view_notifications')->group(function () {
             Route::get('/',                         [AdminNotificationController::class, 'index'])->name('index');
             Route::get('/unread-count',             [AdminNotificationController::class, 'unreadCount'])->name('unread-count');
             Route::post('/read-all',                [AdminNotificationController::class, 'markAllAsRead'])->name('read-all');
@@ -322,7 +322,7 @@ Route::prefix('admin')
         });
 
         // System Settings Management
-        Route::prefix('settings')->name('settings.')->group(function () {
+        Route::prefix('settings')->name('settings.')->middleware('permission:view_settings')->group(function () {
             // Audit Log
             Route::get('/audit-log',           [SettingsController::class, 'auditLog'])->name('audit-log');
 
@@ -338,7 +338,7 @@ Route::prefix('admin')
         });
 
         // Visual Styles Management
-        Route::prefix('styles')->name('styles.')->group(function () {
+        Route::prefix('styles')->name('styles.')->middleware('permission:view_settings')->group(function () {
             // Static routes first
             Route::post('/reorder', [AdminVisualStyleController::class, 'reorder'])->name('reorder');
 
@@ -358,7 +358,7 @@ Route::prefix('admin')
         });
 
         // Products Management
-        Route::prefix('products')->name('products.')->group(function () {
+        Route::prefix('products')->name('products.')->middleware('permission:view_settings')->group(function () {
             Route::post('/reorder', [AdminProductController::class, 'reorder'])->name('reorder');
 
             Route::get('/',              [AdminProductController::class, 'index'])->name('index');

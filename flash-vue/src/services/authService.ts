@@ -21,6 +21,7 @@ export interface AuthUser {
   email: string
   avatar: string | null
   roles: string[]
+  permissions: string[]
 }
 
 export interface LoginResponse {
@@ -53,6 +54,7 @@ export interface MeResponse {
   avatar: string | null
   status: string
   roles: string[]
+  permissions: string[]
   locale: string
   timezone: string
   last_login_at: string | null

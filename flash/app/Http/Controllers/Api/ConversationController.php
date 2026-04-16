@@ -8,6 +8,7 @@ use App\Models\Conversation;
 use App\Models\ConversationMessage;
 use App\Models\CreditLedger;
 use App\Models\MediaFile;
+use App\Models\Product;
 use App\Models\VisualStyle;
 use App\Services\GeminiService;
 use App\Services\UsageService;
@@ -192,6 +193,7 @@ class ConversationController extends Controller
         $data = $request->validate([
             'content'     => ['required', 'string', 'max:5000'],
             'image_style' => ['nullable', 'string', 'max:100'],
+            'product'     => ['nullable', 'string', 'max:100'],
             'image'       => ['nullable', 'image', 'max:10240'], // 10MB
             'images'      => ['nullable', 'array', 'max:10'],
             'images.*'    => ['image', 'max:10240'],
@@ -306,8 +308,15 @@ class ConversationController extends Controller
         // Build the prompt — inject hidden base + style prompts
         $userContent = $data['content'];
         $styleSlug = $data['image_style'] ?? null;
+        $productSlug = $data['product'] ?? null;
         $baseImagePrompt = $imageFollowUpContext['prompt'] ?? $userContent;
         $geminiPrompt = $userContent;
+
+        // Fetch product if selected (for hidden_prompt injection)
+        $product = null;
+        if ($productSlug) {
+            $product = Product::where('slug', $productSlug)->where('is_active', true)->first();
+        }
 
         if ($mode === 'image') {
             $parts = [];
@@ -321,12 +330,22 @@ class ConversationController extends Controller
                 }
             }
 
+            // Inject product hidden_prompt if a product is selected
+            if ($product && $product->hidden_prompt) {
+                $parts[] = $product->hidden_prompt;
+            }
+
             // User prompt (keep it clean - enhancePromptForImagen will handle quality keywords)
             $parts[] = $baseImagePrompt;
 
             // Style suffix (if any)
             if ($style && $style->prompt_suffix) {
                 $parts[] = $style->prompt_suffix;
+            }
+
+            // Product negative prompt (append as negative instruction)
+            if ($product && $product->negative_prompt) {
+                $parts[] = 'Avoid: ' . $product->negative_prompt;
             }
 
             $geminiPrompt = implode(', ', $parts);
@@ -338,12 +357,19 @@ class ConversationController extends Controller
                 if ($style->prompt_prefix) {
                     $parts[] = $style->prompt_prefix;
                 }
+                // Inject product hidden_prompt in text mode too
+                if ($product && $product->hidden_prompt) {
+                    $parts[] = $product->hidden_prompt;
+                }
                 $parts[] = $userContent;
                 if ($style->prompt_suffix) {
                     $parts[] = $style->prompt_suffix;
                 }
                 $geminiPrompt = implode("\n\n", $parts);
             }
+        } elseif ($product && $product->hidden_prompt) {
+            // Product only (no style) — inject hidden_prompt
+            $geminiPrompt = $product->hidden_prompt . "\n\n" . $userContent;
         }
 
         // Build conversation history for Gemini — include recent images for multimodal context
@@ -442,10 +468,13 @@ class ConversationController extends Controller
             'user_id'          => $request->user()->id,
             'subscription_id'  => $consumption['subscription']?->id,
             'visual_style_id'  => isset($style) ? $style->id : null,
+            'product_id'       => $product?->id,
             'type'             => $imageBase64 ? 'multimodal' : ($mode === 'image' ? 'text_to_image' : ($styleSlug ? 'styled_chat' : 'chat')),
             'status'           => $result['success'] ? 'completed' : 'failed',
             'user_prompt'      => $userContent,
             'processed_prompt' => $geminiPrompt !== $userContent ? $geminiPrompt : null,
+            'hidden_prompt'    => $product?->hidden_prompt,
+            'negative_prompt'  => $product?->negative_prompt,
             'model_used'       => $gemini->getModel(),
             'engine_provider'  => 'gemini',
             'credits_consumed' => $creditCost,

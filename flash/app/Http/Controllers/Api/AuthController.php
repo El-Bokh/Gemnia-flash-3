@@ -176,10 +176,17 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
-        $user->load('roles');
+        $user->load('roles.permissions');
 
         $usageService = new UsageService();
         $quota = $usageService->getUsageStats($user);
+
+        // Collect unique permission slugs across all user roles
+        $permissions = $user->roles
+            ->flatMap(fn ($role) => $role->permissions->pluck('slug'))
+            ->unique()
+            ->values()
+            ->toArray();
 
         return response()->json([
             'success' => true,
@@ -191,6 +198,7 @@ class AuthController extends Controller
                 'avatar' => $user->avatarUrl(),
                 'status' => $user->status,
                 'roles'  => $user->roles->pluck('slug')->toArray(),
+                'permissions' => $permissions,
                 'locale' => $user->locale,
                 'timezone' => $user->timezone,
                 'last_login_at' => $user->last_login_at?->toIso8601String(),
@@ -216,7 +224,14 @@ class AuthController extends Controller
             'last_login_ip' => $request->ip(),
         ]);
 
-        $user->loadMissing('roles');
+        $user->loadMissing('roles.permissions');
+
+        // Collect unique permission slugs across all user roles
+        $permissions = $user->roles
+            ->flatMap(fn ($role) => $role->permissions->pluck('slug'))
+            ->unique()
+            ->values()
+            ->toArray();
 
         $response = [
             'success' => true,
@@ -228,6 +243,7 @@ class AuthController extends Controller
                     'email'  => $user->email,
                     'avatar' => $user->avatarUrl(),
                     'roles'  => $user->roles->pluck('slug')->values()->all(),
+                    'permissions' => $permissions,
                 ],
             ],
         ];
