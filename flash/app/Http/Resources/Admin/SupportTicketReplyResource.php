@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Support\SupportTicketAttachmentManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,7 +14,7 @@ class SupportTicketReplyResource extends JsonResource
             'id'             => $this->id,
             'message'        => $this->message,
             'is_staff_reply' => (bool) $this->is_staff_reply,
-            'attachments'    => $this->attachments,
+            'attachments'    => SupportTicketAttachmentManager::presentMany($this->attachments),
             'created_at'     => $this->created_at?->toIso8601String(),
             'updated_at'     => $this->updated_at?->toIso8601String(),
 
@@ -22,7 +23,7 @@ class SupportTicketReplyResource extends JsonResource
                 'id'     => $this->user->id,
                 'name'   => $this->user->name,
                 'email'  => $this->user->email,
-                'avatar' => $this->user->avatar,
+                'avatar' => $this->user->avatarUrl(),
             ]),
         ];
     }

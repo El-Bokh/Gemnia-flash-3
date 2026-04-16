@@ -101,6 +101,7 @@ export const useChatStore = defineStore('chat', () => {
   const quotaError = ref<{ code: string; message: string } | null>(null)
 
   const aiMode = ref<'text' | 'image'>('text')
+  const aspectRatio = ref<string>('1:1')
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeConversationId.value) ?? null,
@@ -256,6 +257,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!conv) return
 
     const currentMode = aiMode.value
+    const currentAspectRatio = currentMode === 'image' ? aspectRatio.value : undefined
 
     // Build optimistic preview URL for attached image
     const optimisticImageUrl = image ? URL.createObjectURL(image) : undefined
@@ -296,7 +298,7 @@ export const useChatStore = defineStore('chat', () => {
     isAiTyping.value = true
     quotaError.value = null
     try {
-      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product) as any
+      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product, currentAspectRatio) as any
       if (res.success && res.data) {
         // Replace temp user message with real one
         const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
@@ -507,6 +509,7 @@ export const useChatStore = defineStore('chat', () => {
     loaded,
     quotaError,
     aiMode,
+    aspectRatio,
     loadConversations,
     setActiveConversation,
     createConversation,

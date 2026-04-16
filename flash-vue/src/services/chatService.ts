@@ -56,7 +56,7 @@ export function deleteConversation(id: number) {
   return apiDelete<ApiResponse<null>>(`/conversations/${id}`)
 }
 
-export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File, mode?: 'text' | 'image', product?: string) {
+export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File, mode?: 'text' | 'image', product?: string, aspectRatio?: string) {
   const requestConfig = mode === 'image'
     ? { timeout: LONG_RUNNING_CHAT_TIMEOUT_MS }
     : undefined
@@ -67,6 +67,7 @@ export function sendMessage(conversationId: number, content: string, imageStyle?
     if (imageStyle) form.append('image_style', imageStyle)
     if (product) form.append('product', product)
     if (mode) form.append('mode', mode)
+    if (aspectRatio) form.append('aspect_ratio', aspectRatio)
     form.append('image', image)
     return apiPost<ApiResponse<SendMessageResponse>>(
       `/conversations/${conversationId}/messages`,
@@ -79,7 +80,7 @@ export function sendMessage(conversationId: number, content: string, imageStyle?
   }
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,
-    { content, image_style: imageStyle, product, mode: mode ?? 'text' },
+    { content, image_style: imageStyle, product, mode: mode ?? 'text', aspect_ratio: aspectRatio },
     requestConfig,
   )
 }

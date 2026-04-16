@@ -6,6 +6,7 @@ use App\Models\Notification;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketReply;
 use App\Models\UsageLog;
+use App\Support\SupportTicketAttachmentManager;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -128,12 +129,14 @@ class SupportTicketManagementService
             // Auto-set timestamps based on status
             if ($data['status'] === 'resolved') {
                 $data['resolved_at'] = now();
+                $data['closed_at'] = null;
             }
             if ($data['status'] === 'closed') {
                 $data['closed_at'] = now();
+                $data['resolved_at'] = $ticket->resolved_at ?? now();
             }
-            // Clear timestamps if reopened
-            if (in_array($data['status'], ['open', 'in_progress']) && in_array($ticket->status, ['resolved', 'closed'])) {
+            // Clear timestamps if moved back into an active workflow state
+            if (in_array($data['status'], ['open', 'in_progress', 'waiting_reply'], true)) {
                 $data['resolved_at'] = null;
                 $data['closed_at']   = null;
             }
@@ -211,14 +214,16 @@ class SupportTicketManagementService
             'user_id'       => $adminId,
             'message'       => $data['message'],
             'is_staff_reply'=> true,
-            'attachments'   => $data['attachments'] ?? null,
+            'attachments'   => SupportTicketAttachmentManager::storeUploadedFiles($data['attachments'] ?? [], $adminId, 'admin-replies'),
         ]);
 
         // Update ticket state
-        $updateData = ['last_reply_at' => now()];
-        if ($ticket->status === 'open' || $ticket->status === 'waiting_reply') {
-            $updateData['status'] = 'in_progress';
-        }
+        $updateData = [
+            'last_reply_at' => now(),
+            'status' => 'waiting_reply',
+            'resolved_at' => null,
+            'closed_at' => null,
+        ];
         $ticket->update($updateData);
 
         $this->logAction($ticket, $adminId, 'ticket_reply_added', [
@@ -241,6 +246,51 @@ class SupportTicketManagementService
         );
 
         return $reply->fresh('user:id,name,email,avatar');
+    }
+
+    // ──────────────────────────────────────────────
+    //  RESOLVE TICKET
+    // ──────────────────────────────────────────────
+
+    public function resolve(SupportTicket $ticket, int $adminId): SupportTicket
+    {
+        if ($ticket->status === 'resolved') {
+            abort(422, 'Ticket is already resolved.');
+        }
+
+        if ($ticket->status === 'closed') {
+            abort(422, 'Closed ticket cannot be resolved. Reopen it first.');
+        }
+
+        $oldStatus = $ticket->status;
+
+        $ticket->update([
+            'status' => 'resolved',
+            'resolved_at' => now(),
+            'closed_at' => null,
+        ]);
+
+        $this->logAction($ticket, $adminId, 'ticket_resolved', [
+            'old_status' => $oldStatus,
+        ]);
+
+        $this->createNotification(
+            userId: $ticket->user_id,
+            type: 'ticket_resolved',
+            title: 'Your Ticket Has Been Resolved',
+            body: "Ticket #{$ticket->ticket_number} — {$ticket->subject} has been marked as resolved.",
+            actionUrl: "/support?ticket={$ticket->id}",
+            data: [
+                'ticket_id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'resolved_by' => $adminId,
+            ],
+        );
+
+        return $ticket->fresh([
+            'user:id,name,email,avatar',
+            'assignedAgent:id,name,email,avatar',
+        ]);
     }
 
     // ──────────────────────────────────────────────

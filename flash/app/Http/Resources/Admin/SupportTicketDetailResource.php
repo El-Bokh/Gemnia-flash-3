@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Admin;
 
+use App\Support\SupportTicketAttachmentManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,7 +19,7 @@ class SupportTicketDetailResource extends JsonResource
             'status'        => $this->status,
             'priority'      => $this->priority,
             'category'      => $this->category,
-            'attachments'   => $this->attachments,
+            'attachments'   => SupportTicketAttachmentManager::presentMany($this->attachments),
             'metadata'      => $this->metadata,
 
             // ── Dates ──
@@ -37,7 +38,7 @@ class SupportTicketDetailResource extends JsonResource
                 'id'     => $this->user->id,
                 'name'   => $this->user->name,
                 'email'  => $this->user->email,
-                'avatar' => $this->user->avatar,
+                'avatar' => $this->user->avatarUrl(),
                 'phone'  => $this->user->phone,
                 'status' => $this->user->status,
                 'subscription' => $this->user->subscriptions?->sortByDesc('created_at')->first()
@@ -64,7 +65,7 @@ class SupportTicketDetailResource extends JsonResource
                 'id'     => $this->assignedAgent->id,
                 'name'   => $this->assignedAgent->name,
                 'email'  => $this->assignedAgent->email,
-                'avatar' => $this->assignedAgent->avatar,
+                'avatar' => $this->assignedAgent->avatarUrl(),
             ] : null),
 
             // ── Conversation Thread (replies ordered chronologically) ──

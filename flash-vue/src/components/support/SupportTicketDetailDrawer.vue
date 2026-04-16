@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { SupportAttachment } from '@/types/supportShared'
+import { resolveMediaUrl } from '@/utils/mediaUrl'
 import {
   assignTicket,
   closeTicket,
   deleteSupportTicket,
   getSupportTicket,
+  resolveTicket,
   reopenTicket,
   replyToTicket,
   restoreSupportTicket,
@@ -51,10 +54,17 @@ const saving = ref(false)
 const replying = ref(false)
 const assigning = ref(false)
 const stateActionLoading = ref(false)
+const quickActionLoading = ref<string | null>(null)
 const destructiveLoading = ref(false)
 
 const detail = ref<SupportTicketDetail | null>(null)
 const agentOptions = ref<Array<{ label: string; value: number; meta: string }>>([])
+const replyAttachmentInput = ref<HTMLInputElement | null>(null)
+const replyAttachments = ref<File[]>([])
+const previewAttachment = ref<SupportAttachment | null>(null)
+const previewDialogVisible = ref(false)
+
+const acceptedAttachmentTypes = '.png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.doc,.docx,.xls,.xlsx,.csv'
 
 const statusOptions = computed(() => [
   { label: t('support.open'), value: 'open' },
@@ -88,7 +98,7 @@ type ConversationEntry = {
   id: number | string
   message: string
   is_staff_reply: boolean
-  attachments: string[] | null
+  attachments: SupportAttachment[]
   created_at: string
   user: {
     name: string
@@ -134,16 +144,62 @@ const conversationMessages = computed<ConversationEntry[]>(() => {
   ]
 })
 
+const allConversationAttachments = computed(() => conversationMessages.value.flatMap(entry =>
+  (entry.attachments ?? []).map((attachment, index) => ({
+    id: `${entry.id}-${index}-${attachment.name}`,
+    attachment,
+    url: attachmentUrl(attachment),
+    source: `${entry.is_opening ? t('ticketDetail.openingMessage') : (entry.is_staff_reply ? t('ticketDetail.staffReply') : t('ticketDetail.customerReply'))} · ${entry.user.name}`,
+    created_at: entry.created_at,
+  })),
+))
+
+const previewAttachmentUrl = computed(() => (previewAttachment.value ? attachmentUrl(previewAttachment.value) : null))
+
+const ticketSnapshot = computed(() => {
+  if (!detail.value) return null
+
+  return {
+    ticket_number: detail.value.ticket_number,
+    subject: detail.value.subject,
+    message: detail.value.message,
+    status: detail.value.status,
+    priority: detail.value.priority,
+    category: detail.value.category,
+    created_at: detail.value.created_at,
+    updated_at: detail.value.updated_at,
+    last_reply_at: detail.value.last_reply_at,
+    resolved_at: detail.value.resolved_at,
+    closed_at: detail.value.closed_at,
+    replies_count: detail.value.replies_count,
+    attachments_count: allConversationAttachments.value.length,
+    assigned_agent: detail.value.assigned_agent ? {
+      id: detail.value.assigned_agent.id,
+      name: detail.value.assigned_agent.name,
+      email: detail.value.assigned_agent.email,
+    } : null,
+    customer: {
+      id: detail.value.user.id,
+      name: detail.value.user.name,
+      email: detail.value.user.email,
+      phone: detail.value.user.phone,
+      status: detail.value.user.status,
+    },
+    metadata: detail.value.metadata,
+  }
+})
+
 watch(
-  () => props.visible,
-  visible => {
-    if (!visible || !props.ticketId) {
+  [() => props.visible, () => props.ticketId],
+  ([visible, ticketId]) => {
+    if (!visible || !ticketId) {
       detail.value = null
       return
     }
 
     Promise.all([loadAgents(), loadTicket()])
   },
+  { immediate: true },
 )
 
 async function loadAgents() {
@@ -186,6 +242,7 @@ async function loadTicket() {
       }
       assignForm.value = { assigned_to: detail.value.assigned_agent?.id || null }
       replyForm.value = { message: '' }
+      replyAttachments.value = []
     }
     loading.value = false
   }
@@ -233,7 +290,10 @@ async function sendReply() {
 
   replying.value = true
   try {
-    const payload: ReplyTicketData = { message: replyForm.value.message }
+    const payload: ReplyTicketData = {
+      message: replyForm.value.message,
+      attachments: replyAttachments.value,
+    }
     await replyToTicket(detail.value.id, payload)
     await loadTicket()
     emit('updated')
@@ -241,6 +301,36 @@ async function sendReply() {
     // noop
   } finally {
     replying.value = false
+  }
+}
+
+async function resolveCurrentTicket() {
+  if (!detail.value) return
+
+  quickActionLoading.value = 'resolved'
+  try {
+    await resolveTicket(detail.value.id)
+    await loadTicket()
+    emit('updated')
+  } catch {
+    // noop
+  } finally {
+    quickActionLoading.value = null
+  }
+}
+
+async function setStatusQuick(status: TicketStatus) {
+  if (!detail.value || detail.value.status === status) return
+
+  quickActionLoading.value = status
+  try {
+    await updateSupportTicket(detail.value.id, { status })
+    await loadTicket()
+    emit('updated')
+  } catch {
+    // noop
+  } finally {
+    quickActionLoading.value = null
   }
 }
 
@@ -294,7 +384,112 @@ async function handleRestore() {
 }
 
 function close() {
+  replyAttachments.value = []
+  closeAttachmentPreview()
   emit('update:visible', false)
+}
+
+function fileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`
+}
+
+function attachmentKey(attachment: SupportAttachment) {
+  return `${attachment.name}-${attachment.url ?? 'none'}`
+}
+
+function formatAttachmentSize(size: number | null) {
+  if (!size) return null
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`
+  return `${size} B`
+}
+
+function attachmentIcon(attachment: SupportAttachment) {
+  return attachment.is_image ? 'pi pi-image' : 'pi pi-paperclip'
+}
+
+function avatarUrl(value: string | null | undefined) {
+  return resolveMediaUrl(value) || undefined
+}
+
+function attachmentUrl(attachment: SupportAttachment) {
+  return resolveMediaUrl(attachment.url)
+}
+
+function canPreviewAttachment(attachment: SupportAttachment) {
+  return attachment.is_image && !!attachmentUrl(attachment)
+}
+
+function openAttachmentPreview(attachment: SupportAttachment) {
+  if (!canPreviewAttachment(attachment)) return
+  previewAttachment.value = attachment
+  previewDialogVisible.value = true
+}
+
+function closeAttachmentPreview() {
+  previewDialogVisible.value = false
+  previewAttachment.value = null
+}
+
+function downloadAttachment(attachment: SupportAttachment) {
+  const url = attachmentUrl(attachment)
+  if (!url) return
+
+  const link = document.createElement('a')
+  link.href = url
+  link.download = attachment.name || 'attachment'
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
+function openAttachmentInNewTab(attachment: SupportAttachment) {
+  const url = attachmentUrl(attachment)
+  if (!url) return
+
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+function handleAttachmentPrimaryAction(attachment: SupportAttachment) {
+  if (!attachmentUrl(attachment)) return
+
+  if (attachment.is_image) {
+    openAttachmentPreview(attachment)
+    return
+  }
+
+  downloadAttachment(attachment)
+}
+
+function mergeFiles(existing: File[], files: FileList | null) {
+  if (!files) return existing
+
+  const next = [...existing]
+
+  Array.from(files).forEach(file => {
+    const key = fileKey(file)
+    if (!next.some(item => fileKey(item) === key)) {
+      next.push(file)
+    }
+  })
+
+  return next.slice(0, 5)
+}
+
+function selectReplyAttachments() {
+  replyAttachmentInput.value?.click()
+}
+
+function onReplyAttachmentsChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  replyAttachments.value = mergeFiles(replyAttachments.value, input.files)
+  input.value = ''
+}
+
+function removeReplyAttachment(file: File) {
+  replyAttachments.value = replyAttachments.value.filter(item => fileKey(item) !== fileKey(file))
 }
 
 function buildMockTicket(id: number): SupportTicketDetail {
@@ -307,7 +502,10 @@ function buildMockTicket(id: number): SupportTicketDetail {
     status: 'in_progress',
     priority: 'high',
     category: 'billing',
-    attachments: ['refund-receipt.pdf', 'ledger-screenshot.png'],
+    attachments: [
+      { name: 'refund-receipt.pdf', url: null, mime_type: 'application/pdf', size: 240000, is_image: false },
+      { name: 'ledger-screenshot.png', url: null, mime_type: 'image/png', size: 190000, is_image: true },
+    ],
     metadata: { source: 'dashboard_widget', sentiment: 'frustrated', sla_minutes_left: 82 },
     last_reply_at: '2026-04-04T09:38:00Z',
     resolved_at: null,
@@ -338,7 +536,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
         id: 91,
         message: 'I can confirm the refund landed on Stripe, but my credits remain locked in the account.',
         is_staff_reply: false,
-        attachments: null,
+        attachments: [],
         created_at: '2026-04-04T08:55:00Z',
         updated_at: '2026-04-04T08:55:00Z',
         user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
@@ -347,7 +545,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
         id: 92,
         message: 'We are reviewing the credit ledger now. I will update you once reconciliation finishes.',
         is_staff_reply: true,
-        attachments: null,
+        attachments: [],
         created_at: '2026-04-04T09:12:00Z',
         updated_at: '2026-04-04T09:12:00Z',
         user: { id: 6, name: 'Nour Sayed', email: 'nour@klek.ai', avatar: null },
@@ -356,7 +554,7 @@ function buildMockTicket(id: number): SupportTicketDetail {
         id: 93,
         message: 'Understood. Sharing the latest screenshot from the billing page for reference.',
         is_staff_reply: false,
-        attachments: ['billing-page.png'],
+        attachments: [{ name: 'billing-page.png', url: null, mime_type: 'image/png', size: 160000, is_image: true }],
         created_at: '2026-04-04T09:38:00Z',
         updated_at: '2026-04-04T09:38:00Z',
         user: { id: 1, name: 'Sara Ahmed', email: 'sara@klek.ai', avatar: null },
@@ -432,6 +630,33 @@ function formatJson(value: Record<string, unknown> | null) {
             <p class="hero-desc">{{ detail.message }}</p>
           </div>
           <div class="hero-actions">
+            <Button
+              v-if="detail.status !== 'closed' && detail.status !== 'in_progress'"
+              :label="t('ticketDetail.setInProgress')"
+              size="small"
+              severity="info"
+              outlined
+              :loading="quickActionLoading === 'in_progress'"
+              @click="setStatusQuick('in_progress')"
+            />
+            <Button
+              v-if="detail.status !== 'closed' && detail.status !== 'waiting_reply'"
+              :label="t('ticketDetail.waitingForCustomer')"
+              size="small"
+              severity="secondary"
+              outlined
+              :loading="quickActionLoading === 'waiting_reply'"
+              @click="setStatusQuick('waiting_reply')"
+            />
+            <Button
+              v-if="detail.status !== 'closed' && detail.status !== 'resolved'"
+              :label="t('ticketDetail.resolveTicket')"
+              size="small"
+              severity="success"
+              outlined
+              :loading="quickActionLoading === 'resolved'"
+              @click="resolveCurrentTicket"
+            />
             <Button :label="stateActionLabel" size="small" severity="secondary" outlined :loading="stateActionLoading" @click="toggleTicketState" />
             <Button v-if="detail.deleted_at" icon="pi pi-replay" severity="secondary" text rounded size="small" :loading="destructiveLoading" @click="handleRestore" />
             <Button v-else icon="pi pi-trash" severity="danger" text rounded size="small" :loading="destructiveLoading" @click="handleDelete" />
@@ -516,7 +741,7 @@ function formatJson(value: Record<string, unknown> | null) {
                 <div class="thread-head">
                   <div class="thread-user">
                     <div class="thread-avatar">
-                      <img v-if="entry.user.avatar" :src="entry.user.avatar" :alt="entry.user.name" />
+                      <img v-if="avatarUrl(entry.user.avatar)" :src="avatarUrl(entry.user.avatar)" :alt="entry.user.name" />
                       <span v-else>{{ initials(entry.user.name) }}</span>
                     </div>
                     <div class="thread-copy">
@@ -528,7 +753,54 @@ function formatJson(value: Record<string, unknown> | null) {
                 </div>
                 <p class="thread-message">{{ entry.message }}</p>
                 <div v-if="entry.attachments?.length" class="attachment-row">
-                  <span v-for="attachment in entry.attachments" :key="attachment" class="attachment-chip">{{ attachment }}</span>
+                  <div
+                    v-for="attachment in entry.attachments"
+                    :key="attachmentKey(attachment)"
+                    class="support-attachment-card compact"
+                    :class="{ disabled: !attachmentUrl(attachment), 'has-preview': canPreviewAttachment(attachment) }"
+                  >
+                    <button
+                      type="button"
+                      class="support-attachment-main"
+                      :disabled="!attachmentUrl(attachment)"
+                      @click="handleAttachmentPrimaryAction(attachment)"
+                    >
+                      <img
+                        v-if="attachment.is_image && attachmentUrl(attachment)"
+                        :src="attachmentUrl(attachment) || undefined"
+                        :alt="attachment.name"
+                        class="support-attachment-thumb"
+                        loading="lazy"
+                      >
+                      <span v-else class="support-attachment-icon-shell"><i :class="attachmentIcon(attachment)" /></span>
+                      <span class="support-attachment-copy">
+                        <strong>{{ attachment.name }}</strong>
+                        <small v-if="formatAttachmentSize(attachment.size)">{{ formatAttachmentSize(attachment.size) }}</small>
+                      </span>
+                    </button>
+                    <div class="support-attachment-actions">
+                      <Button
+                        v-if="canPreviewAttachment(attachment)"
+                        icon="pi pi-search-plus"
+                        severity="secondary"
+                        text
+                        rounded
+                        size="small"
+                        :aria-label="t('attachmentViewer.zoomImage')"
+                        @click="openAttachmentPreview(attachment)"
+                      />
+                      <Button
+                        icon="pi pi-download"
+                        severity="secondary"
+                        text
+                        rounded
+                        size="small"
+                        :disabled="!attachmentUrl(attachment)"
+                        :aria-label="t('attachmentViewer.download')"
+                        @click="downloadAttachment(attachment)"
+                      />
+                    </div>
+                  </div>
                 </div>
               </article>
             </div>
@@ -538,6 +810,27 @@ function formatJson(value: Record<string, unknown> | null) {
                 <div class="form-field form-field-full">
                   <label>{{ t('ticketDetail.message') }}</label>
                   <Textarea v-model="replyForm.message" rows="5" autoResize class="w-full" :placeholder="t('ticketDetail.messagePlaceholder')" :disabled="replyDisabled" />
+                </div>
+                <input
+                  ref="replyAttachmentInput"
+                  type="file"
+                  class="hidden-file-input"
+                  :accept="acceptedAttachmentTypes"
+                  multiple
+                  @change="onReplyAttachmentsChange"
+                >
+                <div class="upload-toolbar">
+                  <Button :label="t('ticketDetail.addAttachments')" size="small" severity="secondary" text icon="pi pi-paperclip" :disabled="replyDisabled" @click="selectReplyAttachments" />
+                  <span class="upload-hint">{{ t('ticketDetail.attachmentsHint') }}</span>
+                </div>
+                <div v-if="replyAttachments.length" class="pending-attachments">
+                  <div v-for="file in replyAttachments" :key="fileKey(file)" class="pending-attachment-item">
+                    <div class="pending-attachment-copy">
+                      <strong>{{ file.name }}</strong>
+                      <span>{{ formatAttachmentSize(file.size) }}</span>
+                    </div>
+                    <Button icon="pi pi-times" severity="secondary" text rounded size="small" :aria-label="t('ticketDetail.removeAttachment')" @click="removeReplyAttachment(file)" />
+                  </div>
                 </div>
                 <div class="edit-actions">
                   <Button :label="t('ticketDetail.sendReply')" size="small" :disabled="replyDisabled || !replyForm.message.trim()" :loading="replying" @click="sendReply" />
@@ -593,13 +886,67 @@ function formatJson(value: Record<string, unknown> | null) {
           <TabPanel value="payloads">
             <div class="payload-grid">
               <section class="payload-card">
-                <h3 class="section-title">{{ t('ticketDetail.attachments') }}</h3>
-                <div v-if="detail.attachments?.length" class="attachment-row multi-line">
-                  <span v-for="attachment in detail.attachments" :key="attachment" class="attachment-chip">{{ attachment }}</span>
+                <h3 class="section-title">{{ t('ticketDetail.allAttachments') }}</h3>
+                <div v-if="allConversationAttachments.length" class="attachment-gallery">
+                  <div
+                    v-for="item in allConversationAttachments"
+                    :key="item.id"
+                    class="support-attachment-card support-attachment-card--gallery"
+                    :class="{ disabled: !item.url, 'has-preview': canPreviewAttachment(item.attachment) }"
+                  >
+                    <button
+                      type="button"
+                      class="support-attachment-main"
+                      :disabled="!item.url"
+                      @click="handleAttachmentPrimaryAction(item.attachment)"
+                    >
+                      <img
+                        v-if="item.attachment.is_image && item.url"
+                        :src="item.url || undefined"
+                        :alt="item.attachment.name"
+                        class="support-attachment-thumb support-attachment-thumb--large"
+                        loading="lazy"
+                      >
+                      <span v-else class="support-attachment-icon-shell"><i :class="attachmentIcon(item.attachment)" /></span>
+                      <span class="support-attachment-copy support-attachment-copy--wide">
+                        <strong>{{ item.attachment.name }}</strong>
+                        <span>{{ item.source }}</span>
+                        <small>
+                          <template v-if="formatAttachmentSize(item.attachment.size)">{{ formatAttachmentSize(item.attachment.size) }} · </template>{{ formatDateTime(item.created_at) }}
+                        </small>
+                      </span>
+                    </button>
+                    <div class="support-attachment-actions">
+                      <Button
+                        v-if="canPreviewAttachment(item.attachment)"
+                        icon="pi pi-search-plus"
+                        severity="secondary"
+                        text
+                        rounded
+                        size="small"
+                        :aria-label="t('attachmentViewer.zoomImage')"
+                        @click="openAttachmentPreview(item.attachment)"
+                      />
+                      <Button
+                        icon="pi pi-download"
+                        severity="secondary"
+                        text
+                        rounded
+                        size="small"
+                        :disabled="!item.url"
+                        :aria-label="t('attachmentViewer.download')"
+                        @click="downloadAttachment(item.attachment)"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <pre v-else>—</pre>
               </section>
               <section class="payload-card">
+                <h3 class="section-title">{{ t('ticketDetail.ticketSnapshot') }}</h3>
+                <pre>{{ formatJson(ticketSnapshot) }}</pre>
+              </section>
+              <section v-if="detail.metadata" class="payload-card">
                 <h3 class="section-title">{{ t('invoiceDetail.metadata') }}</h3>
                 <pre>{{ formatJson(detail.metadata) }}</pre>
               </section>
@@ -608,6 +955,48 @@ function formatJson(value: Record<string, unknown> | null) {
         </TabPanels>
       </Tabs>
     </div>
+  </Dialog>
+
+  <Dialog
+    v-model:visible="previewDialogVisible"
+    modal
+    dismissableMask
+    class="attachment-preview-dialog"
+    :header="previewAttachment?.name || t('ticketDetail.attachments')"
+    :style="{ width: 'min(92vw, 1080px)' }"
+    @hide="closeAttachmentPreview"
+  >
+    <div v-if="previewAttachmentUrl" class="attachment-preview-shell">
+      <img
+        :src="previewAttachmentUrl"
+        :alt="previewAttachment?.name || ''"
+        class="attachment-preview-image"
+      >
+    </div>
+    <template #footer>
+      <div class="attachment-preview-footer">
+        <span class="attachment-preview-meta">
+          {{ previewAttachment?.name }}
+          <template v-if="previewAttachment && formatAttachmentSize(previewAttachment.size)">
+            · {{ formatAttachmentSize(previewAttachment.size) }}
+          </template>
+        </span>
+        <div class="attachment-preview-actions">
+          <Button
+            icon="pi pi-external-link"
+            severity="secondary"
+            text
+            :label="t('attachmentViewer.openOriginal')"
+            @click="previewAttachment && openAttachmentInNewTab(previewAttachment)"
+          />
+          <Button
+            icon="pi pi-download"
+            :label="t('attachmentViewer.download')"
+            @click="previewAttachment && downloadAttachment(previewAttachment)"
+          />
+        </div>
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -658,7 +1047,7 @@ function formatJson(value: Record<string, unknown> | null) {
 .thread-message { margin: 0; font-size: 0.72rem; line-height: 1.5; color: var(--text-primary); }
 .attachment-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .attachment-row.multi-line { margin-top: 0; }
-.attachment-chip { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; background: var(--hover-bg); font-size: 0.62rem; color: var(--text-secondary); }
+.attachment-gallery { display: grid; gap: 8px; }
 .conversation-reply-card { position: sticky; bottom: 0; }
 .form-field { display: flex; flex-direction: column; gap: 4px; }
 .form-field label { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -669,7 +1058,47 @@ function formatJson(value: Record<string, unknown> | null) {
 .agent-option { display: flex; flex-direction: column; gap: 2px; }
 .agent-label { font-size: 0.7rem; color: var(--text-primary); }
 .agent-meta { font-size: 0.6rem; color: var(--text-muted); }
+.hidden-file-input { display: none; }
+.upload-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 10px; border: 1px dashed var(--card-border); border-radius: 10px; background: var(--hover-bg); }
+.upload-hint { font-size: 0.62rem; color: var(--text-muted); }
+.pending-attachments { display: grid; gap: 8px; margin-top: 10px; }
+.pending-attachment-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--hover-bg); }
+.pending-attachment-copy { display: flex; flex-direction: column; min-width: 0; }
+.pending-attachment-copy strong { font-size: 0.68rem; color: var(--text-primary); word-break: break-word; }
+.pending-attachment-copy span { font-size: 0.6rem; color: var(--text-muted); }
+.support-attachment-card { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--hover-bg); }
+.support-attachment-card.compact { min-width: min(100%, 320px); }
+.support-attachment-card--gallery { align-items: stretch; }
+.support-attachment-card.disabled { opacity: 0.7; }
+.support-attachment-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding: 0; border: 0; background: transparent; color: inherit; text-align: start; cursor: pointer; }
+.support-attachment-main:disabled { cursor: default; }
+.support-attachment-thumb,
+.support-attachment-icon-shell { width: 56px; height: 56px; border-radius: 12px; flex-shrink: 0; }
+.support-attachment-thumb--large { width: 72px; height: 72px; }
+.support-attachment-thumb { object-fit: cover; background: rgba(255, 255, 255, 0.04); }
+.support-attachment-icon-shell { display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--card-bg) 78%, rgba(59, 130, 246, 0.14)); }
+.support-attachment-copy { display: flex; flex-direction: column; min-width: 0; }
+.support-attachment-copy strong { font-size: 0.68rem; line-height: 1.35; color: var(--text-primary); word-break: break-word; }
+.support-attachment-copy span,
+.support-attachment-copy small { font-size: 0.62rem; color: var(--text-muted); }
+.support-attachment-copy--wide { gap: 3px; }
+.support-attachment-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.attachment-preview-shell { display: flex; align-items: center; justify-content: center; min-height: min(70vh, 720px); padding: 12px; border-radius: 20px; background: rgba(10, 13, 22, 0.96); }
+.attachment-preview-image { max-width: 100%; max-height: min(68vh, 680px); border-radius: 16px; object-fit: contain; }
+.attachment-preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.attachment-preview-meta { min-width: 0; color: var(--text-muted); font-size: 0.74rem; word-break: break-word; }
+.attachment-preview-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 :deep(.support-ticket-drawer) { margin: 0 !important; border-radius: 0 !important; }
 :deep(.support-ticket-drawer .p-dialog-header) { background: var(--card-bg); border-color: var(--card-border); color: var(--text-primary); padding: 10px 16px; }
 :deep(.support-ticket-drawer .p-dialog-content) { background: var(--card-bg); color: var(--text-primary); padding: 12px 16px; overflow-y: auto; }
+:deep(.attachment-preview-dialog .p-dialog-header),
+:deep(.attachment-preview-dialog .p-dialog-content),
+:deep(.attachment-preview-dialog .p-dialog-footer) { background: var(--card-bg); color: var(--text-primary); border-color: var(--card-border); }
+
+@media (max-width: 720px) {
+  .support-attachment-card,
+  .attachment-preview-footer { flex-direction: column; align-items: stretch; }
+  .support-attachment-actions,
+  .attachment-preview-actions { justify-content: flex-end; }
+}
 </style>

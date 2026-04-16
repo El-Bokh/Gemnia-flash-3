@@ -31,7 +31,19 @@ export function assignTicket(id: number, data: AssignTicketData) {
 }
 
 export function replyToTicket(id: number, data: ReplyTicketData) {
-  return apiPost<ApiResponse<SupportTicketReply>>(`${BASE}/${id}/reply`, data)
+  const form = new FormData()
+  form.append('message', data.message)
+  data.attachments?.forEach((file, index) => {
+    form.append(`attachments[${index}]`, file)
+  })
+
+  return apiPost<ApiResponse<SupportTicketReply>>(`${BASE}/${id}/reply`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export function resolveTicket(id: number) {
+  return apiPost<ApiResponse<SupportTicket>>(`${BASE}/${id}/resolve`)
 }
 
 export function closeTicket(id: number) {

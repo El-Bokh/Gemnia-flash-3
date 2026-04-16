@@ -1,5 +1,7 @@
 // ─── Support Ticket Types ───────────────────────────────
 
+import type { SupportAttachment } from '@/types/supportShared'
+
 export interface TicketUser {
   id: number
   name: string
@@ -67,7 +69,7 @@ export interface SupportTicketReply {
   id: number
   message: string
   is_staff_reply: boolean
-  attachments: string[] | null
+  attachments: SupportAttachment[]
   created_at: string
   updated_at: string
   user: TicketUser
@@ -82,7 +84,7 @@ export interface SupportTicketDetail {
   status: string
   priority: string
   category: string | null
-  attachments: string[] | null
+  attachments: SupportAttachment[]
   metadata: Record<string, unknown> | null
   last_reply_at: string | null
   resolved_at: string | null
@@ -130,7 +132,7 @@ export interface AssignTicketData {
 
 export interface ReplyTicketData {
   message: string
-  attachments?: string[] | null
+  attachments?: File[] | null
 }
 
 // ─── Aggregations ───────────────────────────────────────

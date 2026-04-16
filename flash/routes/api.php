@@ -103,6 +103,8 @@ Route::middleware(['auth:sanctum', 'platform.maintenance'])->group(function () {
         Route::post('/',             [ClientSupportTicketController::class, 'store'])->name('store');
         Route::get('/{ticket}',      [ClientSupportTicketController::class, 'show'])->name('show');
         Route::post('/{ticket}/reply', [ClientSupportTicketController::class, 'reply'])->name('reply');
+        Route::post('/{ticket}/resolve', [ClientSupportTicketController::class, 'resolve'])->name('resolve');
+        Route::post('/{ticket}/reopen', [ClientSupportTicketController::class, 'reopen'])->name('reopen');
     });
 });
 
@@ -303,6 +305,7 @@ Route::prefix('admin')
             // Extra actions
             Route::post('/{ticket}/assign',    [SupportTicketController::class, 'assign'])->name('assign');
             Route::post('/{ticket}/reply',     [SupportTicketController::class, 'reply'])->name('reply');
+            Route::post('/{ticket}/resolve',   [SupportTicketController::class, 'resolve'])->name('resolve');
             Route::post('/{ticket}/close',     [SupportTicketController::class, 'close'])->name('close');
             Route::post('/{ticket}/reopen',    [SupportTicketController::class, 'reopen'])->name('reopen');
             Route::delete('/{ticketId}/force',   [SupportTicketController::class, 'forceDelete'])->name('force-delete');

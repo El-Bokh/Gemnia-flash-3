@@ -196,24 +196,25 @@ class ConversationController extends Controller
             'images'      => ['nullable', 'array', 'max:10'],
             'images.*'    => ['image', 'max:10240'],
             'mode'        => ['nullable', 'string', 'in:text,image,product'],
+            'aspect_ratio' => ['nullable', 'string', 'in:1:1,3:4,4:3,9:16,16:9'],
         ]);
 
         $mode = $data['mode'] ?? 'text';
+        $imageFollowUpContext = null;
 
-        // Auto-detect: if user sends image-mode text follow-up in a conversation
-        // that has recent product/image uploads, switch to text mode for multimodal context.
-        // This prevents accidental image generation when the user intends to discuss uploaded images.
+        // Image-mode follow-ups need better intent handling:
+        // - Questions like "كم عدد الصور" should become text replies.
+        // - Requests like "أعد الصورة بنفس الفكرة لكن 16:9" must stay in image mode
+        //   and reuse the referenced previous image as context.
         if ($mode === 'image' && ! $request->hasFile('image') && ! $request->hasFile('images')) {
-            $hasRecentImages = $conversation->messages()
-                ->where('role', 'user')
-                ->where(function ($q) {
-                    $q->whereNotNull('image_url')->orWhereNotNull('product_images');
-                })
-                ->where('created_at', '>=', now()->subHours(1))
-                ->exists();
-
-            if ($hasRecentImages) {
+            if ($this->shouldTreatImagePromptAsText($data['content'])) {
                 $mode = 'text';
+            } else {
+                $imageFollowUpContext = $this->resolveImageFollowUpContext(
+                    $conversation,
+                    $request->user()->id,
+                    $data['content'],
+                );
             }
         }
 
@@ -305,6 +306,7 @@ class ConversationController extends Controller
         // Build the prompt — inject hidden base + style prompts
         $userContent = $data['content'];
         $styleSlug = $data['image_style'] ?? null;
+        $baseImagePrompt = $imageFollowUpContext['prompt'] ?? $userContent;
         $geminiPrompt = $userContent;
 
         if ($mode === 'image') {
@@ -320,7 +322,7 @@ class ConversationController extends Controller
             }
 
             // User prompt (keep it clean - enhancePromptForImagen will handle quality keywords)
-            $parts[] = $userContent;
+            $parts[] = $baseImagePrompt;
 
             // Style suffix (if any)
             if ($style && $style->prompt_suffix) {
@@ -420,7 +422,16 @@ class ConversationController extends Controller
             }
         }
 
-        $gemini = new GeminiService($mode);
+        if (
+            $mode === 'image'
+            && ! $imageBase64
+            && ! $imageMime
+            && ! empty($imageFollowUpContext['reference_image_url'])
+        ) {
+            $this->appendInlineImageFromUrl($currentParts, $imageFollowUpContext['reference_image_url']);
+        }
+
+        $gemini = new GeminiService($mode, $data['aspect_ratio'] ?? null);
         $startedAt = now();
         $result = $gemini->chatWithParts($history, $currentParts);
         $completedAt = now();
@@ -791,6 +802,212 @@ class ConversationController extends Controller
         }
 
         return 'text';
+    }
+
+    private function shouldTreatImagePromptAsText(string $content): bool
+    {
+        $prompt = $this->normalizePrompt($content);
+
+        $imageIntentPatterns = [
+            '/\b(generate|create|make|remake|redo|again|variation|version|aspect|ratio|size|resize|portrait|landscape|widescreen|same image|image number|number\s*\d+)\b/u',
+            '/(اعمل|اعملي|أنشئ|انشئ|ولد|ولّد|سوي|سوّي|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|نفس|مثلها|زيها|نسخة|نسخه|ابعاد|أبعاد|مقاس|نسبة|أفقي|افقي|طولي|عمودي|الصورة|الصوره|صورة|صوره|رقم|16:9|9:16|4:3|3:4|1:1)/u',
+        ];
+
+        foreach ($imageIntentPatterns as $pattern) {
+            if (preg_match($pattern, $prompt)) {
+                return false;
+            }
+        }
+
+        $textIntentPatterns = [
+            '/\b(how many|count|list|which|what did|tell me|summarize|summary|explain|describe|analyze|compare|remember)\b/u',
+            '/(كم|عدد|اذكر|قول|قل|لخص|لخّص|اختصر|اشرح|اوصف|حلل|حلّل|قارن|تذكر|تتذكر|ما الذي|ماهي|ما هي|ايه|إيه|ايش)/u',
+        ];
+
+        foreach ($textIntentPatterns as $pattern) {
+            if (preg_match($pattern, $prompt)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function resolveImageFollowUpContext(Conversation $conversation, int $userId, string $content): ?array
+    {
+        $imageMessages = $conversation->messages()
+            ->with('aiRequest')
+            ->where('role', 'assistant')
+            ->whereNotNull('image_url')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (ConversationMessage $message) => $message->aiRequest !== null)
+            ->values();
+
+        if ($imageMessages->isEmpty()) {
+            return null;
+        }
+
+        $referencedMessage = null;
+        $ordinal = $this->extractReferencedOrdinal($content);
+
+        if ($ordinal !== null && $ordinal >= 1 && $ordinal <= $imageMessages->count()) {
+            $referencedMessage = $imageMessages->get($ordinal - 1);
+        }
+
+        if (! $referencedMessage) {
+            $referencedMessage = $this->findBestMatchingImageMessage($imageMessages, $content);
+        }
+
+        if (! $referencedMessage || ! $referencedMessage->aiRequest) {
+            return null;
+        }
+
+        $referencedRequest = $referencedMessage->aiRequest;
+        $basePrompt = $referencedRequest->processed_prompt ?: $referencedRequest->user_prompt;
+
+        if (! $basePrompt) {
+            return null;
+        }
+
+        return [
+            'prompt' => $this->mergeImageFollowUpPrompt($basePrompt, $content, $ordinal !== null),
+            'reference_image_url' => $referencedRequest->output_image_path ?: $referencedMessage->image_url,
+            'reference_ai_request_id' => $referencedRequest->id,
+            'reference_user_id' => $userId,
+        ];
+    }
+
+    private function findBestMatchingImageMessage($imageMessages, string $content): ?ConversationMessage
+    {
+        $keywords = $this->extractReferenceKeywords($content);
+
+        if (empty($keywords)) {
+            return $imageMessages->last();
+        }
+
+        $bestMessage = null;
+        $bestScore = 0;
+
+        foreach ($imageMessages as $message) {
+            $haystack = $this->normalizePrompt(implode(' ', array_filter([
+                $message->aiRequest?->user_prompt,
+                $message->aiRequest?->processed_prompt,
+                $message->content,
+            ])));
+
+            $score = 0;
+            foreach ($keywords as $keyword) {
+                if ($keyword !== '' && str_contains($haystack, $keyword)) {
+                    $score += mb_strlen($keyword);
+                }
+            }
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestMessage = $message;
+            }
+        }
+
+        return $bestMessage ?: $imageMessages->last();
+    }
+
+    private function extractReferencedOrdinal(string $content): ?int
+    {
+        $normalizedDigits = strtr($content, [
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ]);
+
+        if (preg_match('/(?:رقم|number|#)\s*(\d+)/iu', $normalizedDigits, $matches)) {
+            return (int) $matches[1];
+        }
+
+        if (preg_match('/\b(\d+)\b/u', $normalizedDigits, $matches)) {
+            return (int) $matches[1];
+        }
+
+        $lower = $this->normalizePrompt($normalizedDigits);
+
+        return match (true) {
+            str_contains($lower, 'الاولى'), str_contains($lower, 'الأولى'), str_contains($lower, 'first') => 1,
+            str_contains($lower, 'الثانية'), str_contains($lower, 'الثانيه'), str_contains($lower, 'second') => 2,
+            str_contains($lower, 'الثالثة'), str_contains($lower, 'الثالثه'), str_contains($lower, 'third') => 3,
+            default => null,
+        };
+    }
+
+    private function extractReferenceKeywords(string $content): array
+    {
+        $normalized = $this->normalizePrompt($content);
+        $tokens = preg_split('/[^\p{L}\p{N}:]+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $stopwords = [
+            'رقم', 'number', 'image', 'photo', 'picture',
+            'الصورة', 'الصوره', 'صورة', 'صوره',
+            'اعمل', 'اعملي', 'أنشئ', 'انشئ', 'ولد', 'ولد', 'عيد', 'اعد', 'أعد',
+            'مرة', 'مره', 'تاني', 'ثاني', 'ثانية', 'ثانيه',
+            'نفس', 'مثلها', 'زيها', 'نسخة', 'نسخه',
+            'ابعاد', 'أبعاد', 'مقاس', 'نسبة', 'aspect', 'ratio', 'size', 'dimensions',
+            'new', 'different', 'الجديدة', 'جديدة', 'بتاع', 'بتاعت',
+            '16:9', '9:16', '4:3', '3:4', '1:1',
+        ];
+
+        return array_values(array_filter(array_unique($tokens), function (string $token) use ($stopwords) {
+            return ! in_array($token, $stopwords, true)
+                && ! ctype_digit($token)
+                && mb_strlen($token) >= 3;
+        }));
+    }
+
+    private function mergeImageFollowUpPrompt(string $basePrompt, string $followUpPrompt, bool $resolvedByOrdinal = false): string
+    {
+        if ($this->isReferenceOnlyImageFollowUp($followUpPrompt, $resolvedByOrdinal)) {
+            return $basePrompt;
+        }
+
+        return trim($basePrompt) . "\n\nKeep the same main subject, identity, composition, mood, and overall style as the referenced image. Apply only these requested changes: " . trim($followUpPrompt);
+    }
+
+    private function isReferenceOnlyImageFollowUp(string $content, bool $resolvedByOrdinal = false): bool
+    {
+        $normalized = $this->normalizePrompt($content);
+        $stripped = preg_replace([
+            '/(?:رقم|number|#)\s*\d+/iu',
+            '/\b\d+\b/u',
+            '/(الصورة|الصوره|صورة|صوره|نفس|مثلها|زيها|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|ابعاد|أبعاد|مقاس|نسبة|الجديدة|جديدة|بتاع|بتاعت|aspect|ratio|size|dimensions|same|again|remake|redo|variation|version|new|different)/u',
+            '/\b(?:16:9|9:16|4:3|3:4|1:1)\b/u',
+        ], ' ', $normalized);
+
+        $stripped = trim(preg_replace('/\s+/u', ' ', $stripped) ?? '');
+
+        if ($stripped === '') {
+            return true;
+        }
+
+        return $resolvedByOrdinal && mb_strlen($stripped) <= 12;
+    }
+
+    private function appendInlineImageFromUrl(array &$parts, string $imageUrl): void
+    {
+        $imagePath = str_replace('/storage/', '', $imageUrl);
+        $fullPath = Storage::disk('public')->path($imagePath);
+
+        if (! file_exists($fullPath)) {
+            return;
+        }
+
+        $parts[] = [
+            'inline_data' => [
+                'mime_type' => 'image/jpeg',
+                'data'      => $this->resizeImageForApi($fullPath, mime_content_type($fullPath) ?: 'image/jpeg'),
+            ],
+        ];
+    }
+
+    private function normalizePrompt(string $content): string
+    {
+        $normalized = mb_strtolower(trim($content));
+        return preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
     }
 
     /**

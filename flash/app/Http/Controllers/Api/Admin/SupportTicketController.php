@@ -132,6 +132,21 @@ class SupportTicketController extends Controller
     }
 
     // ──────────────────────────────────────────────
+    //  RESOLVE (POST /api/admin/support-tickets/{ticket}/resolve)
+    // ──────────────────────────────────────────────
+
+    public function resolve(SupportTicket $ticket): JsonResponse
+    {
+        $resolved = $this->service->resolve($ticket, request()->user()->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ticket resolved successfully.',
+            'data' => new SupportTicketResource($resolved),
+        ]);
+    }
+
+    // ──────────────────────────────────────────────
     //  DELETE (DELETE /api/admin/support-tickets/{ticket})
     // ──────────────────────────────────────────────
 

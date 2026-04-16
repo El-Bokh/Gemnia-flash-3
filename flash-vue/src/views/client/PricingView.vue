@@ -175,19 +175,69 @@ async function selectPlan(plan: any) {
 
 <style scoped>
 .pricing-page {
-  flex: 1;
-  padding: 40px 20px;
+  --pricing-grid-line: rgba(99, 102, 241, 0.08);
+  --pricing-grid-glow: rgba(99, 102, 241, 0.14);
+  --pricing-grid-glow-alt: rgba(16, 185, 129, 0.1);
+
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 34px 26px 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 32px;
   min-width: 0;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 30px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+    rgba(8, 10, 18, 0.82);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+}
+
+:global(.dark) .pricing-page {
+  --pricing-grid-line: rgba(147, 197, 253, 0.08);
+  --pricing-grid-glow: rgba(129, 140, 248, 0.16);
+  --pricing-grid-glow-alt: rgba(56, 189, 248, 0.12);
+}
+
+.pricing-page::before,
+.pricing-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pricing-page::before {
+  background:
+    linear-gradient(var(--pricing-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pricing-grid-line) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.86), rgba(0, 0, 0, 0.24));
+  z-index: -2;
+}
+
+.pricing-page::after {
+  background:
+    radial-gradient(circle at 14% 14%, var(--pricing-grid-glow), transparent 24%),
+    radial-gradient(circle at 84% 20%, var(--pricing-grid-glow-alt), transparent 22%),
+    radial-gradient(circle at 50% 88%, rgba(99, 102, 241, 0.08), transparent 24%);
+  z-index: -1;
+}
+
+.pricing-page > * {
+  position: relative;
+  z-index: 1;
 }
 
 .pricing-header {
   text-align: center;
-  max-width: 560px;
+  max-width: 640px;
 }
 
 .pricing-title {
@@ -230,9 +280,9 @@ async function selectPlan(plan: any) {
 .plans-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 18px;
   width: 100%;
-  max-width: 1000px;
+  max-width: none;
 }
 
 @media (min-width: 640px) {
@@ -248,16 +298,18 @@ async function selectPlan(plan: any) {
   position: relative;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--card-border);
-  border-radius: 14px;
-  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--card-border) 84%, rgba(255, 255, 255, 0.08));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card-bg) 92%, transparent);
   padding: 24px 20px;
   gap: 16px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  backdrop-filter: blur(14px);
 }
 
 .plan-card:hover {
   border-color: color-mix(in srgb, var(--active-color) 40%, transparent);
+  transform: translateY(-2px);
 }
 
 .plan-card.popular {
@@ -386,5 +438,12 @@ async function selectPlan(plan: any) {
   font-size: 0.72rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+@media (max-width: 640px) {
+  .pricing-page {
+    padding: 20px 12px 40px;
+    border-radius: 22px;
+  }
 }
 </style>

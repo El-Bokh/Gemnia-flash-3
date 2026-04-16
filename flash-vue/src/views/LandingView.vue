@@ -28,18 +28,20 @@ useSeo({
   },
 })
 
-const features = computed(() => [
-  { icon: 'pi pi-sparkles', title: t('landing.feature1Title'), desc: t('landing.feature1Desc'), color: '#8b5cf6' },
-  { icon: 'pi pi-palette', title: t('landing.feature2Title'), desc: t('landing.feature2Desc'), color: '#06b6d4' },
-  { icon: 'pi pi-bolt', title: t('landing.feature3Title'), desc: t('landing.feature3Desc'), color: '#f59e0b' },
-  { icon: 'pi pi-check-circle', title: t('landing.feature4Title'), desc: t('landing.feature4Desc'), color: '#10b981' },
-])
-
 const steps = computed(() => [
   { num: '1', icon: 'pi pi-pencil', title: t('landing.step1Title'), desc: t('landing.step1Desc') },
   { num: '2', icon: 'pi pi-cog', title: t('landing.step2Title'), desc: t('landing.step2Desc') },
   { num: '3', icon: 'pi pi-download', title: t('landing.step3Title'), desc: t('landing.step3Desc') },
 ])
+
+const heroHighlights = computed(() => [
+  t('landing.proof1Value'),
+  t('landing.proof2Value'),
+  t('landing.proof3Value'),
+])
+
+const primaryActionLabel = computed(() => auth.isAuthenticated ? t('landing.chat') : t('client.startNow'))
+const primaryActionIcon = computed(() => auth.isAuthenticated ? 'pi pi-comments' : 'pi pi-arrow-right')
 
 // Scroll reveal
 let observer: IntersectionObserver | null = null
@@ -82,10 +84,18 @@ function goLogin() {
 function goChat() {
   router.push({ name: 'chat' })
 }
+
+function goPrimary() {
+  if (auth.isAuthenticated) {
+    goChat()
+  } else {
+    goRegister()
+  }
+}
 </script>
 
 <template>
-  <div class="landing-page">
+  <div class="landing-page" :class="{ 'landing-dark': layout.darkMode }">
     <!-- ═══ Navbar ═══ -->
     <nav class="landing-nav">
       <div class="nav-inner">
@@ -100,99 +110,52 @@ function goChat() {
           <button class="nav-icon-btn" @click="layout.toggleDarkMode()" :title="t('client.toggleTheme')">
             <i :class="layout.darkMode ? 'pi pi-sun' : 'pi pi-moon'" />
           </button>
-          <button class="nav-icon-btn" @click="layout.toggleLocale()" :title="layout.locale === 'ar' ? 'English' : 'العربية'">
-            <i class="pi pi-globe" />
+          <button class="nav-lang-btn" @click="layout.toggleLocale()">
+            {{ layout.locale === 'ar' ? 'English' : 'العربية' }}
           </button>
-          <template v-if="auth.isAuthenticated">
-            <button type="button" class="nav-cta" @click="goChat">
-              <i class="pi pi-sparkles" />
-              <span>{{ t('client.home') }}</span>
-            </button>
-          </template>
-          <template v-else>
+          <template v-if="!auth.isAuthenticated">
             <button class="nav-login-btn" @click="goLogin">{{ t('landing.login') }}</button>
-            <button type="button" class="nav-cta" @click="goRegister">
-              <i class="pi pi-user-plus" />
-              <span>{{ t('landing.register') }}</span>
-            </button>
           </template>
+          <button type="button" class="nav-cta" @click="goPrimary">
+            <i :class="auth.isAuthenticated ? 'pi pi-comments' : 'pi pi-sparkles'" />
+            <span>{{ primaryActionLabel }}</span>
+          </button>
         </div>
       </div>
     </nav>
 
     <!-- ═══ Hero ═══ -->
     <section class="hero-section">
-      <div class="hero-content reveal">
-        <div class="hero-badge">
-          <i class="pi pi-sparkles" />
-          <span>{{ t('landing.trustedBy') }}</span>
-        </div>
-        <h1 class="hero-title">
-          {{ t('landing.heroTitle') }}
-          <span class="hero-highlight">{{ t('landing.heroTitleHighlight') }}</span>
-        </h1>
-        <p class="hero-sub">{{ t('landing.heroSub') }}</p>
-        <div class="hero-actions">
-          <button type="button" class="hero-btn hero-btn-primary" @click="goRegister">
-            <span>{{ t('landing.getStarted') }}</span>
-            <i class="pi pi-arrow-right" />
-          </button>
-          <button type="button" class="hero-btn hero-btn-secondary" @click="goPricing">
-            <i class="pi pi-tag" />
-            <span>{{ t('landing.viewPricing') }}</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="hero-preview reveal" style="--reveal-delay: 0.2s;">
-        <div class="preview-card">
-          <div class="preview-header">
-            <div class="preview-dot red" />
-            <div class="preview-dot yellow" />
-            <div class="preview-dot green" />
+      <div class="hero-shell hero-shell-simple">
+        <div class="hero-content hero-content-centered reveal">
+          <h1 class="hero-title">
+            {{ t('landing.heroTitle') }}
+            <span class="hero-highlight">{{ t('landing.heroTitleHighlight') }}</span>
+          </h1>
+          <p class="hero-sub">{{ t('landing.heroSub') }}</p>
+          <div class="hero-actions">
+            <button type="button" class="hero-btn hero-btn-primary" @click="goPrimary">
+              <i :class="primaryActionIcon" />
+              <span>{{ primaryActionLabel }}</span>
+            </button>
+            <button type="button" class="hero-btn hero-btn-secondary" @click="goPricing">
+              <i class="pi pi-tag" />
+              <span>{{ t('landing.viewPricing') }}</span>
+            </button>
           </div>
-          <div class="preview-body">
-            <div class="preview-prompt">
-              <i class="pi pi-sparkles" />
-              <span>{{ t('client.suggestDesign') }}</span>
-            </div>
-            <div class="preview-result">
-              <div class="preview-img-placeholder">
-                <i class="pi pi-image" />
-              </div>
-              <div class="preview-generating">
-                <div class="gen-bar" />
-                <div class="gen-bar short" />
-              </div>
-            </div>
+
+          <div class="hero-highlight-row">
+            <span v-for="item in heroHighlights" :key="item" class="hero-highlight-pill">
+              {{ item }}
+            </span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ═══ Features ═══ -->
-    <section class="features-section">
+    <section class="simple-steps-section">
       <div class="section-inner">
-        <h2 class="section-title reveal">{{ t('landing.featuresTitle') }}</h2>
-        <p class="section-sub reveal" style="--reveal-delay: 0.1s;">{{ t('landing.featuresSub') }}</p>
-        <div class="features-grid">
-          <div v-for="(f, i) in features" :key="i" class="feature-card reveal" :style="{ '--reveal-delay': i * 0.08 + 's' }">
-            <div class="feature-icon" :style="{ background: f.color + '12', color: f.color }">
-              <i :class="f.icon" />
-            </div>
-            <h3 class="feature-title">{{ f.title }}</h3>
-            <p class="feature-desc">{{ f.desc }}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ═══ How It Works ═══ -->
-    <section class="how-section">
-      <div class="section-inner">
-        <h2 class="section-title reveal">{{ t('landing.howTitle') }}</h2>
-        <p class="section-sub reveal" style="--reveal-delay: 0.1s;">{{ t('landing.howSub') }}</p>
-        <div class="steps-grid">
+        <div class="simple-steps-grid">
           <div v-for="(s, i) in steps" :key="i" class="step-card reveal" :style="{ '--reveal-delay': i * 0.1 + 's' }">
             <div class="step-num">{{ s.num }}</div>
             <div class="step-icon-wrap">
@@ -202,18 +165,6 @@ function goChat() {
             <p class="step-desc">{{ s.desc }}</p>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- ═══ CTA ═══ -->
-    <section class="cta-section">
-      <div class="cta-inner reveal">
-        <h2 class="cta-title">{{ t('landing.ctaTitle') }}</h2>
-        <p class="cta-sub">{{ t('landing.ctaSub') }}</p>
-        <button type="button" class="cta-btn" @click="goRegister">
-          <span>{{ t('landing.ctaButton') }}</span>
-          <i class="pi pi-arrow-right" />
-        </button>
       </div>
     </section>
 
@@ -250,6 +201,25 @@ function goChat() {
 
 /* ═══ Base ═══ */
 .landing-page {
+  --lp-bg: #f5f5f7;
+  --lp-surface: #eeeef0;
+  --lp-card: rgba(255, 255, 255, 0.75);
+  --lp-card-border: rgba(0, 0, 0, 0.08);
+  --lp-text: #1a1a2e;
+  --lp-text-dim: #555568;
+  --lp-text-muted: #8888a0;
+  --lp-accent: #7c5ce0;
+  --lp-accent-dim: rgba(124, 92, 224, 0.1);
+
+  min-height: 100vh;
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  overflow-x: hidden;
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-page.landing-dark {
   --lp-bg: #07070e;
   --lp-surface: #0b0b16;
   --lp-card: rgba(14, 14, 28, 0.65);
@@ -259,13 +229,6 @@ function goChat() {
   --lp-text-muted: #55556a;
   --lp-accent: #9580ff;
   --lp-accent-dim: rgba(149, 128, 255, 0.12);
-
-  min-height: 100vh;
-  background: var(--lp-bg);
-  color: var(--lp-text);
-  overflow-x: hidden;
-  position: relative;
-  isolation: isolate;
 }
 
 /* ═══ Ambient background ═══ */
@@ -277,10 +240,17 @@ function goChat() {
   pointer-events: none;
   z-index: 0;
   background:
+    radial-gradient(circle at 50% 8%, rgba(120, 90, 220, 0.1) 0%, transparent 34%),
+    radial-gradient(circle at 88% 42%, rgba(60, 100, 200, 0.07) 0%, transparent 28%),
+    radial-gradient(circle at 12% 64%, rgba(140, 80, 200, 0.06) 0%, transparent 24%);
+  opacity: 0.9;
+}
+
+.landing-page.landing-dark::before {
+  background:
     radial-gradient(circle at 50% 8%, rgba(120, 90, 220, 0.22) 0%, transparent 34%),
     radial-gradient(circle at 88% 42%, rgba(60, 100, 200, 0.14) 0%, transparent 28%),
     radial-gradient(circle at 12% 64%, rgba(140, 80, 200, 0.12) 0%, transparent 24%);
-  opacity: 0.9;
 }
 
 /* ═══ Navbar ═══ */
@@ -290,8 +260,14 @@ function goChat() {
   left: 0;
   right: 0;
   z-index: 100;
+  background: rgba(245, 245, 247, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.landing-page.landing-dark .landing-nav {
   background: rgba(7, 7, 14, 0.92);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom-color: rgba(255, 255, 255, 0.05);
 }
 .nav-inner {
   max-width: 1100px;
@@ -317,7 +293,7 @@ function goChat() {
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--lp-text);
 }
 .nav-links {
   display: flex;
@@ -333,6 +309,10 @@ function goChat() {
   transition: color 0.2s, background 0.2s;
 }
 .nav-link:hover {
+  color: var(--lp-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+.landing-page.landing-dark .nav-link:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
 }
@@ -351,9 +331,36 @@ function goChat() {
   transition: color 0.2s, background 0.2s;
 }
 .nav-icon-btn:hover {
+  color: var(--lp-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.landing-page.landing-dark .nav-icon-btn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
 }
+
+.nav-lang-btn {
+  border: none;
+  background: none;
+  color: var(--lp-text-dim);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: color 0.2s, background 0.2s;
+}
+.nav-lang-btn:hover {
+  color: var(--lp-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.landing-page.landing-dark .nav-lang-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .nav-actions {
   display: flex;
   align-items: center;
@@ -371,6 +378,11 @@ function goChat() {
   transition: color 0.2s, background 0.2s;
 }
 .nav-login-btn:hover {
+  color: var(--lp-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.landing-page.landing-dark .nav-login-btn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
 }
@@ -398,18 +410,33 @@ function goChat() {
 .hero-section {
   position: relative;
   z-index: 1;
-  padding: 150px 24px 80px;
-  display: flex;
-  flex-direction: column;
+  padding: 152px 24px 64px;
+}
+.hero-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.92fr);
+  gap: 28px;
   align-items: center;
 }
+.hero-shell-simple {
+  max-width: 920px;
+  grid-template-columns: 1fr;
+}
 .hero-content {
-  text-align: center;
+  text-align: start;
   max-width: 680px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 18px;
+}
+.hero-content-centered {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+  align-items: center;
 }
 .hero-badge {
   display: inline-flex;
@@ -430,7 +457,7 @@ function goChat() {
   line-height: 1.1;
   letter-spacing: -0.03em;
   margin: 0;
-  color: #fff;
+  color: var(--lp-text);
 }
 .hero-highlight {
   background: linear-gradient(135deg, #9580ff 0%, #b8a4ff 50%, #c9b8ff 100%);
@@ -443,11 +470,12 @@ function goChat() {
   color: var(--lp-text-dim);
   line-height: 1.7;
   margin: 0;
-  max-width: 500px;
+  max-width: 620px;
 }
 .hero-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 8px;
 }
@@ -475,6 +503,162 @@ function goChat() {
   box-shadow: 0 6px 28px rgba(149, 128, 255, 0.35);
   transform: translateY(-1px);
 }
+.hero-highlight-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.hero-highlight-pill {
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-card-border);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--lp-text);
+}
+.hero-proof-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.hero-proof-card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hero-proof-card strong {
+  font-size: 0.92rem;
+  color: var(--lp-text);
+}
+
+.hero-proof-card span {
+  font-size: 0.74rem;
+  line-height: 1.55;
+  color: var(--lp-text-dim);
+}
+
+.hero-panel {
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-card-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.hero-panel-kicker {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--lp-accent-dim);
+  color: var(--lp-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.hero-panel-title {
+  margin: 14px 0 0;
+  font-size: 1.35rem;
+  line-height: 1.25;
+  color: var(--lp-text);
+}
+
+.hero-panel-sub {
+  margin: 10px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.7;
+  color: var(--lp-text-dim);
+}
+
+.hero-panel-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.hero-panel-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--lp-card-border);
+}
+
+.hero-panel-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.hero-panel-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lp-accent-dim);
+  color: var(--lp-accent);
+  flex-shrink: 0;
+}
+
+.hero-panel-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hero-panel-copy strong {
+  font-size: 0.84rem;
+  color: var(--lp-text);
+}
+
+.hero-panel-copy span {
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--lp-text-dim);
+}
+
+.hero-panel-prompt {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.14);
+}
+
+.landing-page.landing-dark .hero-panel-prompt {
+  background: rgba(149, 128, 255, 0.08);
+  border-color: rgba(149, 128, 255, 0.16);
+}
+
+.hero-panel-prompt span {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lp-accent);
+}
+
+.hero-panel-prompt p {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--lp-text);
+}
+
 .hero-btn-secondary {
   font-size: 0.88rem;
   font-weight: 600;
@@ -485,6 +669,16 @@ function goChat() {
   border-color: rgba(255, 255, 255, 0.1);
 }
 .hero-btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--lp-text);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.landing-page.landing-dark .hero-btn-secondary {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.landing-page.landing-dark .hero-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.04);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.18);
@@ -572,6 +766,18 @@ function goChat() {
 .gen-bar.short { width: 60%; }
 
 /* ═══ Features ═══ */
+.simple-steps-section {
+  position: relative;
+  z-index: 1;
+  padding: 0 24px 88px;
+}
+
+.simple-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
 .features-section {
   position: relative;
   z-index: 1;
@@ -587,7 +793,7 @@ function goChat() {
   text-align: center;
   letter-spacing: -0.02em;
   margin: 0 0 8px;
-  color: #fff;
+  color: var(--lp-text);
 }
 .section-sub {
   text-align: center;
@@ -625,7 +831,7 @@ function goChat() {
   font-size: 0.95rem;
   font-weight: 700;
   margin: 0 0 5px;
-  color: #fff;
+  color: var(--lp-text);
 }
 .feature-desc {
   font-size: 0.8rem;
@@ -679,7 +885,7 @@ function goChat() {
   font-size: 0.95rem;
   font-weight: 700;
   margin: 0 0 5px;
-  color: #fff;
+  color: var(--lp-text);
 }
 .step-desc {
   font-size: 0.8rem;
@@ -704,7 +910,7 @@ function goChat() {
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0 0 10px;
-  color: #fff;
+  color: var(--lp-text);
 }
 .cta-sub {
   font-size: 0.9rem;
@@ -766,7 +972,7 @@ function goChat() {
   gap: 8px;
   font-weight: 700;
   font-size: 0.88rem;
-  color: #fff;
+  color: var(--lp-text);
 }
 .footer-logo {
   width: 22px;
@@ -797,21 +1003,31 @@ function goChat() {
 
 /* ═══ Responsive ═══ */
 @media (max-width: 768px) {
+  .hero-shell {
+    grid-template-columns: 1fr;
+  }
+  .hero-content {
+    text-align: center;
+    align-items: center;
+  }
   .hero-title { font-size: 2rem; }
   .hero-sub { font-size: 0.88rem; }
   .hero-actions {
     flex-direction: column;
     width: 100%;
   }
+  .hero-proof-grid {
+    grid-template-columns: 1fr;
+  }
   .hero-btn-primary,
   .hero-btn-secondary { width: 100%; }
+  .simple-steps-grid { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: 1fr; }
   .steps-grid { grid-template-columns: 1fr; }
   .section-title { font-size: 1.4rem; }
   .cta-title { font-size: 1.4rem; }
   .nav-links { display: none; }
   .nav-login-btn { display: none; }
-  .hero-preview { max-width: 100%; }
   .footer-inner {
     flex-direction: column;
     gap: 10px;

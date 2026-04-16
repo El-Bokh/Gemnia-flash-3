@@ -326,38 +326,46 @@ function onEntityUpdated() {
   Promise.all([fetchTickets(), fetchCoupons(), fetchAggregations()])
 }
 
+function formatCount(value: number | null | undefined) {
+  return Number(value ?? 0).toLocaleString()
+}
+
+function safeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : []
+}
+
 const overviewCards = computed(() => {
   const ticketSummary = ticketAggregations.value?.summary
   const couponSummary = couponAggregations.value?.summary
-  const avgFirstResponse = ticketAggregations.value?.avg_first_response.avg_first_response_minutes
+  const avgFirstResponse = ticketAggregations.value?.avg_first_response?.avg_first_response_minutes ?? null
   if (!ticketSummary || !couponSummary) return []
 
   return [
     {
       label: t('support.openWorkload'),
-      value: (ticketSummary.open_count + ticketSummary.in_progress_count + ticketSummary.waiting_reply_count).toLocaleString(),
+      value: formatCount(ticketSummary.open_count + ticketSummary.in_progress_count + ticketSummary.waiting_reply_count),
       sub: t('support.unassignedCount', { count: ticketSummary.unassigned_active_count }),
       tone: '#0ea5e9',
       icon: 'pi pi-inbox',
     },
     {
       label: t('support.resolvedToday'),
-      value: ticketSummary.resolved_count.toLocaleString(),
+      value: formatCount(ticketSummary.resolved_count),
       sub: avgFirstResponse ? t('support.minFirstResponse', { min: avgFirstResponse }) : t('support.responseTimePending'),
       tone: '#10b981',
       icon: 'pi pi-check-circle',
     },
     {
       label: t('support.activeCouponsLabel'),
-      value: couponSummary.active_count.toLocaleString(),
-      sub: t('support.expiredCouponsCount', { count: couponAggregations.value?.expired_count || 0 }),
+      value: formatCount(couponSummary.active_count),
+      sub: t('support.expiredCouponsCount', { count: Number(couponAggregations.value?.expired_count ?? 0) }),
       tone: '#f59e0b',
       icon: 'pi pi-ticket',
     },
     {
       label: t('support.couponUsage'),
-      value: couponSummary.total_uses.toLocaleString(),
-      sub: t('support.totalCodesCount', { count: couponSummary.total_coupons }),
+      value: formatCount(couponSummary.total_uses),
+      sub: t('support.totalCodesCount', { count: Number(couponSummary.total_coupons ?? 0) }),
       tone: '#ef4444',
       icon: 'pi pi-bolt',
     },
@@ -372,8 +380,11 @@ function mutedText() {
   return getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#94a3b8'
 }
 
+const agentPerformancePreview = computed(() => safeArray(ticketAggregations.value?.agent_performance).slice(0, 4))
+const topCouponsPreview = computed(() => safeArray(couponAggregations.value?.top_coupons).slice(0, 4))
+
 const ticketTrendData = computed(() => {
-  const items = ticketAggregations.value?.daily_trend || []
+  const items = safeArray(ticketAggregations.value?.daily_trend)
   return {
     labels: items.map(item => formatShortDate(item.date)),
     datasets: [
@@ -412,7 +423,7 @@ const ticketTrendOptions = computed(() => ({
 }))
 
 const ticketPriorityData = computed(() => {
-  const items = ticketAggregations.value?.by_priority || []
+  const items = safeArray(ticketAggregations.value?.by_priority)
   return {
     labels: items.map(item => capitalize(item.priority)),
     datasets: [{ data: items.map(item => item.count), backgroundColor: ['#94a3b8', '#0ea5e9', '#f59e0b', '#ef4444'], borderWidth: 0, hoverOffset: 6 }],
@@ -429,7 +440,7 @@ const ticketPriorityChartOptions = {
 }
 
 const couponTypeData = computed(() => {
-  const items = couponAggregations.value?.by_type || []
+  const items = safeArray(couponAggregations.value?.by_type)
   return {
     labels: items.map(item => capitalize(item.discount_type.replace('_', ' '))),
     datasets: [{ data: items.map(item => item.total_uses), backgroundColor: ['#f59e0b', '#10b981', '#8b5cf6'], borderRadius: 6, barThickness: 18, borderWidth: 0 }],
@@ -604,7 +615,7 @@ function capitalize(value: string) {
                   <h3>{{ t('support.agentPerformance') }}</h3>
                 </div>
                 <div class="mini-list">
-                  <div v-for="agent in ticketAggregations.agent_performance.slice(0, 4)" :key="agent.id" class="mini-row">
+                  <div v-for="agent in agentPerformancePreview" :key="agent.id" class="mini-row">
                     <div class="mini-avatar">{{ initials(agent.name) }}</div>
                     <div class="mini-copy">
                       <span class="mini-title">{{ agent.name }}</span>
@@ -620,7 +631,7 @@ function capitalize(value: string) {
                   <h3>{{ t('support.topCoupons') }}</h3>
                 </div>
                 <div class="health-list">
-                  <div v-for="coupon in couponAggregations.top_coupons.slice(0, 4)" :key="coupon.id" class="health-row">
+                  <div v-for="coupon in topCouponsPreview" :key="coupon.id" class="health-row">
                     <span>{{ coupon.code }}</span>
                     <strong>{{ coupon.times_used }} uses</strong>
                   </div>

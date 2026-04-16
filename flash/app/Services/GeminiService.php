@@ -20,8 +20,9 @@ class GeminiService
     protected string $projectId;
     protected string $region;
     protected ?array $serviceAccount = null;
+    protected ?string $explicitAspectRatio = null;
 
-    public function __construct(string $mode = 'text')
+    public function __construct(string $mode = 'text', ?string $aspectRatio = null)
     {
         $this->apiKey = Setting::getValue('gemini_api_key', '');
         $this->authMethod = Setting::getValue('gemini_auth_method', 'service_account');
@@ -32,6 +33,7 @@ class GeminiService
 
         $this->mode = in_array($mode, ['text', 'image', 'product']) ? $mode : 'text';
         $this->activeModel = in_array($this->mode, ['image', 'product']) ? $this->imageModel : $this->textModel;
+        $this->explicitAspectRatio = $aspectRatio;
 
         // Vertex AI config
         $this->projectId = config('services.vertex_ai.project_id', '');
@@ -272,6 +274,11 @@ class GeminiService
      */
     private function detectAspectRatio(string $prompt): string
     {
+        // If an explicit aspect ratio was provided from the frontend, use it
+        if ($this->explicitAspectRatio && in_array($this->explicitAspectRatio, ['1:1', '3:4', '4:3', '9:16', '16:9'], true)) {
+            return $this->explicitAspectRatio;
+        }
+
         $validRatios = ['1:1', '3:4', '4:3', '9:16', '16:9'];
 
         // Match patterns like "aspect ratio 3:4", "ratio 16:9", "نسبة 3:4", or standalone "3:4"
@@ -818,7 +825,8 @@ SYSTEM;
 
     private function requestAccessToken(): string
     {
-        $now = time();
+        // Use Google's server time to avoid clock-skew issues
+        $now = $this->getGoogleTime();
         $payload = [
             'iss'   => $this->serviceAccount['client_email'],
             'scope' => 'https://www.googleapis.com/auth/cloud-platform',
@@ -843,5 +851,27 @@ SYSTEM;
         }
 
         return $response->json('access_token');
+    }
+
+    /**
+     * Get the current timestamp from Google's servers to avoid clock-skew issues.
+     * Falls back to local time() if the request fails.
+     */
+    private function getGoogleTime(): int
+    {
+        try {
+            $response = Http::timeout(5)->head('https://www.googleapis.com');
+            $dateHeader = $response->header('Date');
+            if ($dateHeader) {
+                $ts = strtotime($dateHeader);
+                if ($ts !== false) {
+                    return $ts;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silently fall back to local time
+        }
+
+        return time();
     }
 }

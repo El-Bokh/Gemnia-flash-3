@@ -15,8 +15,8 @@ class ReplyTicketRequest extends FormRequest
     {
         return [
             'message'     => ['required', 'string', 'min:1', 'max:10000'],
-            'attachments' => ['sometimes', 'nullable', 'array'],
-            'attachments.*' => ['string', 'max:500'],
+            'attachments' => ['sometimes', 'nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,webp,gif,pdf,txt,doc,docx,xls,xlsx,csv'],
         ];
     }
 }

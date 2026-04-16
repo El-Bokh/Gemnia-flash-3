@@ -59,7 +59,13 @@ function handleRegenerate() {
 <template>
   <div
     class="chat-message"
-    :class="[message.role, { 'has-image': message.imageUrl }]"
+    :class="[
+      message.role,
+      {
+        'has-image': message.imageUrl,
+        'image-only': message.imageUrl && !message.productImages?.length && !message.content?.trim(),
+      },
+    ]"
     @mouseenter="showActions = true"
     @mouseleave="showActions = false"
   >
@@ -188,6 +194,11 @@ function handleRegenerate() {
   max-width: 560px;
 }
 
+.chat-message.assistant.image-only .msg-bubble {
+  flex: 0 1 auto;
+  max-width: 364px;
+}
+
 .chat-message.user .msg-bubble {
   display: flex;
   flex-direction: column;
@@ -204,6 +215,10 @@ function handleRegenerate() {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-start-start-radius: 4px;
+}
+
+.chat-message.assistant.image-only .msg-content {
+  display: inline-block;
 }
 
 .chat-message.user .msg-content {
@@ -259,8 +274,12 @@ function handleRegenerate() {
   overflow: hidden;
 }
 
+.chat-message.assistant.image-only .msg-image-wrap {
+  margin-top: 0;
+}
+
 .msg-image {
-  width: 100%;
+  width: auto;
   max-width: 340px;
   border-radius: 10px;
   display: block;
@@ -447,6 +466,10 @@ function handleRegenerate() {
   }
 
   .msg-image {
+    max-width: 100%;
+  }
+
+  .chat-message.assistant.image-only .msg-bubble {
     max-width: 100%;
   }
 

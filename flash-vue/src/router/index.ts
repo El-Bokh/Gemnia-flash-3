@@ -9,6 +9,23 @@ const routes: RouteRecordRaw[] = [
     name: 'landing',
     component: () => import('@/views/LandingView.vue'),
   },
+  {
+    path: '/',
+    component: () => import('@/layouts/StandaloneLayout.vue'),
+    children: [
+      {
+        path: 'pricing',
+        name: 'pricing',
+        component: () => import('@/views/client/PricingView.vue'),
+      },
+      {
+        path: 'support',
+        name: 'support',
+        component: () => import('@/views/client/SupportView.vue'),
+        meta: { requiresAuth: true },
+      },
+    ],
+  },
   // ── Client (authenticated) ─────────────────────
   {
     path: '/',
@@ -21,20 +38,9 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true },
       },
       {
-        path: 'pricing',
-        name: 'pricing',
-        component: () => import('@/views/client/PricingView.vue'),
-      },
-      {
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/client/ProfileView.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'support',
-        name: 'support',
-        component: () => import('@/views/client/SupportView.vue'),
         meta: { requiresAuth: true },
       },
     ],

@@ -35,7 +35,7 @@ class SupportTicketResource extends JsonResource
                 'id'     => $this->user->id,
                 'name'   => $this->user->name,
                 'email'  => $this->user->email,
-                'avatar' => $this->user->avatar,
+                'avatar' => $this->user->avatarUrl(),
             ]),
 
             // ── Assigned Agent ──
@@ -43,7 +43,7 @@ class SupportTicketResource extends JsonResource
                 'id'     => $this->assignedAgent->id,
                 'name'   => $this->assignedAgent->name,
                 'email'  => $this->assignedAgent->email,
-                'avatar' => $this->assignedAgent->avatar,
+                'avatar' => $this->assignedAgent->avatarUrl(),
             ] : null),
 
             // ── User's active subscription (quick context) ──

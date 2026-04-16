@@ -2,6 +2,7 @@
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
+import AspectRatioSelector from '@/components/chat/AspectRatioSelector.vue'
 import Button from 'primevue/button'
 
 const { t } = useI18n()
@@ -330,6 +331,9 @@ function formatSize(bytes: number): string {
           <span>{{ t('chat.productMinImages') }}</span>
         </div>
       </div>
+
+      <!-- Aspect Ratio Selector (image mode only) -->
+      <AspectRatioSelector v-if="chat.aiMode === 'image'" v-model="chat.aspectRatio" />
 
       <div class="input-row">
         <!-- Tools button -->

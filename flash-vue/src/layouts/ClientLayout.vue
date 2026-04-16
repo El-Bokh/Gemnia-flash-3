@@ -438,10 +438,9 @@ onBeforeUnmount(() => {
             v-tooltip.bottom="t('client.toggleTheme')"
           />
           <!-- Language -->
-          <Button icon="pi pi-globe" severity="secondary" text rounded size="small"
-            @click="layout.toggleLocale()"
-            v-tooltip.bottom="layout.locale === 'ar' ? 'English' : 'العربية'"
-          />
+          <button class="lang-toggle-btn" @click="layout.toggleLocale()">
+            {{ layout.locale === 'ar' ? 'English' : 'العربية' }}
+          </button>
           <!-- Notifications -->
           <div class="notification-container" ref="notificationMenuRef">
             <Button icon="pi pi-bell" severity="secondary" text rounded size="small"
@@ -987,6 +986,23 @@ html.dark .client-topbar {
   font-size: 0.78rem !important;
   border-radius: 8px !important;
   font-weight: 600 !important;
+}
+
+/* ── Language toggle ── */
+.lang-toggle-btn {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: color 0.2s, background 0.2s;
+}
+.lang-toggle-btn:hover {
+  color: var(--text-primary);
+  background: var(--card-bg);
 }
 
 /* ── Notifications ── */
