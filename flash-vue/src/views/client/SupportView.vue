@@ -22,9 +22,11 @@ import {
   type ClientTicketDetail,
 } from '@/services/clientSupportService'
 import { useAuthStore } from '@/stores/auth'
+import { useLayoutStore } from '@/stores/layout'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const layout = useLayoutStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -464,7 +466,7 @@ watch(() => route.query.ticket, ticketQuery => {
 </script>
 
 <template>
-  <div class="support-page">
+  <div class="support-page" :class="{ 'support-page-dark': layout.darkMode }">
     <!-- ═══ Header ═══ -->
     <div class="support-header">
       <div class="header-left">
@@ -954,7 +956,7 @@ watch(() => route.query.ticket, ticketQuery => {
       v-model:visible="previewDialogVisible"
       modal
       dismissableMask
-      class="attachment-preview-dialog"
+      :class="['attachment-preview-dialog', { 'attachment-preview-dialog-dark': layout.darkMode }]"
       :header="previewAttachment?.name || t('clientSupport.attachments')"
       :style="{ width: 'min(92vw, 1080px)' }"
       @hide="closeAttachmentPreview"
@@ -996,15 +998,22 @@ watch(() => route.query.ticket, ticketQuery => {
 
 <style scoped>
 .support-page {
-  --support-staff-bg: rgba(59, 130, 246, 0.08);
-  --support-staff-border: rgba(59, 130, 246, 0.18);
+  --support-staff-bg: rgba(219, 234, 254, 0.74);
+  --support-staff-border: rgba(96, 165, 250, 0.34);
   --support-staff-text: var(--text-color);
   --support-staff-meta: var(--text-color-secondary);
-  --support-staff-badge-bg: rgba(59, 130, 246, 0.12);
+  --support-staff-badge-bg: rgba(59, 130, 246, 0.16);
   --support-staff-badge-text: #1d4ed8;
-  --support-grid-line: rgba(99, 102, 241, 0.08);
-  --support-grid-glow: rgba(99, 102, 241, 0.12);
-  --support-grid-glow-alt: rgba(16, 185, 129, 0.09);
+  --support-grid-line: rgba(148, 163, 184, 0.16);
+  --support-grid-glow: rgba(99, 102, 241, 0.16);
+  --support-grid-glow-alt: rgba(16, 185, 129, 0.12);
+  --support-shell-top: rgba(255, 255, 255, 0.95);
+  --support-shell-bottom: rgba(248, 250, 252, 0.92);
+  --support-shell-border: rgba(148, 163, 184, 0.18);
+  --support-shell-shadow: 0 28px 70px rgba(15, 23, 42, 0.08);
+  --support-panel-bg: rgba(255, 255, 255, 0.8);
+  --support-panel-border: rgba(148, 163, 184, 0.22);
+  --support-dialog-bg: rgba(255, 255, 255, 0.98);
 
   position: relative;
   isolation: isolate;
@@ -1012,16 +1021,17 @@ watch(() => route.query.ticket, ticketQuery => {
   max-width: none;
   margin: 0;
   padding: 30px 26px 60px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--support-shell-border);
   border-radius: 30px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
-    rgba(8, 10, 18, 0.82);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+    linear-gradient(180deg, var(--support-shell-top), var(--support-shell-bottom)),
+    rgba(255, 255, 255, 0.9);
+  box-shadow: var(--support-shell-shadow);
+  backdrop-filter: blur(16px);
   overflow: hidden;
 }
 
-:global(.dark) .support-page {
+.support-page.support-page-dark {
   --support-staff-bg: rgba(30, 64, 175, 0.34);
   --support-staff-border: rgba(147, 197, 253, 0.24);
   --support-staff-text: #eff6ff;
@@ -1031,6 +1041,13 @@ watch(() => route.query.ticket, ticketQuery => {
   --support-grid-line: rgba(147, 197, 253, 0.08);
   --support-grid-glow: rgba(129, 140, 248, 0.16);
   --support-grid-glow-alt: rgba(56, 189, 248, 0.12);
+  --support-shell-top: rgba(21, 25, 38, 0.94);
+  --support-shell-bottom: rgba(8, 10, 18, 0.88);
+  --support-shell-border: rgba(255, 255, 255, 0.06);
+  --support-shell-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+  --support-panel-bg: rgba(15, 23, 42, 0.74);
+  --support-panel-border: rgba(255, 255, 255, 0.08);
+  --support-dialog-bg: rgba(8, 10, 18, 0.98);
 }
 
 .support-page::before,
@@ -1055,7 +1072,7 @@ watch(() => route.query.ticket, ticketQuery => {
   background:
     radial-gradient(circle at 14% 12%, var(--support-grid-glow), transparent 26%),
     radial-gradient(circle at 84% 20%, var(--support-grid-glow-alt), transparent 24%),
-    radial-gradient(circle at 70% 78%, rgba(99, 102, 241, 0.08), transparent 22%);
+    radial-gradient(circle at 70% 78%, rgba(99, 102, 241, 0.1), transparent 22%);
   z-index: -1;
 }
 
@@ -1092,10 +1109,11 @@ watch(() => route.query.ticket, ticketQuery => {
 .support-shortcuts-card,
 .filter-bar,
 .empty-state-card {
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 80%, rgba(255, 255, 255, 0.08));
+  background: var(--support-panel-bg);
+  border: 1px solid var(--support-panel-border);
   border-radius: 18px;
   backdrop-filter: blur(14px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
 .support-shortcuts-card {
@@ -1122,12 +1140,16 @@ watch(() => route.query.ticket, ticketQuery => {
   gap: 12px;
   width: 100%;
   padding: 12px;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--support-panel-border);
   border-radius: 14px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.4);
   text-align: start;
   cursor: pointer;
   transition: border-color 0.2s, transform 0.2s, background 0.2s;
+}
+
+.support-page-dark .shortcut-item {
+  background: rgba(15, 23, 42, 0.28);
 }
 
 .shortcut-item:hover {
@@ -1235,11 +1257,15 @@ watch(() => route.query.ticket, ticketQuery => {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid var(--surface-border);
-  background: transparent;
+  border: 1px solid var(--support-panel-border);
+  background: rgba(255, 255, 255, 0.4);
   color: var(--text-color);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
+}
+
+.support-page-dark .empty-shortcut {
+  background: rgba(15, 23, 42, 0.28);
 }
 .empty-shortcut:hover {
   border-color: rgba(99, 102, 241, 0.35);
@@ -1251,9 +1277,13 @@ watch(() => route.query.ticket, ticketQuery => {
   align-items: center;
   gap: 10px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--surface-border) 82%, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--support-panel-border);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--surface-card) 90%, transparent);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.support-page-dark .support-attachment-card {
+  background: rgba(15, 23, 42, 0.4);
 }
 
 .support-attachment-card.disabled {
@@ -1366,9 +1396,17 @@ watch(() => route.query.ticket, ticketQuery => {
 :deep(.attachment-preview-dialog .p-dialog-header),
 :deep(.attachment-preview-dialog .p-dialog-content),
 :deep(.attachment-preview-dialog .p-dialog-footer) {
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--text-color);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+:deep(.attachment-preview-dialog-dark .p-dialog-header),
+:deep(.attachment-preview-dialog-dark .p-dialog-content),
+:deep(.attachment-preview-dialog-dark .p-dialog-footer) {
   background: rgba(8, 10, 18, 0.98);
   color: var(--text-color);
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 720px) {
@@ -1391,8 +1429,8 @@ watch(() => route.query.ticket, ticketQuery => {
   gap: 10px;
 }
 .ticket-card {
-  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.06));
+  background: var(--support-panel-bg);
+  border: 1px solid var(--support-panel-border);
   border-radius: 12px;
   padding: 16px 18px;
   cursor: pointer;
@@ -1400,7 +1438,7 @@ watch(() => route.query.ticket, ticketQuery => {
 }
 .ticket-card:hover {
   border-color: var(--primary-color);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.12);
 }
 .ticket-top {
   display: flex;
@@ -1445,11 +1483,12 @@ watch(() => route.query.ticket, ticketQuery => {
 
 /* ── New Ticket Form ──────────────────── */
 .new-ticket-card {
-  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.06));
+  background: var(--support-panel-bg);
+  border: 1px solid var(--support-panel-border);
   border-radius: 18px;
   padding: 24px;
   backdrop-filter: blur(14px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 .card-title {
   font-size: 1.1rem;
@@ -1490,9 +1529,14 @@ watch(() => route.query.ticket, ticketQuery => {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px dashed color-mix(in srgb, var(--surface-border) 85%, rgba(255, 255, 255, 0.08));
+  border: 1px dashed var(--support-panel-border);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-card) 88%, transparent);
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.support-page-dark .attachment-upload-card,
+.support-page-dark .reply-toolbar {
+  background: rgba(15, 23, 42, 0.38);
 }
 
 .attachment-hint {
@@ -1517,8 +1561,12 @@ watch(() => route.query.ticket, ticketQuery => {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.06));
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid var(--support-panel-border);
+}
+
+.support-page-dark .pending-attachment-item {
+  background: rgba(15, 23, 42, 0.44);
 }
 
 .pending-attachment-copy {
@@ -1541,12 +1589,13 @@ watch(() => route.query.ticket, ticketQuery => {
 
 /* ── Detail View ──────────────────────── */
 .detail-header-card {
-  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.06));
+  background: var(--support-panel-bg);
+  border: 1px solid var(--support-panel-border);
   border-radius: 14px;
   padding: 20px 22px;
   margin-bottom: 20px;
   backdrop-filter: blur(14px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 .detail-top {
   display: flex;
@@ -1617,11 +1666,15 @@ watch(() => route.query.ticket, ticketQuery => {
 }
 .msg-body {
   flex: 1;
-  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.06));
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--support-panel-border);
   border-radius: 12px;
   padding: 12px 16px;
   backdrop-filter: blur(12px);
+}
+
+.support-page-dark .msg-body {
+  background: rgba(15, 23, 42, 0.64);
 }
 .staff-msg .msg-body {
   background: var(--support-staff-bg);
@@ -1681,11 +1734,15 @@ watch(() => route.query.ticket, ticketQuery => {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.08));
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+  border: 1px solid var(--support-panel-border);
+  background: rgba(255, 255, 255, 0.48);
   color: var(--text-color);
   text-decoration: none;
   font-size: 0.75rem;
+}
+
+.support-page-dark .attachment-link {
+  background: rgba(15, 23, 42, 0.42);
 }
 
 .attachment-link.has-preview {
@@ -1754,8 +1811,8 @@ watch(() => route.query.ticket, ticketQuery => {
   gap: 8px;
   padding: 16px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-card) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-border) 84%, rgba(255, 255, 255, 0.06));
+  background: var(--support-panel-bg);
+  border: 1px solid var(--support-panel-border);
   font-size: 0.82rem;
   color: var(--text-color-secondary);
 }

@@ -7,11 +7,13 @@ import Tag from 'primevue/tag'
 import SelectButton from 'primevue/selectbutton'
 import { getPlans, upgradeSubscription } from '@/services/subscriptionService'
 import { useAuthStore } from '@/stores/auth'
+import { useLayoutStore } from '@/stores/layout'
 import { useSeo } from '@/composables/useSeo'
 
 const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+const layout = useLayoutStore()
 
 useSeo({
   title: computed(() => t('seo.pricingTitle')),
@@ -97,7 +99,7 @@ async function selectPlan(plan: any) {
 </script>
 
 <template>
-  <div class="pricing-page">
+  <div class="pricing-page" :class="{ 'pricing-page-dark': layout.darkMode }">
     <div class="pricing-header">
       <h1 class="pricing-title">{{ t('client.pricingTitle') }}</h1>
       <p class="pricing-sub">{{ t('client.pricingSub') }}</p>
@@ -167,17 +169,21 @@ async function selectPlan(plan: any) {
       </article>
     </div>
 
-    <div class="pricing-footer">
-      <p>{{ t('client.pricingFooter') }}</p>
-    </div>
   </div>
 </template>
 
 <style scoped>
 .pricing-page {
-  --pricing-grid-line: rgba(99, 102, 241, 0.08);
-  --pricing-grid-glow: rgba(99, 102, 241, 0.14);
-  --pricing-grid-glow-alt: rgba(16, 185, 129, 0.1);
+  --pricing-grid-line: rgba(148, 163, 184, 0.16);
+  --pricing-grid-glow: rgba(99, 102, 241, 0.16);
+  --pricing-grid-glow-alt: rgba(16, 185, 129, 0.12);
+  --pricing-shell-top: rgba(255, 255, 255, 0.94);
+  --pricing-shell-bottom: rgba(248, 250, 252, 0.92);
+  --pricing-shell-border: rgba(148, 163, 184, 0.18);
+  --pricing-shell-shadow: 0 28px 70px rgba(15, 23, 42, 0.08);
+  --pricing-card-bg: rgba(255, 255, 255, 0.8);
+  --pricing-card-border: rgba(148, 163, 184, 0.22);
+  --pricing-card-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
 
   position: relative;
   isolation: isolate;
@@ -191,18 +197,26 @@ async function selectPlan(plan: any) {
   gap: 32px;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--pricing-shell-border);
   border-radius: 30px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
-    rgba(8, 10, 18, 0.82);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+    linear-gradient(180deg, var(--pricing-shell-top), var(--pricing-shell-bottom)),
+    rgba(255, 255, 255, 0.9);
+  box-shadow: var(--pricing-shell-shadow);
+  backdrop-filter: blur(16px);
 }
 
-:global(.dark) .pricing-page {
+.pricing-page.pricing-page-dark {
   --pricing-grid-line: rgba(147, 197, 253, 0.08);
   --pricing-grid-glow: rgba(129, 140, 248, 0.16);
   --pricing-grid-glow-alt: rgba(56, 189, 248, 0.12);
+  --pricing-shell-top: rgba(21, 25, 38, 0.94);
+  --pricing-shell-bottom: rgba(8, 10, 18, 0.88);
+  --pricing-shell-border: rgba(255, 255, 255, 0.06);
+  --pricing-shell-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+  --pricing-card-bg: rgba(15, 23, 42, 0.74);
+  --pricing-card-border: rgba(255, 255, 255, 0.08);
+  --pricing-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
 }
 
 .pricing-page::before,
@@ -226,7 +240,7 @@ async function selectPlan(plan: any) {
   background:
     radial-gradient(circle at 14% 14%, var(--pricing-grid-glow), transparent 24%),
     radial-gradient(circle at 84% 20%, var(--pricing-grid-glow-alt), transparent 22%),
-    radial-gradient(circle at 50% 88%, rgba(99, 102, 241, 0.08), transparent 24%);
+    radial-gradient(circle at 50% 88%, rgba(99, 102, 241, 0.1), transparent 24%);
   z-index: -1;
 }
 
@@ -270,6 +284,20 @@ async function selectPlan(plan: any) {
   border-radius: 8px;
 }
 
+:deep(.cycle-toggle .p-selectbutton) {
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.pricing-page-dark :deep(.cycle-toggle .p-selectbutton) {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
 .loading-state {
   display: flex;
   justify-content: center;
@@ -298,17 +326,19 @@ async function selectPlan(plan: any) {
   position: relative;
   display: flex;
   flex-direction: column;
-  border: 1px solid color-mix(in srgb, var(--card-border) 84%, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--pricing-card-border);
   border-radius: 18px;
-  background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  background: var(--pricing-card-bg);
   padding: 24px 20px;
   gap: 16px;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   backdrop-filter: blur(14px);
+  box-shadow: var(--pricing-card-shadow);
 }
 
 .plan-card:hover {
   border-color: color-mix(in srgb, var(--active-color) 40%, transparent);
+  box-shadow: 0 18px 36px rgba(99, 102, 241, 0.12);
   transform: translateY(-2px);
 }
 
@@ -428,16 +458,6 @@ async function selectPlan(plan: any) {
   border-radius: 10px !important;
   font-weight: 600 !important;
   font-size: 0.82rem !important;
-}
-
-.pricing-footer {
-  text-align: center;
-}
-
-.pricing-footer p {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin: 0;
 }
 
 @media (max-width: 640px) {

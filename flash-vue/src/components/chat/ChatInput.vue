@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
 import AspectRatioSelector from '@/components/chat/AspectRatioSelector.vue'
@@ -27,6 +27,12 @@ interface AttachedFile {
   type: 'image' | 'file'
 }
 
+const IMAGE_MAX_DIMENSION = 1024
+const IMAGE_FALLBACK_DIMENSION = 768
+const IMAGE_TARGET_BYTES = 200 * 1024
+const IMAGE_PRIMARY_QUALITY = 0.78
+const IMAGE_FALLBACK_QUALITY = 0.68
+
 const message = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const showToolsMenu = ref(false)
@@ -39,6 +45,139 @@ const linkUrl = ref('')
 const productMode = ref(false)
 const productImages = ref<AttachedFile[]>([])
 const productInputRef = ref<HTMLInputElement | null>(null)
+const showAspectRatioPopup = ref(false)
+const aspectRatioPopupRef = ref<HTMLDivElement | null>(null)
+const attachmentTaskCount = ref(0)
+const isProcessingAttachments = computed(() => attachmentTaskCount.value > 0)
+
+function replaceExtension(fileName: string, extension: string) {
+  return fileName.replace(/\.[^.]+$/, '') + '.' + extension
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function loadImageElement(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const image = new Image()
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Failed to load image'))
+    }
+    image.src = objectUrl
+  })
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+  return new Promise(resolve => {
+    canvas.toBlob(blob => resolve(blob), type, quality)
+  })
+}
+
+async function renderCompressedImage(image: HTMLImageElement, maxDimension: number, quality: number) {
+  const longestSide = Math.max(image.naturalWidth, image.naturalHeight)
+  const scale = Math.min(1, maxDimension / longestSide)
+  const width = Math.max(1, Math.round(image.naturalWidth * scale))
+  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+
+  if (!context) return null
+
+  canvas.width = width
+  canvas.height = height
+  context.fillStyle = '#ffffff'
+  context.fillRect(0, 0, width, height)
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = 'high'
+  context.drawImage(image, 0, 0, width, height)
+
+  return canvasToBlob(canvas, 'image/jpeg', quality)
+}
+
+async function compressImageFile(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif') return file
+
+  try {
+    const image = await loadImageElement(file)
+    const longestSide = Math.max(image.naturalWidth, image.naturalHeight)
+    const attempts = [
+      { maxDimension: IMAGE_MAX_DIMENSION, quality: IMAGE_PRIMARY_QUALITY },
+      { maxDimension: IMAGE_FALLBACK_DIMENSION, quality: IMAGE_FALLBACK_QUALITY },
+    ]
+
+    for (const attempt of attempts) {
+      const blob = await renderCompressedImage(image, attempt.maxDimension, attempt.quality)
+
+      if (!blob) continue
+
+      const shouldUseCompressed = blob.size < file.size || longestSide > attempt.maxDimension
+
+      if (!shouldUseCompressed) {
+        return file
+      }
+
+      if (blob.size <= IMAGE_TARGET_BYTES || attempt === attempts[attempts.length - 1]) {
+        return new File([blob], replaceExtension(file.name, 'jpg'), {
+          type: 'image/jpeg',
+          lastModified: file.lastModified,
+        })
+      }
+    }
+  } catch {
+    return file
+  }
+
+  return file
+}
+
+async function createAttachedFile(file: File, type: 'image' | 'file', previewMode: 'dataUrl' | 'objectUrl' = 'dataUrl'): Promise<AttachedFile> {
+  const preparedFile = file.type.startsWith('image/')
+    ? await compressImageFile(file)
+    : file
+  const isImage = preparedFile.type.startsWith('image/')
+
+  return {
+    file: preparedFile,
+    preview: isImage
+      ? previewMode === 'objectUrl'
+        ? URL.createObjectURL(preparedFile)
+        : await readFileAsDataUrl(preparedFile)
+      : null,
+    type: isImage ? 'image' : type,
+  }
+}
+
+async function withAttachmentTask<T>(task: Promise<T>) {
+  attachmentTaskCount.value += 1
+  try {
+    return await task
+  } finally {
+    attachmentTaskCount.value = Math.max(0, attachmentTaskCount.value - 1)
+  }
+}
+
+function revokePreview(preview: string | null) {
+  if (preview?.startsWith('blob:')) {
+    URL.revokeObjectURL(preview)
+  }
+}
+
+function clearProductImages() {
+  productImages.value.forEach(image => revokePreview(image.preview))
+  productImages.value = []
+}
 
 function autoResize() {
   const el = textareaRef.value
@@ -56,18 +195,20 @@ function handleSend() {
 
   // Product mode
   if (productMode.value) {
+    if (isProcessingAttachments.value) return
     if (productImages.value.length < 2) return
     if (!text) return
     const files = productImages.value.map(af => af.file)
     emit('sendProducts', text, files)
     message.value = ''
-    productImages.value = []
+    clearProductImages()
     productMode.value = false
     nextTick(autoResize)
     return
   }
 
   if (!text && attachedFiles.value.length === 0) return
+  if (isProcessingAttachments.value) return
   if (props.disabled) return
 
   // Find the first image attachment (if any)
@@ -110,18 +251,17 @@ function handleToolClick(tool: string) {
   }
 }
 
-function handleProductSelect(e: Event) {
+async function handleProductSelect(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files) return
-  for (const file of Array.from(input.files)) {
-    if (!file.type.startsWith('image/')) continue
-    const preview = URL.createObjectURL(file)
-    productImages.value.push({ file, preview, type: 'image' })
-  }
+  const files = Array.from(input.files).filter(file => file.type.startsWith('image/'))
+  const attachments = await withAttachmentTask(Promise.all(files.map(file => createAttachedFile(file, 'image', 'objectUrl'))))
+  productImages.value.push(...attachments)
   input.value = ''
 }
 
 function removeProductImage(index: number) {
+  revokePreview(productImages.value[index]?.preview ?? null)
   productImages.value.splice(index, 1)
   if (productImages.value.length === 0) {
     productMode.value = false
@@ -134,40 +274,26 @@ function addMoreProductImages() {
 
 function cancelProductMode() {
   productMode.value = false
-  productImages.value = []
+  clearProductImages()
 }
 
-function handleImageSelect(e: Event) {
+async function handleImageSelect(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files) return
-  processFiles(Array.from(input.files), 'image')
+  await processFiles(Array.from(input.files), 'image')
   input.value = ''
 }
 
-function handleFileSelect(e: Event) {
+async function handleFileSelect(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files) return
-  processFiles(Array.from(input.files), 'file')
+  await processFiles(Array.from(input.files), 'file')
   input.value = ''
 }
 
-function processFiles(files: File[], type: 'image' | 'file') {
-  for (const file of files) {
-    const isImage = file.type.startsWith('image/')
-    const attached: AttachedFile = {
-      file,
-      preview: null,
-      type: isImage ? 'image' : type,
-    }
-    if (isImage) {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        attached.preview = ev.target?.result as string
-      }
-      reader.readAsDataURL(file)
-    }
-    attachedFiles.value.push(attached)
-  }
+async function processFiles(files: File[], type: 'image' | 'file') {
+  const attachments = await withAttachmentTask(Promise.all(files.map(file => createAttachedFile(file, type))))
+  attachedFiles.value.push(...attachments)
 }
 
 function removeAttached(index: number) {
@@ -197,30 +323,41 @@ function handleDragLeave() {
   isDragOver.value = false
 }
 
-function handleDrop(e: DragEvent) {
+async function handleDrop(e: DragEvent) {
   e.preventDefault()
   isDragOver.value = false
   if (e.dataTransfer?.files?.length) {
-    processFiles(Array.from(e.dataTransfer.files), 'file')
+    await processFiles(Array.from(e.dataTransfer.files), 'file')
   }
 }
 
 const toolsMenuRef = ref<HTMLDivElement | null>(null)
 
 function onDocClick(e: MouseEvent) {
-  if (!showToolsMenu.value) return
   const target = e.target as Node
-  if (toolsMenuRef.value?.contains(target)) return
-  showToolsMenu.value = false
+  if (showToolsMenu.value && !toolsMenuRef.value?.contains(target)) {
+    showToolsMenu.value = false
+  }
+  if (showAspectRatioPopup.value && !aspectRatioPopupRef.value?.contains(target)) {
+    showAspectRatioPopup.value = false
+  }
 }
 
 onMounted(() => document.addEventListener('pointerdown', onDocClick))
-onUnmounted(() => document.removeEventListener('pointerdown', onDocClick))
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocClick)
+  clearProductImages()
+})
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
+function selectAspectRatio(value: string) {
+  chat.aspectRatio = value
+  showAspectRatioPopup.value = false
 }
 </script>
 
@@ -332,8 +469,7 @@ function formatSize(bytes: number): string {
         </div>
       </div>
 
-      <!-- Aspect Ratio Selector (image mode only) -->
-      <AspectRatioSelector v-if="chat.aiMode === 'image'" v-model="chat.aspectRatio" />
+      <!-- Aspect Ratio Selector: popup triggered by button in input row (image mode only) -->
 
       <div class="input-row">
         <!-- Tools button -->
@@ -396,25 +532,33 @@ function formatSize(bytes: number): string {
           rows="1"
           class="chat-textarea"
           :placeholder="productMode ? t('chat.productPromptPlaceholder') : t('chat.placeholder')"
-          :disabled="disabled"
+          :disabled="disabled || isProcessingAttachments"
           @keydown="handleKeydown"
         />
 
-        <!-- Action buttons -->
-        <Button
-          icon="pi pi-microphone"
-          severity="secondary"
-          text
-          rounded
-          size="small"
-          class="mic-btn"
-        />
+        <!-- Aspect Ratio button (image mode only) -->
+        <div v-if="chat.aiMode === 'image'" class="aspect-ratio-container">
+          <button
+            class="aspect-ratio-btn"
+            :class="{ active: showAspectRatioPopup }"
+            :title="t('chat.aspectRatio')"
+            @click.stop="showAspectRatioPopup = !showAspectRatioPopup"
+          >
+            <i class="pi pi-objects-column" />
+            <span class="ar-current-label">{{ chat.aspectRatio }}</span>
+          </button>
+          <Transition name="pop">
+            <div v-if="showAspectRatioPopup" ref="aspectRatioPopupRef" class="aspect-ratio-popup">
+              <AspectRatioSelector :model-value="chat.aspectRatio" @update:model-value="selectAspectRatio" />
+            </div>
+          </Transition>
+        </div>
         <Button
           icon="pi pi-arrow-up"
           rounded
           size="small"
           class="send-btn"
-          :disabled="productMode ? (productImages.length < 2 || !message.trim()) : ((!message.trim() && !attachedFiles.length) || disabled)"
+          :disabled="productMode ? (productImages.length < 2 || !message.trim() || isProcessingAttachments) : ((!message.trim() && !attachedFiles.length) || disabled || isProcessingAttachments)"
           @click="handleSend"
         />
       </div>
@@ -596,11 +740,61 @@ function formatSize(bytes: number): string {
   color: var(--text-muted);
 }
 
-.mic-btn {
+/* Aspect Ratio button & popup */
+.aspect-ratio-container {
+  position: relative;
   flex-shrink: 0;
-  width: 30px !important;
-  height: 30px !important;
-  color: var(--text-muted) !important;
+}
+
+.aspect-ratio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--hover-bg);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 30px;
+  white-space: nowrap;
+}
+
+.aspect-ratio-btn:hover {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.aspect-ratio-btn.active {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.aspect-ratio-btn i {
+  font-size: 0.78rem;
+}
+
+.ar-current-label {
+  line-height: 1;
+}
+
+.aspect-ratio-popup {
+  position: absolute;
+  bottom: 100%;
+  inset-inline-end: 0;
+  margin-bottom: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  z-index: 20;
+  white-space: nowrap;
 }
 
 .send-btn {

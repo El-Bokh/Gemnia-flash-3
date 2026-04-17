@@ -140,11 +140,41 @@ class ConversationController extends Controller
 
     private function processSendMessage(Request $request, Conversation $conversation): JsonResponse
     {
+        $data = $request->validate([
+            'content'     => ['required', 'string', 'max:5000'],
+            'image_style' => ['nullable', 'string', 'max:100'],
+            'product'     => ['nullable', 'string', 'max:100'],
+            'image'       => ['nullable', 'image', 'max:10240'], // 10MB
+            'images'      => ['nullable', 'array', 'max:10'],
+            'images.*'    => ['image', 'max:10240'],
+            'mode'        => ['nullable', 'string', 'in:text,image,product'],
+            'aspect_ratio' => ['nullable', 'string', 'in:1:1,3:4,4:3,9:16,16:9'],
+        ]);
+
+        $mode = $data['mode'] ?? 'text';
+        $imageFollowUpContext = null;
+
+        if ($mode === 'image') {
+            if ($this->shouldTreatImagePromptAsText($data['content'])) {
+                $mode = 'text';
+            } elseif (! $request->hasFile('image') && ! $request->hasFile('images')) {
+                $imageFollowUpContext = $this->resolveImageFollowUpContext(
+                    $conversation,
+                    $request->user()->id,
+                    $data['content'],
+                );
+            }
+        }
+
+        $hasReferenceInput = $request->hasFile('image')
+            || $request->hasFile('images')
+            || ! empty($imageFollowUpContext['reference_image_url']);
+
         // ── Quota enforcement (concurrency-safe) ──
         $usageService = new UsageService();
 
         // Check feature-level limits first
-        $featureSlug = ($request->input('mode') === 'image') ? 'text_to_image' : 'chat';
+        $featureSlug = $this->resolveFeatureSlug($mode, $hasReferenceInput);
         $featureCheck = $usageService->checkFeatureLimit($request->user(), $featureSlug);
 
         if (! $featureCheck['allowed']) {
@@ -190,36 +220,6 @@ class ConversationController extends Controller
             ], 402);
         }
 
-        $data = $request->validate([
-            'content'     => ['required', 'string', 'max:5000'],
-            'image_style' => ['nullable', 'string', 'max:100'],
-            'product'     => ['nullable', 'string', 'max:100'],
-            'image'       => ['nullable', 'image', 'max:10240'], // 10MB
-            'images'      => ['nullable', 'array', 'max:10'],
-            'images.*'    => ['image', 'max:10240'],
-            'mode'        => ['nullable', 'string', 'in:text,image,product'],
-            'aspect_ratio' => ['nullable', 'string', 'in:1:1,3:4,4:3,9:16,16:9'],
-        ]);
-
-        $mode = $data['mode'] ?? 'text';
-        $imageFollowUpContext = null;
-
-        // Image-mode follow-ups need better intent handling:
-        // - Questions like "كم عدد الصور" should become text replies.
-        // - Requests like "أعد الصورة بنفس الفكرة لكن 16:9" must stay in image mode
-        //   and reuse the referenced previous image as context.
-        if ($mode === 'image' && ! $request->hasFile('image') && ! $request->hasFile('images')) {
-            if ($this->shouldTreatImagePromptAsText($data['content'])) {
-                $mode = 'text';
-            } else {
-                $imageFollowUpContext = $this->resolveImageFollowUpContext(
-                    $conversation,
-                    $request->user()->id,
-                    $data['content'],
-                );
-            }
-        }
-
         // Handle uploaded image
         $imageUrl = null;
         $imageBase64 = null;
@@ -242,8 +242,9 @@ class ConversationController extends Controller
             ]);
 
             $imageUrl = '/storage/' . $path;
-            $imageBase64 = base64_encode(file_get_contents($file->getRealPath()));
-            $imageMime = $file->getMimeType();
+            $preparedImage = $this->prepareImageForApi($file->getRealPath(), $file->getMimeType() ?: 'image/jpeg');
+            $imageBase64 = $preparedImage['data'];
+            $imageMime = $preparedImage['mime_type'];
         }
 
         // Handle multiple product images
@@ -266,12 +267,12 @@ class ConversationController extends Controller
                 ]);
 
                 // Resize for Gemini API to avoid payload-too-large errors
-                $resizedBase64 = $this->resizeImageForApi($file->getRealPath(), $file->getMimeType());
+                $preparedImage = $this->prepareImageForApi($file->getRealPath(), $file->getMimeType() ?: 'image/jpeg');
 
                 $productImagesData[] = [
                     'url'    => '/storage/' . $path,
-                    'base64' => $resizedBase64,
-                    'mime'   => 'image/jpeg',
+                    'base64' => $preparedImage['data'],
+                    'mime'   => $preparedImage['mime_type'],
                 ];
             }
 
@@ -379,13 +380,22 @@ class ConversationController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        // Identify recent user messages with images (last 3) for inline inclusion
-        $recentImageMsgIds = $historyMessages
-            ->filter(fn ($m) => $m->role === 'user' && ($m->image_url || $m->product_images))
-            ->sortByDesc('id')
-            ->take(3)
-            ->pluck('id')
-            ->toArray();
+        // When the current request already includes a reference image, do not also
+        // attach older inline images from history. That inflates payload size and
+        // has been triggering Google 417 anti-automation responses on follow-ups.
+        $shouldAttachRecentHistoryImages = ! (
+            $mode === 'image'
+            && ($imageBase64 !== null || $imageFollowUpContext !== null)
+        );
+
+        $recentImageMsgIds = $shouldAttachRecentHistoryImages
+            ? $historyMessages
+                ->filter(fn ($m) => $m->role === 'user' && ($m->image_url || $m->product_images))
+                ->sortByDesc('id')
+                ->take(3)
+                ->pluck('id')
+                ->toArray()
+            : [];
 
         $history = [];
         foreach ($historyMessages as $m) {
@@ -405,11 +415,11 @@ class ConversationController extends Controller
                 foreach ($imagePaths as $imgPath) {
                     $fullPath = Storage::disk('public')->path($imgPath);
                     if (file_exists($fullPath)) {
-                        $resizedBase64 = $this->resizeImageForApi($fullPath, mime_content_type($fullPath) ?: 'image/jpeg');
+                        $preparedImage = $this->prepareImageForApi($fullPath, mime_content_type($fullPath) ?: 'image/jpeg');
                         $parts[] = [
                             'inline_data' => [
-                                'mime_type' => 'image/jpeg',
-                                'data'      => $resizedBase64,
+                                'mime_type' => $preparedImage['mime_type'],
+                                'data'      => $preparedImage['data'],
                             ],
                         ];
                     }
@@ -469,7 +479,7 @@ class ConversationController extends Controller
             'subscription_id'  => $consumption['subscription']?->id,
             'visual_style_id'  => isset($style) ? $style->id : null,
             'product_id'       => $product?->id,
-            'type'             => $imageBase64 ? 'multimodal' : ($mode === 'image' ? 'text_to_image' : ($styleSlug ? 'styled_chat' : 'chat')),
+            'type'             => $this->resolveAiRequestType($mode, $styleSlug, $imageBase64 !== null, $hasReferenceInput),
             'status'           => $result['success'] ? 'completed' : 'failed',
             'user_prompt'      => $userContent,
             'processed_prompt' => $geminiPrompt !== $userContent ? $geminiPrompt : null,
@@ -833,13 +843,39 @@ class ConversationController extends Controller
         return 'text';
     }
 
+    private function resolveFeatureSlug(string $mode, bool $hasReferenceInput): string
+    {
+        if ($mode === 'image') {
+            return $hasReferenceInput ? 'image_to_image' : 'text_to_image';
+        }
+
+        return 'chat';
+    }
+
+    private function resolveAiRequestType(string $mode, ?string $styleSlug, bool $hasUploadedImage, bool $hasReferenceInput): string
+    {
+        if ($mode === 'product') {
+            return 'product';
+        }
+
+        if ($mode === 'image') {
+            return $hasReferenceInput ? 'image_to_image' : 'text_to_image';
+        }
+
+        if ($hasUploadedImage) {
+            return 'multimodal';
+        }
+
+        return $styleSlug ? 'styled_chat' : 'chat';
+    }
+
     private function shouldTreatImagePromptAsText(string $content): bool
     {
         $prompt = $this->normalizePrompt($content);
 
         $imageIntentPatterns = [
             '/\b(generate|create|make|remake|redo|again|variation|version|aspect|ratio|size|resize|portrait|landscape|widescreen|same image|image number|number\s*\d+)\b/u',
-            '/(اعمل|اعملي|أنشئ|انشئ|ولد|ولّد|سوي|سوّي|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|نفس|مثلها|زيها|نسخة|نسخه|ابعاد|أبعاد|مقاس|نسبة|أفقي|افقي|طولي|عمودي|الصورة|الصوره|صورة|صوره|رقم|16:9|9:16|4:3|3:4|1:1)/u',
+            '/(اعمل|اعملي|أنشئ|انشئ|ولد|ولّد|سوي|سوّي|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|نفس الصورة|نفس الصوره|الصورة نفسها|الصوره نفسها|مثلها|زيها|نسخة|نسخه|ابعاد|أبعاد|مقاس|نسبة|أفقي|افقي|طولي|عمودي|صورة رقم|صوره رقم|الصورة رقم|الصوره رقم|16:9|9:16|4:3|3:4|1:1)/u',
         ];
 
         foreach ($imageIntentPatterns as $pattern) {
@@ -849,8 +885,8 @@ class ConversationController extends Controller
         }
 
         $textIntentPatterns = [
-            '/\b(how many|count|list|which|what did|tell me|summarize|summary|explain|describe|analyze|compare|remember)\b/u',
-            '/(كم|عدد|اذكر|قول|قل|لخص|لخّص|اختصر|اشرح|اوصف|حلل|حلّل|قارن|تذكر|تتذكر|ما الذي|ماهي|ما هي|ايه|إيه|ايش)/u',
+            '/\b(how many|count|list|which|what did|tell me|summarize|summary|explain|describe|analyze|compare|remember|understand|identify|recognize|read|ocr|extract)\b/u',
+            '/(كم|عدد|اذكر|قول|قل|لخص|لخّص|اختصر|اشرح|اوصف|حلل|حلّل|قارن|تذكر|تتذكر|ما الذي|ماهي|ما هي|ايه|إيه|ايش|افهم|فهم|حدد|حدّد|تعرف|تعرّف|اقرأ|استخرج)/u',
         ];
 
         foreach ($textIntentPatterns as $pattern) {
@@ -893,17 +929,25 @@ class ConversationController extends Controller
         }
 
         $referencedRequest = $referencedMessage->aiRequest;
-        $basePrompt = $referencedRequest->processed_prompt ?: $referencedRequest->user_prompt;
+        // Use user_prompt (raw) so the image-generation enhancer can re-enhance it.
+        // processed_prompt is already enhanced and would be double-enhanced.
+        $basePrompt = $referencedRequest->user_prompt ?: $referencedRequest->processed_prompt;
 
         if (! $basePrompt) {
             return null;
         }
 
+        $isRegeneration = $this->isReferenceOnlyImageFollowUp($content, $ordinal !== null);
+
+        // Never attach inline reference images — sending base64 image data
+        // triggers Google 417 anti-automation blocks. Instead, merge any edit
+        // instructions into the text prompt and regenerate as text-to-image.
         return [
             'prompt' => $this->mergeImageFollowUpPrompt($basePrompt, $content, $ordinal !== null),
-            'reference_image_url' => $referencedRequest->output_image_path ?: $referencedMessage->image_url,
+            'reference_image_url' => null,
             'reference_ai_request_id' => $referencedRequest->id,
             'reference_user_id' => $userId,
+            'is_regeneration' => $isRegeneration,
         ];
     }
 
@@ -994,7 +1038,7 @@ class ConversationController extends Controller
             return $basePrompt;
         }
 
-        return trim($basePrompt) . "\n\nKeep the same main subject, identity, composition, mood, and overall style as the referenced image. Apply only these requested changes: " . trim($followUpPrompt);
+        return trim($basePrompt) . "\nWith these modifications: " . trim($followUpPrompt);
     }
 
     private function isReferenceOnlyImageFollowUp(string $content, bool $resolvedByOrdinal = false): bool
@@ -1003,7 +1047,7 @@ class ConversationController extends Controller
         $stripped = preg_replace([
             '/(?:رقم|number|#)\s*\d+/iu',
             '/\b\d+\b/u',
-            '/(الصورة|الصوره|صورة|صوره|نفس|مثلها|زيها|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|ابعاد|أبعاد|مقاس|نسبة|الجديدة|جديدة|بتاع|بتاعت|aspect|ratio|size|dimensions|same|again|remake|redo|variation|version|new|different)/u',
+            '/(الصورة|الصوره|صورة|صوره|نفس|مثلها|زيها|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|ابعاد|أبعاد|مقاس|نسبة|الجديدة|جديدة|بتاع|بتاعت|عايز|عاوز|ابي|ابغى|أبي|أبغى|ممكن|شوت|لقطه|لقطة|مشهد|اخر|آخر|اخرى|أخرى|جديد|جديده|طيب|اوكي|اوك|حاضر|ماشي|يلا|كمان|واحد|واحده|aspect|ratio|size|dimensions|same|again|remake|redo|variation|version|new|different|another|shot|scene|one more|give me|ok|okay|sure|yes|please)/u',
             '/\b(?:16:9|9:16|4:3|3:4|1:1)\b/u',
         ], ' ', $normalized);
 
@@ -1025,10 +1069,12 @@ class ConversationController extends Controller
             return;
         }
 
+        $preparedImage = $this->prepareImageForApi($fullPath, mime_content_type($fullPath) ?: 'image/jpeg');
+
         $parts[] = [
             'inline_data' => [
-                'mime_type' => 'image/jpeg',
-                'data'      => $this->resizeImageForApi($fullPath, mime_content_type($fullPath) ?: 'image/jpeg'),
+                'mime_type' => $preparedImage['mime_type'],
+                'data'      => $preparedImage['data'],
             ],
         ];
     }
@@ -1040,14 +1086,30 @@ class ConversationController extends Controller
     }
 
     /**
-     * Resize an image to a max 1024px dimension and return base64-encoded JPEG.
-     * This keeps the Gemini API payload small and prevents request-too-large errors.
+     * Prepare an image for Gemini/Imagen requests while preserving the original mime type when GD is unavailable.
      */
-    private function resizeImageForApi(string $filePath, string $mimeType, int $maxDim = 1024, int $quality = 80): string
+    private function prepareImageForApi(string $filePath, string $mimeType, int $maxDim = 1024, int $quality = 80): array
     {
+        $normalizedMime = strtolower(trim($mimeType)) ?: 'image/jpeg';
+        $rawBytes = file_get_contents($filePath);
+
+        if ($rawBytes === false) {
+            return [
+                'mime_type' => $normalizedMime,
+                'data' => '',
+            ];
+        }
+
+        if (! $this->canResizeImageWithGd($normalizedMime)) {
+            return [
+                'mime_type' => $normalizedMime,
+                'data' => base64_encode($rawBytes),
+            ];
+        }
+
         $src = null;
 
-        switch (strtolower($mimeType)) {
+        switch ($normalizedMime) {
             case 'image/jpeg':
             case 'image/jpg':
                 $src = @imagecreatefromjpeg($filePath);
@@ -1064,20 +1126,21 @@ class ConversationController extends Controller
         }
 
         if (! $src) {
-            // Fallback: raw base64 if GD can't read it
-            return base64_encode(file_get_contents($filePath));
+            return [
+                'mime_type' => $normalizedMime,
+                'data' => base64_encode($rawBytes),
+            ];
         }
 
         $w = imagesx($src);
         $h = imagesy($src);
 
         if ($w <= $maxDim && $h <= $maxDim) {
-            // Already small enough — just re-encode as JPEG
-            ob_start();
-            imagejpeg($src, null, $quality);
-            $data = ob_get_clean();
             imagedestroy($src);
-            return base64_encode($data);
+            return [
+                'mime_type' => $normalizedMime,
+                'data' => base64_encode($rawBytes),
+            ];
         }
 
         // Scale down proportionally
@@ -1090,6 +1153,16 @@ class ConversationController extends Controller
         }
 
         $dst = imagecreatetruecolor($newW, $newH);
+
+        if (! $dst) {
+            imagedestroy($src);
+
+            return [
+                'mime_type' => $normalizedMime,
+                'data' => base64_encode($rawBytes),
+            ];
+        }
+
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $w, $h);
 
         ob_start();
@@ -1099,6 +1172,42 @@ class ConversationController extends Controller
         imagedestroy($src);
         imagedestroy($dst);
 
-        return base64_encode($data);
+        if (! is_string($data) || $data === '') {
+            return [
+                'mime_type' => $normalizedMime,
+                'data' => base64_encode($rawBytes),
+            ];
+        }
+
+        return [
+            'mime_type' => 'image/jpeg',
+            'data' => base64_encode($data),
+        ];
+    }
+
+    private function canResizeImageWithGd(string $mimeType): bool
+    {
+        $coreFunctions = [
+            'imagecreatetruecolor',
+            'imagecopyresampled',
+            'imagejpeg',
+            'imagesx',
+            'imagesy',
+            'imagedestroy',
+        ];
+
+        foreach ($coreFunctions as $function) {
+            if (! function_exists($function)) {
+                return false;
+            }
+        }
+
+        return match ($mimeType) {
+            'image/jpeg', 'image/jpg' => function_exists('imagecreatefromjpeg'),
+            'image/png' => function_exists('imagecreatefrompng'),
+            'image/webp' => function_exists('imagecreatefromwebp'),
+            'image/gif' => function_exists('imagecreatefromgif'),
+            default => false,
+        };
     }
 }

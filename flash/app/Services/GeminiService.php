@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class GeminiService
 {
+    private const IMAGE_REQUEST_TIMEOUT_SECONDS = 240;
+
     protected string $apiKey;
     protected string $textModel;
     protected string $configuredImageModel;
@@ -189,6 +191,18 @@ class GeminiService
                 'images'  => $images,
                 'error'   => null,
             ];
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('Gemini API timeout/connection error', [
+                'message'     => $e->getMessage(),
+                'auth_method' => $this->authMethod,
+                'mode'        => $this->mode,
+            ]);
+            return [
+                'success' => false,
+                'content' => null,
+                'images'  => [],
+                'error'   => 'Image generation timed out. Please try again with a simpler prompt.',
+            ];
         } catch (\Exception $e) {
             Log::error('Gemini API exception', [
                 'message'     => $e->getMessage(),
@@ -198,7 +212,7 @@ class GeminiService
                 'success' => false,
                 'content' => null,
                 'images'  => [],
-                'error'   => 'Failed to connect to Gemini: ' . $e->getMessage(),
+                'error'   => 'Something went wrong while generating the image. Please try again.',
             ];
         }
     }
@@ -260,9 +274,10 @@ class GeminiService
         $normalizedModel = strtolower(trim($model));
 
         return match ($normalizedModel) {
-            'nano-banana-2', 'nano banana 2', 'nano-banana-2 preview', 'nano banana 2 preview' => 'gemini-3.1-flash-image-preview',
-            'nano-banana-pro', 'nano banana pro', 'nano-banana-pro preview', 'nano banana pro preview' => 'gemini-3-pro-image-preview',
-            'nano-banana', 'nano banana', 'nano-banana-1', 'nano banana 1' => 'gemini-2.5-flash-image',
+            'nano-banana-2', 'nano banana 2', 'nano-banana-2 preview', 'nano banana 2 preview',
+            'nano-banana-pro', 'nano banana pro', 'nano-banana-pro preview', 'nano banana pro preview',
+            'gemini-3-pro-image-preview',
+            'nano-banana', 'nano banana', 'nano-banana-1', 'nano banana 1' => 'gemini-3.1-flash-image-preview',
             default => trim($model),
         };
     }
@@ -274,14 +289,9 @@ class GeminiService
      */
     private function detectAspectRatio(string $prompt): string
     {
-        // If an explicit aspect ratio was provided from the frontend, use it
-        if ($this->explicitAspectRatio && in_array($this->explicitAspectRatio, ['1:1', '3:4', '4:3', '9:16', '16:9'], true)) {
-            return $this->explicitAspectRatio;
-        }
-
         $validRatios = ['1:1', '3:4', '4:3', '9:16', '16:9'];
 
-        // Match patterns like "aspect ratio 3:4", "ratio 16:9", "نسبة 3:4", or standalone "3:4"
+        // 1. Check if user explicitly mentioned an aspect ratio in the prompt text — this always wins.
         if (preg_match('/(?:aspect\s*ratio|ratio|نسبة)?\s*(\d{1,2})\s*[:x×]\s*(\d{1,2})/iu', $prompt, $matches)) {
             $detected = $matches[1] . ':' . $matches[2];
             if (in_array($detected, $validRatios, true)) {
@@ -299,6 +309,11 @@ class GeminiService
         }
         if (str_contains($lower, 'landscape') || str_contains($lower, 'أفقي')) {
             return '4:3';
+        }
+
+        // 2. Fall back to the frontend-selected aspect ratio.
+        if ($this->explicitAspectRatio && in_array($this->explicitAspectRatio, $validRatios, true)) {
+            return $this->explicitAspectRatio;
         }
 
         return '1:1';
@@ -319,6 +334,29 @@ class GeminiService
         $guardrail = ' Generate only the photo itself, without any phone UI, camera interface, shutter button, status bar, timestamp, watermark, logo, text, symbols, collage frame, or decorative border.';
 
         return $trimmed . $guardrail;
+    }
+
+    private function shouldSkipPromptEnhancement(string $prompt): bool
+    {
+        $trimmed = trim($prompt);
+
+        if ($trimmed === '') {
+            return true;
+        }
+
+        $isEnglishLike = preg_match('/^[\x20-\x7E\r\n\t]+$/', $trimmed) === 1;
+        $wordCount = preg_match_all('/\S+/u', $trimmed);
+        $hasDetailedCue = preg_match(
+            '/photorealistic|ultra\s*detailed|cinematic|35mm|camera\s*flash|iphone\s*camera|aspect\s*ratio|full\s*body|medium\s*distance|side\s*view|low\s*angle|night|desert/i',
+            $trimmed
+        ) === 1;
+
+        return $isEnglishLike && $wordCount >= 24 && $hasDetailedCue;
+    }
+
+    private function nativeImageSize(): string
+    {
+        return app()->environment('production') ? '2K' : '1K';
     }
 
     /**
@@ -373,8 +411,50 @@ class GeminiService
 
         $imageGenModel = $this->imageModel;
 
-        $nativePrompt = $this->sanitizeImagePrompt($rawPrompt);
-        $nativePrompt = $this->enhancePromptForImageGeneration($nativePrompt, $imageGenModel);
+        // Check if this is an image-editing request (has inline images from user or history)
+        $hasReferenceImages = ! empty($inlineImages);
+        if (! $hasReferenceImages) {
+            foreach ($history as $turn) {
+                foreach ($turn['parts'] ?? [] as $p) {
+                    if (isset($p['inline_data'])) {
+                        $hasReferenceImages = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        $nativePrompt = $hasReferenceImages ? trim($rawPrompt) : $this->sanitizeImagePrompt($rawPrompt);
+
+        // For image editing, preserve the user's edit intent; for new images, enhance cinematically
+        if ($hasReferenceImages) {
+            // Light translation only — keep editing instructions intact
+            $nativePrompt = $this->translateForImageEdit($nativePrompt);
+        } else {
+            $nativePrompt = $this->enhancePromptForImageGeneration($nativePrompt, $imageGenModel);
+        }
+
+        $shouldIncludeHistoryInlineImages = empty($inlineImages);
+
+        // Build contents — include history with images for editing context
+        $contents = [];
+
+        if ($hasReferenceImages) {
+            foreach ($history as $turn) {
+                $turnParts = [];
+                foreach ($turn['parts'] ?? [] as $p) {
+                    if (isset($p['text']) || ($shouldIncludeHistoryInlineImages && isset($p['inline_data']))) {
+                        $turnParts[] = $p;
+                    }
+                }
+                if (! empty($turnParts)) {
+                    $contents[] = [
+                        'role'  => $turn['role'] ?? 'user',
+                        'parts' => $turnParts,
+                    ];
+                }
+            }
+        }
 
         // Build the user parts — preserve the user prompt while blocking UI overlays.
         $userParts = [['text' => $nativePrompt]];
@@ -382,65 +462,69 @@ class GeminiService
             $userParts[] = $imgPart;
         }
 
-        $contents = [
-            [
-                'role'  => 'user',
-                'parts' => $userParts,
-            ],
+        $contents[] = [
+            'role'  => 'user',
+            'parts' => $userParts,
         ];
 
-        // IMAGE only — prevents the model from rendering textual overlays into the image.
-        $generationConfig = [
-            'responseModalities' => ['IMAGE'],
-            'temperature'        => 1.0,
-            'imageConfig'        => [
-                'aspectRatio'       => $aspectRatio,
-                'personGeneration'  => 'ALLOW_ALL',
-                'imageSize'         => '2K',
-                'imageOutputOptions' => [
-                    'mimeType' => 'image/png',
+        // Match the production flow: IMAGE-only output with explicit imageConfig.
+        if ($hasReferenceImages) {
+            $generationConfig = [
+                'responseModalities' => ['IMAGE'],
+                'temperature'        => 0.3,
+            ];
+        } else {
+            $generationConfig = [
+                'responseModalities' => ['IMAGE'],
+                'temperature'        => 1.0,
+                'imageConfig'        => [
+                    'aspectRatio'        => $aspectRatio,
+                    'personGeneration'   => 'ALLOW_ALL',
+                    'imageSize'          => $this->nativeImageSize(),
+                    'imageOutputOptions' => [
+                        'mimeType' => 'image/png',
+                    ],
                 ],
-            ],
-        ];
+            ];
+        }
 
         Log::info('Trying Gemini native image generation', [
             'prompt'           => $nativePrompt,
             'configured_model' => $this->configuredImageModel,
             'model'            => $imageGenModel,
             'aspect_ratio'     => $aspectRatio,
+            'is_editing'       => $hasReferenceImages,
+            'history_turns'    => count($history),
+            'auth_method'      => $this->authMethod,
         ]);
 
         try {
-            $request = Http::timeout(120);
+            $requestAuthMethod = $this->authMethod;
 
-            if ($this->authMethod === 'service_account' && $this->serviceAccount !== null) {
-                $url = "https://aiplatform.googleapis.com/v1beta1/projects/{$this->projectId}/locations/global/publishers/google/models/{$imageGenModel}:generateContent";
-                $request = $this->applyAuth($request);
-            } else {
-                $url = "https://generativelanguage.googleapis.com/v1beta/models/{$imageGenModel}:generateContent";
-                if (! empty($this->apiKey)) {
-                    $url .= "?key={$this->apiKey}";
-                }
-            }
-
-            $response = $request->post($url, [
-                'contents'         => $contents,
-                'generationConfig' => $generationConfig,
-            ]);
+            [$response, $url] = $this->sendNativeImageRequest(
+                $imageGenModel,
+                $contents,
+                $generationConfig,
+                $requestAuthMethod
+            );
 
             if (! $response->successful()) {
                 $errorMsg = $response->json('error.message', 'Unknown error');
+                $responseBody = $response->body();
                 Log::error('Gemini native image model failed', [
-                    'model'  => $imageGenModel,
-                    'status' => $response->status(),
-                    'error'  => $errorMsg,
+                    'model'         => $imageGenModel,
+                    'status'        => $response->status(),
+                    'error'         => $errorMsg,
+                    'is_editing'    => $hasReferenceImages,
+                    'auth_method'   => $requestAuthMethod,
+                    'response_body' => mb_substr($responseBody, 0, 2000),
                 ]);
 
                 return [
                     'success' => false,
                     'content' => null,
                     'images'  => [],
-                    'error'   => "{$imageGenModel} failed: {$errorMsg}",
+                    'error'   => 'Image generation failed. Please try again with a different prompt.',
                 ];
             }
 
@@ -467,14 +551,19 @@ class GeminiService
 
             if (empty($images)) {
                 Log::error('Gemini native image model returned no images', [
-                    'model' => $imageGenModel,
+                    'model'       => $imageGenModel,
+                    'is_editing'  => $hasReferenceImages,
+                    'part_shapes' => array_map(
+                        static fn (array $part): array => array_keys($part),
+                        $parts,
+                    ),
                 ]);
 
                 return [
                     'success' => false,
                     'content' => null,
                     'images'  => [],
-                    'error'   => "{$imageGenModel} returned no images.",
+                    'error'   => 'No image was generated. Please try again with a different prompt.',
                 ];
             }
 
@@ -484,6 +573,18 @@ class GeminiService
                 'content' => null,
                 'images'  => $images,
                 'error'   => null,
+            ];
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('Gemini native image timeout/connection error', [
+                'model'   => $imageGenModel,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'content' => null,
+                'images'  => [],
+                'error'   => 'Image generation timed out. Please try again with a simpler prompt.',
             ];
         } catch (\Exception $e) {
             Log::error('Gemini native image exception', [
@@ -495,7 +596,7 @@ class GeminiService
                 'success' => false,
                 'content' => null,
                 'images'  => [],
-                'error'   => "{$imageGenModel} exception: {$e->getMessage()}",
+                'error'   => 'Something went wrong while generating the image. Please try again.',
             ];
         }
     }
@@ -509,6 +610,27 @@ class GeminiService
      */
     private function enhancePromptForImageGeneration(string $userPrompt, string $targetModel): string
     {
+        if ($this->shouldSkipPromptEnhancement($userPrompt)) {
+            Log::info('Prompt enhancement skipped for detailed prompt', [
+                'target_model' => $targetModel,
+                'original'     => $userPrompt,
+            ]);
+
+            return $userPrompt;
+        }
+
+        $cacheKey = 'image_prompt_enhance:' . md5($targetModel . '|' . $userPrompt);
+        $cachedPrompt = Cache::get($cacheKey);
+
+        if (is_string($cachedPrompt) && $cachedPrompt !== '') {
+            Log::info('Prompt enhancement cache hit', [
+                'target_model' => $targetModel,
+                'original'     => $userPrompt,
+            ]);
+
+            return $cachedPrompt;
+        }
+
         $systemInstruction = <<<'SYSTEM'
 You are a cinematic image prompt engineer. Transform the user's request into a vivid, detailed English prompt optimized for a photorealistic AI image generator.
 
@@ -557,6 +679,7 @@ SYSTEM;
                 // Strip any surrounding quotes the model might add
                 $enhanced = trim($enhanced, "\"'`");
                 if (! empty($enhanced)) {
+                    Cache::put($cacheKey, $enhanced, now()->addHours(12));
                     Log::info('Prompt enhanced for image generation', [
                         'target_model' => $targetModel,
                         'original'     => $userPrompt,
@@ -579,6 +702,106 @@ SYSTEM;
 
         // Fallback: return original prompt if enhancement fails
         return $userPrompt;
+    }
+
+    /**
+     * Translate an image-editing prompt to English without altering the editing intent.
+     */
+    private function translateForImageEdit(string $userPrompt): string
+    {
+        // If already English-like, return as-is
+        if (preg_match('/^[\x20-\x7E\n\r\t]+$/', $userPrompt)) {
+            return $userPrompt;
+        }
+        $lines = preg_split('/\r\n|\r|\n/u', $userPrompt) ?: [$userPrompt];
+        $translatedLines = [];
+
+        foreach ($lines as $line) {
+            if ($line === '') {
+                $translatedLines[] = $line;
+                continue;
+            }
+
+            if (preg_match('/^[\x20-\x7E\t ]+$/', $line)) {
+                $translatedLines[] = $line;
+                continue;
+            }
+
+            if (preg_match('/^(?<prefix>[\x20-\x7E\t ]*:\s*)(?<suffix>.*)$/u', $line, $matches) === 1
+                && preg_match('/^[\x20-\x7E\t ]*:\s*$/', $matches['prefix']) === 1
+            ) {
+                $translatedSuffix = $this->translateImageEditSegment($matches['suffix']);
+                $translatedLines[] = $matches['prefix'] . $translatedSuffix;
+                continue;
+            }
+
+            $translatedLines[] = $this->translateImageEditSegment($line);
+        }
+
+        $translatedPrompt = trim(implode("\n", $translatedLines));
+
+        if ($translatedPrompt !== '') {
+            Log::info('Image edit prompt translated', [
+                'original'   => $userPrompt,
+                'translated' => $translatedPrompt,
+            ]);
+
+            return $translatedPrompt;
+        }
+
+        return $userPrompt;
+    }
+
+    private function translateImageEditSegment(string $segment): string
+    {
+        $segment = trim($segment);
+
+        if ($segment === '' || preg_match('/^[\x20-\x7E\n\r\t]+$/', $segment)) {
+            return $segment;
+        }
+
+        $systemInstruction = <<<'SYSTEM'
+You are a translator for image-editing prompts.
+RULES:
+1. Translate the text to English accurately.
+2. Preserve the exact editing intent and constraints.
+3. Do not add creative details, styling, or extra explanation.
+4. Return only the translated text.
+SYSTEM;
+
+        try {
+            $url = $this->buildEndpointUrl($this->textModel, 'generateContent');
+            $request = Http::timeout(15);
+            $request = $this->applyAuth($request);
+
+            $response = $request->post($url, [
+                'contents' => [
+                    ['role' => 'user', 'parts' => [['text' => $segment]]],
+                ],
+                'systemInstruction' => [
+                    'parts' => [['text' => $systemInstruction]],
+                ],
+                'generationConfig' => [
+                    'temperature'     => 0.2,
+                    'maxOutputTokens' => 256,
+                    'thinkingConfig'  => ['thinkingBudget' => 0],
+                ],
+            ]);
+
+            if ($response->successful()) {
+                $translated = trim($response->json('candidates.0.content.parts.0.text', ''));
+                $translated = trim($translated, "\"'`");
+                if ($translated !== '') {
+                    return $translated;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Image edit translation failed, using original segment', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $segment;
     }
 
     private function imagenGenerate(array $currentParts): array
@@ -611,25 +834,31 @@ SYSTEM;
 
         // Detect aspect ratio from user prompt before enhancement
         $aspectRatio = $this->detectAspectRatio($prompt);
+        $hasReferenceImage = $referenceImage !== null;
 
-        $prompt = $this->sanitizeImagePrompt($prompt);
+        if ($hasReferenceImage) {
+            $prompt = $this->translateForImageEdit(trim($prompt));
+        } else {
+            $prompt = $this->sanitizeImagePrompt($prompt);
+            $prompt = $this->enhancePromptForImageGeneration($prompt, $this->imageModel);
+        }
 
-        // Translate & enhance the prompt to English using the text model
-        // Imagen works best with detailed English prompts
-        $prompt = $this->enhancePromptForImageGeneration($prompt, $this->imageModel);
+        return $this->runImagenPredict($prompt, $aspectRatio, $referenceImage, $this->imageModel);
+    }
 
+    private function runImagenPredict(string $prompt, string $aspectRatio, ?array $referenceImage, string $model): array
+    {
         Log::info('Trying Imagen image generation', [
             'configured_model' => $this->configuredImageModel,
-            'model'            => $this->imageModel,
+            'model'            => $model,
             'prompt'           => $prompt,
             'aspect_ratio'     => $aspectRatio,
+            'is_editing'       => $referenceImage !== null,
         ]);
 
-        $url = $this->buildEndpointUrl($this->imageModel, 'predict');
-
+        $url = $this->buildEndpointUrl($model, 'predict');
         $instance = ['prompt' => $prompt];
 
-        // If user uploaded a reference image, include it
         if ($referenceImage) {
             $instance['image'] = [
                 'bytesBase64Encoded' => $referenceImage['data'],
@@ -642,11 +871,12 @@ SYSTEM;
             'personGeneration'  => 'allow_all',
             'safetyFilterLevel' => 'block_some',
             'addWatermark'      => false,
-            'language'           => 'en',
+            'language'          => 'en',
+            'enhancePrompt'     => true,
         ];
 
         try {
-            $request = Http::timeout(120);
+            $request = Http::timeout(self::IMAGE_REQUEST_TIMEOUT_SECONDS);
             $request = $this->applyAuth($request);
 
             $response = $request->post($url, [
@@ -656,16 +886,18 @@ SYSTEM;
 
             if (! $response->successful()) {
                 $errorMsg = $response->json('error.message', 'Unknown Imagen API error');
+                $responseBody = $response->body();
                 Log::error('Imagen API error', [
-                    'status' => $response->status(),
-                    'error'  => $errorMsg,
-                    'model'  => $this->imageModel,
+                    'status'        => $response->status(),
+                    'error'         => $errorMsg,
+                    'model'         => $model,
+                    'response_body' => mb_substr($responseBody, 0, 2000),
                 ]);
                 return [
                     'success' => false,
                     'content' => null,
                     'images'  => [],
-                    'error'   => "{$this->imageModel} failed: {$errorMsg}",
+                    'error'   => 'Image generation failed. Please try again with a different prompt.',
                 ];
             }
 
@@ -683,19 +915,19 @@ SYSTEM;
 
             if (empty($images)) {
                 Log::error('Imagen returned no images', [
-                    'model' => $this->imageModel,
+                    'model' => $model,
                 ]);
 
                 return [
                     'success' => false,
                     'content' => null,
                     'images'  => [],
-                    'error'   => "{$this->imageModel} returned no images.",
+                    'error'   => 'No image was generated. Please try again with a different prompt.',
                 ];
             }
 
             Log::info('Imagen image generated successfully', [
-                'model'       => $this->imageModel,
+                'model'       => $model,
                 'image_count' => count($images),
             ]);
 
@@ -707,16 +939,135 @@ SYSTEM;
             ];
         } catch (\Exception $e) {
             Log::error('Imagen API exception', [
-                'model'   => $this->imageModel,
+                'model'   => $model,
                 'message' => $e->getMessage(),
             ]);
             return [
                 'success' => false,
                 'content' => null,
                 'images'  => [],
-                'error'   => "{$this->imageModel} exception: {$e->getMessage()}",
+                'error'   => 'Something went wrong while generating the image. Please try again.',
             ];
         }
+    }
+
+    private function fallbackImageEditViaVisionRewrite(string $editPrompt, string $aspectRatio, ?array $referenceImage, ?string $previousError = null): array
+    {
+        if ($referenceImage === null) {
+            return [
+                'success' => false,
+                'content' => null,
+                'images'  => [],
+                'error'   => 'Image generation failed. Please try again with a different prompt.',
+            ];
+        }
+
+        Log::warning('Falling back to vision-guided text-to-image rewrite', [
+            'aspect_ratio'   => $aspectRatio,
+            'previous_error' => $previousError,
+        ]);
+
+        $rewrittenPrompt = $this->buildStandaloneImageEditPrompt($editPrompt, $referenceImage);
+
+        if ($rewrittenPrompt === null) {
+            return [
+                'success' => false,
+                'content' => null,
+                'images'  => [],
+                'error'   => 'Image generation failed. Please try again with a different prompt.',
+            ];
+        }
+
+        if ($this->authMethod === 'service_account') {
+            return $this->runImagenPredict($rewrittenPrompt, $aspectRatio, null, $this->fallbackImagenModel());
+        }
+
+        $generator = new self('image', $aspectRatio);
+        return $generator->chatWithParts([], [['text' => $rewrittenPrompt]]);
+    }
+
+    private function buildStandaloneImageEditPrompt(string $editPrompt, array $referenceImage): ?string
+    {
+        $visionInstruction = <<<PROMPT
+Analyze the attached reference image and convert the user's edit request into one standalone English image-generation prompt.
+
+Rules:
+- Preserve the same main subject, composition, framing, perspective, lighting, texture, and overall visual style from the reference image.
+- Apply only the requested change.
+- Keep the output suitable for text-to-image generation.
+- Output exactly one English paragraph and nothing else.
+
+Requested edit: {$editPrompt}
+PROMPT;
+
+        try {
+            $visionService = new self('text');
+            $result = $visionService->chatWithParts([], [
+                ['text' => $visionInstruction],
+                ['inline_data' => $referenceImage],
+            ]);
+
+            $rewrittenPrompt = trim((string) ($result['content'] ?? ''));
+            $rewrittenPrompt = trim($rewrittenPrompt, "\"'`");
+
+            if ($result['success'] && $rewrittenPrompt !== '') {
+                Log::info('Built standalone image-edit prompt from reference image', [
+                    'original_edit' => $editPrompt,
+                    'rewritten'     => $rewrittenPrompt,
+                ]);
+
+                return $rewrittenPrompt;
+            }
+
+            Log::warning('Vision rewrite for image edit returned empty content', [
+                'success' => $result['success'] ?? false,
+                'error'   => $result['error'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Vision rewrite for image edit failed', [
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    private function shouldFallbackToImagen(int $status, string $responseBody): bool
+    {
+        $normalizedBody = ltrim($responseBody);
+
+        return $status === 417
+            || str_contains(strtolower($responseBody), 'automated queries')
+            || (str_starts_with(strtolower($normalizedBody), '<html') && str_contains(strtolower($responseBody), 'google'));
+    }
+
+    private function extractInlineImage(array $parts): ?array
+    {
+        foreach (array_reverse($parts) as $part) {
+            if (isset($part['inline_data']) && is_array($part['inline_data'])) {
+                return $part['inline_data'];
+            }
+        }
+
+        return null;
+    }
+
+    private function extractInlineImageFromHistory(array $history): ?array
+    {
+        foreach (array_reverse($history) as $turn) {
+            foreach (array_reverse($turn['parts'] ?? []) as $part) {
+                if (isset($part['inline_data']) && is_array($part['inline_data'])) {
+                    return $part['inline_data'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function fallbackImagenModel(): string
+    {
+        return 'imagen-4.0-ultra-generate-001';
     }
 
     // ──────────────────────────────────────────────
@@ -765,6 +1116,31 @@ SYSTEM;
 
         // Standard Gemini API endpoint
         return "https://generativelanguage.googleapis.com/v1beta/models/{$model}:{$action}?key={$this->apiKey}";
+    }
+
+    private function sendNativeImageRequest(string $model, array $contents, array $generationConfig, string $authMode): array
+    {
+        $request = Http::timeout(self::IMAGE_REQUEST_TIMEOUT_SECONDS);
+
+        if ($authMode === 'service_account') {
+            $url = "https://aiplatform.googleapis.com/v1beta1/projects/{$this->projectId}/locations/global/publishers/google/models/{$model}:generateContent";
+            $request = $request->withHeaders([
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            ]);
+        } else {
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
+            if (! empty($this->apiKey)) {
+                $url .= "?key={$this->apiKey}";
+            }
+        }
+
+        return [
+            $request->post($url, [
+                'contents'         => $contents,
+                'generationConfig' => $generationConfig,
+            ]),
+            $url,
+        ];
     }
 
     private function applyAuth($request)

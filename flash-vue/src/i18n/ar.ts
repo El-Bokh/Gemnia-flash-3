@@ -1225,7 +1225,6 @@ export default {
     enterpriseFeature4: 'ضمان SLA',
     enterpriseFeature5: 'مدير حساب مخصص',
     enterpriseFeature6: 'دعم متميز 24/7',
-    pricingFooter: 'جميع الخطط تتضمن تجربة مجانية لمدة 7 أيام. إلغاء في أي وقت بدون أسئلة.',
   },
 
   // ── إنشاء حساب ───────────────────────────────────

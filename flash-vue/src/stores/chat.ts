@@ -300,18 +300,18 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product, currentAspectRatio) as any
       if (res.success && res.data) {
-        // Replace temp user message with real one
-        const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
-        if (idx !== -1) {
-          conv.messages[idx] = apiMsgToLocal(res.data.user_message)
-        }
-
-        // Add AI message
-        conv.messages.push(apiMsgToLocal(res.data.ai_message))
-
-        // Sync title from server
         if (res.data.conversation) {
-          conv.title = res.data.conversation.title
+          const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)
+          if (activeConversationId.value === conv.id || activeConversationId.value === String(conv.serverId)) {
+            activeConversationId.value = updatedConv.id
+          }
+        } else {
+          const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+          if (idx !== -1) {
+            conv.messages[idx] = apiMsgToLocal(res.data.user_message)
+          }
+
+          conv.messages.push(apiMsgToLocal(res.data.ai_message))
         }
 
         // Update quota from response
@@ -451,14 +451,20 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const res = await sendProductMessageApi(conv.serverId!, content, images) as any
       if (res.success && res.data) {
-        const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
-        if (idx !== -1) {
-          conv.messages[idx] = apiMsgToLocal(res.data.user_message)
-        }
-        conv.messages.push(apiMsgToLocal(res.data.ai_message))
         if (res.data.conversation) {
-          conv.title = res.data.conversation.title
+          const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)
+          if (activeConversationId.value === conv.id || activeConversationId.value === String(conv.serverId)) {
+            activeConversationId.value = updatedConv.id
+          }
+        } else {
+          const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+          if (idx !== -1) {
+            conv.messages[idx] = apiMsgToLocal(res.data.user_message)
+          }
+
+          conv.messages.push(apiMsgToLocal(res.data.ai_message))
         }
+
         if (res.quota) {
           const auth = useAuthStore()
           auth.quota.credits_remaining = res.quota.remaining

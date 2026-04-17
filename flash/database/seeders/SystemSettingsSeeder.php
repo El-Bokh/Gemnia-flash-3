@@ -65,7 +65,7 @@ class SystemSettingsSeeder extends Seeder
             [
                 'group' => 'ai_integrations',
                 'key' => 'gemini_api_key',
-                'value' => Crypt::encryptString('AIzaSyBXriOUTqqHqTaF-l15bg08C66TlxKm_js'),
+                'value' => Crypt::encryptString(env('GEMINI_API_KEY', '')),
                 'type' => 'string',
                 'display_name' => 'Google Gemini API Key',
                 'description' => 'Secret API key used for Google Gemini requests (only used when auth method is api_key).',
@@ -92,7 +92,7 @@ class SystemSettingsSeeder extends Seeder
                 'value' => 'gemini-3.1-flash-image-preview',
                 'type' => 'string',
                 'display_name' => 'Image Generation Model',
-                'description' => 'Model used for image generation (Gemini 3.1 Flash Image Preview / Nano Banana 2).',
+                'description' => 'Model used for image generation and reference-image editing on Vertex AI.',
                 'is_public' => false,
                 'is_encrypted' => false,
                 'options' => null,

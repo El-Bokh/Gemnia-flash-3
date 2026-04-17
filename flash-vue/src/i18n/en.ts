@@ -1223,7 +1223,6 @@ export default {
     enterpriseFeature4: 'SLA guarantee',
     enterpriseFeature5: 'Dedicated account manager',
     enterpriseFeature6: '24/7 premium support',
-    pricingFooter: 'All plans include a 7-day free trial. Cancel anytime, no questions asked.',
   },
 
   // ── Register ─────────────────────────────────────────────
