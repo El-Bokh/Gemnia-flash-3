@@ -1,17 +1,17 @@
-scp "D:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/flash-vue
-scp -r "D:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/flash-vue
-scp -r "D:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/Gemnia-flash-3/flash-vue
+scp "E:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/flash-vue
+scp -r "E:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/flash-vue
+scp -r "E:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flash-3/Gemnia-flash-3/flash-vue
 git pull origin main
 git reset --hard
 git pull origin main
-
+cd /var/www/Gemnia-flash-3
 cd /var/www
 
 git clone git@github.com:El-Bokh/Gemnia-flash-3.git
 
 sudo lsof -i -P -n | grep LISTEN
-scp "D:\Gemnia flash 3\flash\.env" root@72.61.192.23:/var/www/Gemnia-flash-3/flash
+scp "E:\Gemnia flash 3\flash\.env" root@72.61.192.23:/var/www/Gemnia-flash-3/flash
 
 php artisan migrate:fresh --seed
 
-scp "D:\Gemnia flash 3\project-1c28556b-fd90-4d6b-a4f-a1db7dec9316.json" root@72.61.192.23:/var/www/Gemnia-flash-3/flash/storage/app/google/service-account.json
+scp "E:\Gemnia flash 3\project-1c28556b-fd90-4d6b-a4f-a1db7dec9316.json" root@72.61.192.23:/var/www/Gemnia-flash-3/flash/storage/app/google/service-account.json
