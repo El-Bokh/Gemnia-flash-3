@@ -1,5 +1,5 @@
-// 1776377696 is replaced by deploy.sh on each deploy
-const CACHE_NAME = 'klek-ai-v2-1776377696';
+// 1776632874 is replaced by deploy.sh on each deploy
+const CACHE_NAME = 'klek-ai-v2-1776632874';
 
 const PRECACHE_URLS = [
   '/',
