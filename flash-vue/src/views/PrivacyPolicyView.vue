@@ -44,7 +44,7 @@ useSeo({
         <div class="legal-section">
           <h2>3. Payments and Subscriptions</h2>
           <p>
-            All payments are processed securely through Lemon Squeezy. By subscribing or purchasing
+            All payments are processed securely through paddle. By subscribing or purchasing
             a credit pack, you agree to their terms of service.
           </p>
           <ul>
@@ -103,7 +103,7 @@ useSeo({
               and name.
             </li>
             <li>
-              <strong>Payment Data:</strong> Payments are processed via Lemon Squeezy. We do not
+              <strong>Payment Data:</strong> Payments are processed via paddle. We do not
               store your credit card details on our servers.
             </li>
             <li>
@@ -132,7 +132,7 @@ useSeo({
           <h2>3. Data Sharing and Disclosure</h2>
           <p>
             We do not sell your personal data. We only share information with third-party service
-            providers (like Lemon Squeezy for payments or cloud hosting services) necessary to
+            providers (like paddle for payments or cloud hosting services) necessary to
             operate our platform.
           </p>
         </div>
