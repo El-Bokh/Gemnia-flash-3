@@ -468,23 +468,24 @@ class GeminiService
         ];
 
         // Match the production flow: IMAGE-only output with explicit imageConfig.
+        // ImageConfig only supports: aspectRatio, imageSize (per API docs).
+        // personGeneration goes in safetySettings or model config, not imageConfig.
+        $imageGenConfig = [
+            'aspectRatio' => $aspectRatio,
+            'imageSize'   => $this->nativeImageSize(),
+        ];
+
         if ($hasReferenceImages) {
             $generationConfig = [
                 'responseModalities' => ['IMAGE'],
                 'temperature'        => 0.3,
+                'imageConfig'        => $imageGenConfig,
             ];
         } else {
             $generationConfig = [
                 'responseModalities' => ['IMAGE'],
                 'temperature'        => 1.0,
-                'imageConfig'        => [
-                    'aspectRatio'        => $aspectRatio,
-                    'personGeneration'   => 'ALLOW_ALL',
-                    'imageSize'          => $this->nativeImageSize(),
-                    'imageOutputOptions' => [
-                        'mimeType' => 'image/png',
-                    ],
-                ],
+                'imageConfig'        => $imageGenConfig,
             ];
         }
 
