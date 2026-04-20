@@ -16,5 +16,9 @@ Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');
 
 Route::get('/{any?}', function () {
-    return view('spa');
+    return response()
+        ->view('spa')
+        ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        ->header('Pragma', 'no-cache')
+        ->header('Expires', '0');
 })->where('any', '^(?!api|auth/google).*$')->name('spa');

@@ -12,6 +12,9 @@ export default defineConfig({
     tailwindcss(),
     vueDevTools(),
   ],
+  build: {
+    manifest: 'asset-manifest.json',
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
