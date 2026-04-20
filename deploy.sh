@@ -64,6 +64,7 @@ rm -rf "$LARAVEL_DIR/public/build"
 rm -rf "$LARAVEL_DIR/public/icons"
 cp -r "$VUE_DIR/dist/assets" "$LARAVEL_DIR/public/assets"
 mkdir -p "$LARAVEL_DIR/public/build"
+chmod 755 "$LARAVEL_DIR/public/build"
 copy_optional_dir "$VUE_DIR/dist/icons" "$LARAVEL_DIR/public/icons"
 cp -f "$VUE_DIR/dist/asset-manifest.json" "$LARAVEL_DIR/public/build/asset-manifest.json"
 

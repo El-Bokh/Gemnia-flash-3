@@ -138,6 +138,7 @@ Run-Or-Fail '3/5  Uploading files to server...' {
 Run-Or-Fail '4/5  Clearing Laravel caches on server...' {
     ssh $SERVER @"
 cd $REMOTE_ROOT/flash
+chmod -R 755 public/assets public/build public/icons 2>/dev/null || true
 rm -f bootstrap/cache/*.php
 php artisan config:clear
 php artisan route:clear
@@ -146,6 +147,7 @@ php artisan event:clear
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+systemctl restart php*-fpm
 "@
 }
 
