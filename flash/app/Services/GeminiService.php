@@ -331,7 +331,7 @@ class GeminiService
             return $trimmed;
         }
 
-        $guardrail = ' Generate only the photo itself, without any phone UI, camera interface, shutter button, status bar, timestamp, watermark, logo, text, symbols, collage frame, or decorative border.';
+        $guardrail = ' Generate a natural-looking photo with realistic lighting and colors. Do not over-stylize, do not add cinematic color grading or dramatic HDR effects. No phone UI, camera interface, shutter button, status bar, timestamp, watermark, logo, text overlay, symbols, collage frame, or decorative border.';
 
         return $trimmed . $guardrail;
     }
@@ -344,14 +344,20 @@ class GeminiService
             return true;
         }
 
-        $isEnglishLike = preg_match('/^[\x20-\x7E\r\n\t]+$/', $trimmed) === 1;
-        $wordCount = preg_match_all('/\S+/u', $trimmed);
-        $hasDetailedCue = preg_match(
-            '/photorealistic|ultra\s*detailed|cinematic|35mm|camera\s*flash|iphone\s*camera|aspect\s*ratio|full\s*body|medium\s*distance|side\s*view|low\s*angle|night|desert/i',
-            $trimmed
+        // Only skip for very long, highly technical prompts that already have
+        // explicit quality/style keywords — never skip for normal user prompts.
+        // Strip the guardrail suffix before counting words.
+        $stripped = preg_replace('/\s*Generate a natural-looking photo.*$/s', '', $trimmed);
+        $stripped = preg_replace('/\s*Generate only the photo itself.*$/s', '', $stripped);
+
+        $isEnglishLike = preg_match('/^[\x20-\x7E\r\n\t]+$/', $stripped) === 1;
+        $wordCount = preg_match_all('/\S+/u', $stripped);
+        $hasExplicitQuality = preg_match(
+            '/photorealistic|ultra\s*detailed|8K|cinematic\s*lighting|35mm\s*film|hyper.?realistic/i',
+            $stripped
         ) === 1;
 
-        return $isEnglishLike && $wordCount >= 24 && $hasDetailedCue;
+        return $isEnglishLike && $wordCount >= 40 && $hasExplicitQuality;
     }
 
     private function nativeImageSize(): string
