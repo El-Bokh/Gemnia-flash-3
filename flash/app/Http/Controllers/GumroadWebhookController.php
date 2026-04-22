@@ -41,11 +41,12 @@ class GumroadWebhookController extends Controller
 
         // Make sure the product matches the configured Klek membership.
         $expectedProduct = config('services.gumroad.product_id');
-        if ($expectedProduct && $productId && $productId !== $expectedProduct) {
+        if (! $this->matchesConfiguredProduct($expectedProduct, $payload)) {
             $this->markProcessed($log, 'rejected', 'Unknown product_id');
             Log::warning('Gumroad webhook rejected: unexpected product_id', [
                 'expected' => $expectedProduct,
                 'got' => $productId,
+                'short_product_id' => $payload['short_product_id'] ?? null,
             ]);
             return response()->json(['ok' => false, 'reason' => 'unknown_product'], 200);
         }
@@ -65,16 +66,26 @@ class GumroadWebhookController extends Controller
             ]);
         }
 
-        // Step 3 — verify the sale via Gumroad's API (mandatory).
-        if (! $licenseKey || ! $productId) {
-            $this->markProcessed($log, 'rejected', 'Missing license_key or product_id');
-            return response()->json(['ok' => false, 'reason' => 'missing_license'], 200);
+        // Step 3 — verify the sale when Gumroad sends a license key.
+        if (! $productId) {
+            $this->markProcessed($log, 'rejected', 'Missing product_id');
+            return response()->json(['ok' => false, 'reason' => 'missing_product'], 200);
         }
 
-        if (! $this->gumroad->verifyLicense($productId, $licenseKey)) {
-            $this->markProcessed($log, 'rejected', 'License verification failed');
-            $this->recordFailedPayment($payload, 'License verification failed');
-            return response()->json(['ok' => false, 'reason' => 'verify_failed'], 200);
+        if ($licenseKey) {
+            if (! $this->gumroad->verifyLicense($productId, $licenseKey)) {
+                $this->markProcessed($log, 'rejected', 'License verification failed');
+                $this->recordFailedPayment($payload, 'License verification failed');
+                return response()->json(['ok' => false, 'reason' => 'verify_failed'], 200);
+            }
+        } elseif (! $this->isSubscriptionPayload($payload)) {
+            $this->markProcessed($log, 'rejected', 'Missing license_key');
+            return response()->json(['ok' => false, 'reason' => 'missing_license'], 200);
+        } else {
+            Log::info('Gumroad webhook missing license_key for subscription payload; skipping verification', [
+                'sale_id' => $payload['sale_id'] ?? null,
+                'subscription_id' => $payload['subscription_id'] ?? null,
+            ]);
         }
 
         // Step 4 — locate the user by email.
@@ -133,13 +144,41 @@ class GumroadWebhookController extends Controller
     private function markProcessed(PaymentWebhook $log, string $status, ?string $error = null, ?int $subscriptionId = null): void
     {
         $log->update([
-            'status' => $status,
+            'status' => $this->normalizeWebhookStatus($status),
             'error_message' => $error,
             'processed_at' => now(),
             'gateway_subscription_id' => $subscriptionId
                 ? (string) $subscriptionId
                 : $log->gateway_subscription_id,
         ]);
+    }
+
+    private function matchesConfiguredProduct(?string $expectedProduct, array $payload): bool
+    {
+        if (! is_string($expectedProduct) || $expectedProduct === '') {
+            return true;
+        }
+
+        $candidates = array_values(array_filter([
+            $payload['product_id'] ?? null,
+            $payload['short_product_id'] ?? null,
+        ], fn ($value) => is_string($value) && $value !== ''));
+
+        return in_array($expectedProduct, $candidates, true);
+    }
+
+    private function isSubscriptionPayload(array $payload): bool
+    {
+        return ! empty($payload['subscription_id']);
+    }
+
+    private function normalizeWebhookStatus(string $status): string
+    {
+        return match ($status) {
+            'rejected' => 'failed',
+            'cancelled' => 'processed',
+            default => $status,
+        };
     }
 
     /**

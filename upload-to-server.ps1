@@ -28,6 +28,9 @@ $BACKEND_ENV = Join-Path $LARAVEL_DIR '.env'
 $FRONTEND_ENV = Join-Path $VUE_DIR '.env'
 $BACKEND_PRODUCTION_ENV = Join-Path $LARAVEL_DIR '.env.production'
 $FRONTEND_PRODUCTION_ENV = Join-Path $VUE_DIR '.env.production.local'
+$SERVICE_ACCOUNT_SOURCE = Join-Path $ROOT 'project-1c28556b-fd90-4d6b-a4f-a1db7dec9316.json'
+$REMOTE_GOOGLE_DIR = "${REMOTE_ROOT}/flash/storage/app/google"
+$REMOTE_SERVICE_ACCOUNT = "${REMOTE_GOOGLE_DIR}/service-account.json"
 
 # ── Helper ──
 function Run-Or-Fail {
@@ -284,7 +287,7 @@ Run-Or-Fail '3/5  Uploading files to server...' {
                      '.htaccess','index.php')
 
     # Stage public files remotely first so a failed upload does not break the live site.
-    Invoke-SshOrFail -RemoteCommand "mkdir -p ${remotePub} ${remoteViews} ${remoteRoutes}; rm -rf ${remotePublicStage}; mkdir -p ${remotePublicStage}" -FailureMessage 'Failed to prepare remote staging directories'
+    Invoke-SshOrFail -RemoteCommand "mkdir -p ${remotePub} ${remoteViews} ${remoteRoutes} ${REMOTE_GOOGLE_DIR}; rm -rf ${remotePublicStage}; mkdir -p ${remotePublicStage}" -FailureMessage 'Failed to prepare remote staging directories'
 
     # Upload built public assets in one call to reduce password prompts and partial failures.
     Push-Location $LOCAL_DEPLOY_PUBLIC_DIR
@@ -333,6 +336,12 @@ Run-Or-Fail '3/5  Uploading files to server...' {
         Invoke-ScpOrFail -Paths $backendUploadPaths -Destination "${SERVER}:${remoteFlash}/" -Recursive -FailureMessage 'Failed to upload backend runtime files'
     } finally { Pop-Location }
 
+    if (Test-Path -LiteralPath $SERVICE_ACCOUNT_SOURCE) {
+        Invoke-ScpOrFail -Paths @($SERVICE_ACCOUNT_SOURCE) -Destination "${SERVER}:${REMOTE_SERVICE_ACCOUNT}" -FailureMessage 'Failed to upload Google service account JSON'
+    } else {
+        Write-Host '  Warning: local Google service account JSON not found. Keeping any existing remote credentials file.' -ForegroundColor Yellow
+    }
+
     Invoke-SshOrFail -RemoteCommand "test -f ${remotePub}/build/asset-manifest.json && test -f ${remoteViews}/spa.blade.php && test -f ${remoteRoutes}/web.php && test -f ${remoteFlash}/artisan && test -f ${remoteFlash}/config/app.php" -FailureMessage 'Remote file verification failed'
 
     Write-Host '  All files uploaded.' -ForegroundColor Green
@@ -357,6 +366,8 @@ Run-Or-Fail '4/5  Clearing Laravel caches on server...' {
         'php artisan config:cache'
         'php artisan route:cache'
         'php artisan view:cache'
+        'if test -L public/storage; then true; elif test -e public/storage; then rm -rf public/storage && php artisan storage:link; else php artisan storage:link; fi'
+        'if id www-data >/dev/null 2>&1; then mkdir -p storage/app/google; chown -R www-data:www-data storage/app/google; chmod 750 storage/app/google; if test -f storage/app/google/service-account.json; then chmod 640 storage/app/google/service-account.json; fi; fi'
         'systemctl restart php*-fpm'
     )
 
