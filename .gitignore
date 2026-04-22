@@ -10,3 +10,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Local deploy bundles
+.deploy-upload*/
