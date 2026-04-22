@@ -1,1 +1,0 @@
-import{l as e,o as t,s as n,u as r}from"./index-2lBNFyN0.js";var i=`/admin/users`;function a(e){return n(i,{params:e})}function o(e){return n(`${i}/${e}`)}function s(t){return e(`${i}`,t)}function c(e,t){return r(`${i}/${e}`,t)}function l(e){return t(`${i}/${e}`)}function u(t,n){return e(`${i}/${t}/reset-password`,n)}export{u as a,a as i,l as n,c as o,o as r,s as t};
