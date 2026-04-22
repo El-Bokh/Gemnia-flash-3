@@ -1,0 +1,12 @@
+# Klek AI - Robots.txt
+# https://klek.studio
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth/google/
+Disallow: /profile
+
+# Sitemap
+Sitemap: https://klek.studio/sitemap.xml

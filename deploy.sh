@@ -11,7 +11,76 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VUE_DIR="$SCRIPT_DIR/flash-vue"
 LARAVEL_DIR="$SCRIPT_DIR/flash"
+BACKEND_ENV="$LARAVEL_DIR/.env"
+FRONTEND_ENV="$VUE_DIR/.env"
+BACKEND_PRODUCTION_ENV="$LARAVEL_DIR/.env.production"
+FRONTEND_PRODUCTION_ENV="$VUE_DIR/.env.production.local"
 DEPLOY_TS=$(date +%s)
+
+assert_file_exists() {
+	local path="$1"
+	local label="$2"
+
+	if [ ! -f "$path" ]; then
+		echo "ERROR: Missing $label: $path"
+		exit 1
+	fi
+}
+
+merge_env_template() {
+	local template_path="$1"
+	local target_path="$2"
+	local current_path="$3"
+	local label="$4"
+	local tmp_file="${target_path}.tmp.$$"
+	local preserved_count=0
+
+	assert_file_exists "$template_path" "$label"
+	cp -f "$template_path" "$tmp_file"
+
+	if [ -f "$current_path" ]; then
+		while IFS= read -r line; do
+			local key
+			key="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=.*/\1/')"
+			if ! grep -q -E "^[[:space:]]*${key}=" "$tmp_file"; then
+				if [ "$preserved_count" -eq 0 ]; then
+					printf '\n# Preserved from existing .env during deploy\n' >> "$tmp_file"
+				fi
+				printf '%s\n' "$line" >> "$tmp_file"
+				preserved_count=$((preserved_count + 1))
+			fi
+		done < <(grep -E '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' "$current_path")
+	fi
+
+	mv -f "$tmp_file" "$target_path"
+
+	if [ "$preserved_count" -gt 0 ]; then
+		echo "  $label -> $(basename "$target_path") (preserved $preserved_count extra key(s))"
+	else
+		echo "  $label -> $(basename "$target_path")"
+	fi
+}
+
+ensure_production_env() {
+	echo "══════════════════════════════════════════"
+	echo "  Preparing production env files..."
+	echo "══════════════════════════════════════════"
+
+	merge_env_template "$BACKEND_PRODUCTION_ENV" "$BACKEND_ENV" "$BACKEND_ENV" "Backend production env"
+	merge_env_template "$FRONTEND_PRODUCTION_ENV" "$FRONTEND_ENV" "$FRONTEND_ENV" "Frontend production env"
+
+	if ! grep -q '^APP_ENV=production$' "$BACKEND_ENV"; then
+		echo "ERROR: Backend .env is not in production mode after sync."
+		exit 1
+	fi
+
+	if ! grep -q '^VITE_API_BASE_URL=https://klek.studio/api$' "$FRONTEND_ENV"; then
+		echo "ERROR: Frontend .env is not pointing at the production API after sync."
+		exit 1
+	fi
+
+	echo ""
+}
 
 copy_optional_file() {
 	local source_path="$1"
@@ -32,6 +101,8 @@ copy_optional_dir() {
 		cp -r "$source_path" "$target_path"
 	fi
 }
+
+ensure_production_env
 
 echo "══════════════════════════════════════════"
 echo "  🔨 Building Vue SPA..."
@@ -104,7 +175,7 @@ fi
 
 echo ""
 echo "══════════════════════════════════════════"
-echo "  � Ensuring service account credentials..."
+echo "  Ensuring service account credentials..."
 echo "══════════════════════════════════════════"
 SA_DIR="$LARAVEL_DIR/storage/app/google"
 SA_FILE="$SA_DIR/service-account.json"
@@ -124,7 +195,7 @@ fi
 
 echo ""
 echo "══════════════════════════════════════════"
-echo "  �🚀 Optimizing Laravel for production..."
+echo "  Optimizing Laravel for production..."
 echo "══════════════════════════════════════════"
 rm -f "$LARAVEL_DIR/bootstrap/cache/"*.php
 php artisan config:clear

@@ -33,6 +33,102 @@ function Assert-FileExists {
     }
 }
 
+function Get-EnvAssignments {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $assignments = @()
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $assignments
+    }
+
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=') {
+            $assignments += [PSCustomObject]@{
+                Key  = $Matches[1]
+                Line = $line
+            }
+        }
+    }
+
+    return $assignments
+}
+
+function Write-TextFileUtf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [AllowEmptyString()]
+        [AllowEmptyCollection()]
+        [Parameter(Mandatory = $true)]
+        [string[]]$Lines
+    )
+
+    $content = if ($Lines.Count -gt 0) {
+        [string]::Join([Environment]::NewLine, $Lines) + [Environment]::NewLine
+    } else {
+        ''
+    }
+
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $content, $encoding)
+}
+
+function Copy-MergedEnvTemplate {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TemplatePath,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationPath,
+        [Parameter(Mandatory = $true)]
+        [string]$SourceEnvPath,
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+        [Parameter(Mandatory = $true)]
+        [string]$TemplateLabel
+    )
+
+    Assert-FileExists -Path $TemplatePath -Label $TemplateLabel
+
+    $templateLines = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in Get-Content -LiteralPath $TemplatePath) {
+        [void]$templateLines.Add([string]$line)
+    }
+
+    $templateKeys = @{}
+    foreach ($assignment in Get-EnvAssignments -Path $TemplatePath) {
+        $templateKeys[$assignment.Key] = $true
+    }
+
+    $missingCount = 0
+    foreach ($assignment in Get-EnvAssignments -Path $SourceEnvPath) {
+        if (-not $templateKeys.ContainsKey($assignment.Key)) {
+            if ($missingCount -eq 0) {
+                if ($templateLines.Count -gt 0 -and $templateLines[$templateLines.Count - 1] -ne '') {
+                    [void]$templateLines.Add('')
+                }
+                [void]$templateLines.Add('# Preserved from existing .env during environment switch')
+            }
+
+            [void]$templateLines.Add($assignment.Line)
+            $templateKeys[$assignment.Key] = $true
+            $missingCount++
+        }
+    }
+
+    Write-TextFileUtf8NoBom -Path $DestinationPath -Lines @($templateLines.ToArray())
+
+    $preservedSuffix = if ($missingCount -gt 0) {
+        " (preserved $missingCount extra key(s))"
+    } else {
+        ''
+    }
+
+    Write-Host "[$Label]  $(Split-Path -Leaf $TemplatePath) -> .env$preservedSuffix" -ForegroundColor Green
+}
+
 function Invoke-ArtisanCommands {
     param(
         [Parameter(Mandatory = $true)]
@@ -111,12 +207,9 @@ switch ($Mode) {
             }
         }
 
-        # Copy local templates to active .env
-        Copy-Item -LiteralPath $backendLocalEnv -Destination $backendEnv -Force
-        Write-Host '[Backend]  .env.local -> .env' -ForegroundColor Green
-
-        Copy-Item -LiteralPath $frontendLocalEnv -Destination $frontendEnv -Force
-        Write-Host '[Frontend] .env.local -> .env' -ForegroundColor Green
+        # Copy local templates to active .env while preserving any extra keys
+        Copy-MergedEnvTemplate -TemplatePath $backendLocalEnv -DestinationPath $backendEnv -SourceEnvPath $backendEnv -Label 'Backend' -TemplateLabel 'backend local env (flash/.env.local)'
+        Copy-MergedEnvTemplate -TemplatePath $frontendLocalEnv -DestinationPath $frontendEnv -SourceEnvPath $frontendEnv -Label 'Frontend' -TemplateLabel 'frontend local env (flash-vue/.env.local)'
 
         # Clear Laravel caches for local dev
         Invoke-ArtisanCommands -CommandList @(
@@ -145,12 +238,9 @@ switch ($Mode) {
         Assert-FileExists -Path $backendProductionEnv -Label 'backend production env (flash/.env.production)'
         Assert-FileExists -Path $frontendProductionEnv -Label 'frontend production env (flash-vue/.env.production.local)'
 
-        # Copy production templates to active .env
-        Copy-Item -LiteralPath $backendProductionEnv -Destination $backendEnv -Force
-        Write-Host '[Backend]  .env.production -> .env' -ForegroundColor Green
-
-        Copy-Item -LiteralPath $frontendProductionEnv -Destination $frontendEnv -Force
-        Write-Host '[Frontend] .env.production.local -> .env' -ForegroundColor Green
+        # Copy production templates to active .env while preserving any extra keys
+        Copy-MergedEnvTemplate -TemplatePath $backendProductionEnv -DestinationPath $backendEnv -SourceEnvPath $backendEnv -Label 'Backend' -TemplateLabel 'backend production env (flash/.env.production)'
+        Copy-MergedEnvTemplate -TemplatePath $frontendProductionEnv -DestinationPath $frontendEnv -SourceEnvPath $frontendEnv -Label 'Frontend' -TemplateLabel 'frontend production env (flash-vue/.env.production.local)'
 
         # Rebuild Laravel caches for production
         Invoke-ArtisanCommands -CommandList @(

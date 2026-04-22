@@ -21,8 +21,15 @@ Route::post('/webhook/gumroad', [GumroadWebhookController::class, 'handle'])
     ->name('webhook.gumroad');
 
 Route::get('/{any?}', function () {
-    return response()
-        ->view('spa')
+    $response = view()->exists('spa')
+        ? response()->view('spa')
+        : response(
+            'Frontend entry view is missing. Upload flash/resources/views/spa.blade.php and redeploy the frontend assets.',
+            503,
+            ['Content-Type' => 'text/plain; charset=UTF-8']
+        );
+
+    return $response
         ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
         ->header('Pragma', 'no-cache')
         ->header('Expires', '0');
