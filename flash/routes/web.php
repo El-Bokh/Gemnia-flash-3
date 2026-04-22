@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\GoogleAuthController;
+use App\Http\Controllers\GumroadWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,10 +16,14 @@ use Illuminate\Support\Facades\Route;
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('auth.google.redirect');
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');
 
+// Gumroad Ping endpoint (public, CSRF-exempt — see bootstrap/app.php).
+Route::post('/webhook/gumroad', [GumroadWebhookController::class, 'handle'])
+    ->name('webhook.gumroad');
+
 Route::get('/{any?}', function () {
     return response()
         ->view('spa')
         ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
         ->header('Pragma', 'no-cache')
         ->header('Expires', '0');
-})->where('any', '^(?!api|auth/google).*$')->name('spa');
+})->where('any', '^(?!api|auth/google|webhook/).*$')->name('spa');

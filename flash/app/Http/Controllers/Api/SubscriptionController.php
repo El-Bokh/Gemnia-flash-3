@@ -39,6 +39,12 @@ class SubscriptionController extends Controller
             ->with(['features' => fn ($q) => $q->where('is_active', true)])
             ->get()
             ->map(function (Plan $plan) {
+                $checkoutUrl = match ($plan->slug) {
+                    config('services.gumroad.monthly_plan_slug', 'gumroad-monthly')      => config('services.gumroad.monthly_url'),
+                    config('services.gumroad.six_months_plan_slug', 'gumroad-6-months') => config('services.gumroad.six_months_url'),
+                    default => null,
+                };
+
                 return [
                     'id'              => $plan->id,
                     'name'            => $plan->name,
@@ -52,6 +58,7 @@ class SubscriptionController extends Controller
                     'is_free'         => $plan->is_free,
                     'is_featured'     => $plan->is_featured,
                     'trial_days'      => $plan->trial_days,
+                    'checkout_url'    => $checkoutUrl,
                     'features'        => $plan->features->map(fn ($f) => [
                         'name'           => $f->name,
                         'slug'           => $f->slug,

@@ -47,4 +47,21 @@ return [
         'region' => env('VERTEX_AI_REGION', 'us-central1'),
     ],
 
+    'gumroad' => [
+        // Gumroad product permalink/short id (e.g. "mghcgm" for klekstudio.gumroad.com/l/membership)
+        'product_id' => env('GUMROAD_PRODUCT_ID', 'mghcgm'),
+        // Public checkout URL the frontend redirects users to
+        'product_url' => env('GUMROAD_PRODUCT_URL', 'https://klekstudio.gumroad.com/l/membership'),
+        // Per-variant checkout URLs. Get these from Gumroad: open the product page,
+        // pick the variant, then copy the URL from the address bar (it will contain
+        // ?variant=XXXX or ?option=XXXX). Paste each one in the matching env var.
+        'monthly_url'    => env('GUMROAD_MONTHLY_URL',    'https://klekstudio.gumroad.com/l/membership'),
+        'six_months_url' => env('GUMROAD_SIX_MONTHS_URL', 'https://klekstudio.gumroad.com/l/membership'),
+        // License verify endpoint
+        'verify_url' => env('GUMROAD_VERIFY_URL', 'https://api.gumroad.com/v2/licenses/verify'),
+        // Plan slugs created on the fly when a webhook arrives
+        'monthly_plan_slug' => env('GUMROAD_MONTHLY_PLAN_SLUG', 'gumroad-monthly'),
+        'six_months_plan_slug' => env('GUMROAD_SIX_MONTHS_PLAN_SLUG', 'gumroad-6-months'),
+    ],
+
 ];

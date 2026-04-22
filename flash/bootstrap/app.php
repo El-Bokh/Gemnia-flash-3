@@ -23,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->statefulApi();
 
+        // CSRF-exempt routes (external webhook callers can't send tokens).
+        $middleware->validateCsrfTokens(except: [
+            'webhook/gumroad',
+        ]);
+
         // Global API rate limiting
         $middleware->throttleApi('120,1');
     })

@@ -1187,6 +1187,7 @@ export default {
     pricingSub: 'اختر الخطة المناسبة لسير عملك الإبداعي. يمكنك الترقية أو التخفيض في أي وقت.',
     perMonth: 'شهر',
     perYear: 'سنة',
+    per6Months: '6 شهور',
     monthly: 'شهري',
     yearly: 'سنوي',
     save20: 'وفّر 20%',

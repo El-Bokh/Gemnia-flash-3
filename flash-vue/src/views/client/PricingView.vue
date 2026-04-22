@@ -4,11 +4,12 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import SelectButton from 'primevue/selectbutton'
 import { getPlans, upgradeSubscription } from '@/services/subscriptionService'
 import { useAuthStore } from '@/stores/auth'
 import { useLayoutStore } from '@/stores/layout'
 import { useSeo } from '@/composables/useSeo'
+
+const GUMROAD_CHECKOUT_URL = 'https://klekstudio.gumroad.com/l/membership'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -35,20 +36,18 @@ useSeo({
 
 const loading = ref(true)
 const upgrading = ref<number | null>(null)
-const billingCycle = ref<'monthly' | 'yearly'>('monthly')
 const rawPlans = ref<any[]>([])
-
-const cycleOptions = computed(() => [
-  { label: t('client.monthly'), value: 'monthly' },
-  { label: t('client.yearly'), value: 'yearly' },
-])
 
 const toneMap: Record<string, string> = {
   free: '#64748b',
-  starter: '#0ea5e9',
-  pro: '#8b5cf6',
-  professional: '#8b5cf6',
-  enterprise: '#f59e0b',
+  'gumroad-monthly': '#0ea5e9',
+  'gumroad-6-months': '#8b5cf6',
+}
+
+const periodLabel = (slug: string) => {
+  if (slug === 'gumroad-6-months') return t('client.per6Months')
+  if (slug === 'gumroad-monthly') return t('client.perMonth')
+  return t('client.perMonth')
 }
 
 const plans = computed(() =>
@@ -56,14 +55,17 @@ const plans = computed(() =>
     id: p.id,
     name: p.name,
     slug: p.slug,
-    price: billingCycle.value === 'yearly' ? p.price_yearly : p.price_monthly,
-    credits: billingCycle.value === 'yearly' ? p.credits_yearly : p.credits_monthly,
+    // Gumroad plans use a fixed price; ignore the billing-cycle toggle.
+    price: p.price_monthly,
+    credits: p.credits_monthly,
     currency: p.currency ?? 'USD',
     description: p.description ?? '',
     is_free: p.is_free,
     is_featured: p.is_featured,
     features: (p.features ?? []).map((f: any) => f.name),
     tone: toneMap[p.slug] ?? '#64748b',
+    period: periodLabel(p.slug),
+    checkout_url: p.checkout_url ?? null,
     isCurrent: auth.isAuthenticated && auth.quota?.plan_slug === p.slug,
   })),
 )
@@ -86,9 +88,21 @@ async function selectPlan(plan: any) {
   }
   if (plan.isCurrent || plan.is_free) return
 
+  // Paid plans are sold via Gumroad. Each variant has its own checkout URL
+  // (returned by the backend from config). Redirect with the user's email
+  // pre-filled. The actual subscription is activated by the Gumroad webhook
+  // (POST /webhook/gumroad) once payment succeeds.
+  const baseUrl: string = plan.checkout_url || GUMROAD_CHECKOUT_URL
+  if (baseUrl) {
+    const email = encodeURIComponent(auth.user?.email ?? '')
+    const sep = baseUrl.includes('?') ? '&' : '?'
+    window.location.href = `${baseUrl}${sep}email=${email}&wanted=true`
+    return
+  }
+
   upgrading.value = plan.id
   try {
-    await upgradeSubscription(plan.id, billingCycle.value)
+    await upgradeSubscription(plan.id, 'monthly')
     await auth.refreshQuota()
   } catch {
     // error handled by global interceptor
@@ -103,17 +117,6 @@ async function selectPlan(plan: any) {
     <div class="pricing-header">
       <h1 class="pricing-title">{{ t('client.pricingTitle') }}</h1>
       <p class="pricing-sub">{{ t('client.pricingSub') }}</p>
-
-      <div class="cycle-toggle">
-        <SelectButton
-          v-model="billingCycle"
-          :options="cycleOptions"
-          optionLabel="label"
-          optionValue="value"
-          :allowEmpty="false"
-        />
-        <span v-if="billingCycle === 'yearly'" class="save-badge">{{ t('client.save20') }}</span>
-      </div>
     </div>
 
     <div v-if="loading" class="loading-state">
@@ -141,7 +144,7 @@ async function selectPlan(plan: any) {
 
         <div class="plan-price">
           <span class="price-amount">${{ plan.price }}</span>
-          <span class="price-period">/ {{ billingCycle === 'yearly' ? t('client.perYear') : t('client.perMonth') }}</span>
+          <span class="price-period">/ {{ plan.period }}</span>
         </div>
 
         <div class="plan-credits">

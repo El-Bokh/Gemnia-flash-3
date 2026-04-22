@@ -41,25 +41,48 @@ class AdminDashboardSeeder extends Seeder
         );
         $admin->roles()->syncWithoutDetaching([$adminRole->id]);
 
-        // ── Plans ──
+        // ── Plans (2 Gumroad-backed paid plans only) ──
         $plans = [];
         foreach ([
-            ['name' => 'Free',         'slug' => 'free',         'price_monthly' => 0,     'price_yearly' => 0,     'credits_monthly' => 10,   'is_free' => true,  'sort_order' => 1],
-            ['name' => 'Starter',      'slug' => 'starter',      'price_monthly' => 9.99,  'price_yearly' => 99.99, 'credits_monthly' => 100,  'is_free' => false, 'sort_order' => 2],
-            ['name' => 'Professional', 'slug' => 'professional', 'price_monthly' => 29.99, 'price_yearly' => 299.99,'credits_monthly' => 500,  'is_free' => false, 'sort_order' => 3],
-            ['name' => 'Enterprise',   'slug' => 'enterprise',   'price_monthly' => 99.99, 'price_yearly' => 999.99,'credits_monthly' => 2000, 'is_free' => false, 'sort_order' => 4],
+            [
+                'name' => 'Monthly',
+                'slug' => 'gumroad-monthly',
+                'description' => 'Full access — billed monthly via Gumroad',
+                'price_monthly' => 25,
+                'price_yearly' => 25,
+                'credits_monthly' => 1000,
+                'credits_yearly' => 1000,
+                'is_free' => false,
+                'is_featured' => false,
+                'sort_order' => 2,
+                'trial_days' => 0,
+            ],
+            [
+                'name' => 'Every 6 months',
+                'slug' => 'gumroad-6-months',
+                'description' => '6 months of full access — billed once via Gumroad',
+                'price_monthly' => 130,
+                'price_yearly' => 130,
+                'credits_monthly' => 6000,
+                'credits_yearly' => 6000,
+                'is_free' => false,
+                'is_featured' => true,
+                'sort_order' => 3,
+                'trial_days' => 0,
+            ],
         ] as $planData) {
-            $plans[$planData['slug']] = Plan::firstOrCreate(
+            $plans[$planData['slug']] = Plan::updateOrCreate(
                 ['slug' => $planData['slug']],
                 array_merge($planData, [
-                    'currency'        => 'USD',
-                    'credits_yearly'  => $planData['credits_monthly'] * 12,
-                    'is_active'       => true,
-                    'is_featured'     => $planData['slug'] === 'professional',
-                    'trial_days'      => $planData['is_free'] ? 0 : 7,
+                    'currency'  => 'USD',
+                    'is_active' => true,
                 ])
             );
         }
+
+        // Make sure any legacy plans (including the old Free tier) disappear from the pricing page.
+        Plan::whereNotIn('slug', ['gumroad-monthly', 'gumroad-6-months'])
+            ->update(['is_active' => false]);
 
         // ── Features ──
         $features = [];
@@ -85,19 +108,19 @@ class AdminDashboardSeeder extends Seeder
             }
         }
 
-        // ── Admin Subscription (Enterprise plan) ──
-        $enterprisePlan = $plans['enterprise'];
+        // ── Admin Subscription (top Gumroad plan) ──
+        $topPlan = $plans['gumroad-6-months'];
         Subscription::firstOrCreate(
-            ['user_id' => $admin->id, 'plan_id' => $enterprisePlan->id],
+            ['user_id' => $admin->id, 'plan_id' => $topPlan->id],
             [
-                'billing_cycle'     => 'monthly',
+                'billing_cycle'     => 'yearly',
                 'status'            => 'active',
-                'price'             => $enterprisePlan->price_monthly,
-                'currency'          => $enterprisePlan->currency ?? 'USD',
+                'price'             => $topPlan->price_monthly,
+                'currency'          => $topPlan->currency ?? 'USD',
                 'starts_at'         => now(),
                 'ends_at'           => now()->addYear(),
-                'credits_remaining' => $enterprisePlan->credits_monthly,
-                'credits_total'     => $enterprisePlan->credits_monthly,
+                'credits_remaining' => $topPlan->credits_monthly,
+                'credits_total'     => $topPlan->credits_monthly,
                 'auto_renew'        => true,
             ]
         );

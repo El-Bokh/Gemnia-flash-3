@@ -1185,6 +1185,7 @@ export default {
     pricingSub: 'Choose the plan that fits your creative workflow. Upgrade or downgrade anytime.',
     perMonth: 'month',
     perYear: 'year',
+    per6Months: '6 months',
     monthly: 'Monthly',
     yearly: 'Yearly',
     save20: 'Save 20%',
