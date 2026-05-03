@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import InpaintingEditor from '@/components/chat/InpaintingEditor.vue'
+import MaskHighlight from '@/components/chat/MaskHighlight.vue'
 import type { ChatMessage } from '@/stores/chat'
 
 const { t } = useI18n()
@@ -9,17 +11,20 @@ const { t } = useI18n()
 const props = defineProps<{
   message: ChatMessage
   isLast?: boolean
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
   copy: [content: string]
   regenerate: [messageId: string]
+  inpaint: [payload: { messageId: string; content: string; image: File; mask: File }]
 }>()
 
 const showActions = ref(false)
 const copied = ref(false)
 const showFullscreen = ref(false)
 const fullscreenImageSrc = ref('')
+const showInpaintEditor = ref(false)
 
 function handleDownloadImage() {
   const src = fullscreenImageSrc.value || props.message.imageUrl
@@ -66,6 +71,19 @@ function handleCopy() {
 
 function handleRegenerate() {
   emit('regenerate', props.message.id)
+}
+
+function handleOpenInpaint() {
+  if (!props.message.imageUrl || props.disabled) return
+  showInpaintEditor.value = true
+}
+
+function handleInpaintSubmit(payload: { content: string; image: File; mask: File }) {
+  emit('inpaint', {
+    messageId: props.message.id,
+    ...payload,
+  })
+  showInpaintEditor.value = false
 }
 </script>
 
@@ -115,7 +133,21 @@ function handleRegenerate() {
         <!-- Generated image (single) -->
         <div v-if="message.imageUrl && !message.productImages?.length" class="msg-image-wrap">
           <img :src="message.imageUrl" alt="Generated image" class="msg-image" loading="lazy" />
+          <MaskHighlight
+            v-if="message.role === 'user' && message.maskImageUrl"
+            :src="message.maskImageUrl"
+          />
           <div class="image-overlay">
+            <Button
+              icon="pi pi-pencil"
+              severity="secondary"
+              text
+              rounded
+              size="small"
+              :title="t('chat.editMaskedArea')"
+              :disabled="disabled || message.status !== 'sent'"
+              @click="handleOpenInpaint"
+            />
             <Button icon="pi pi-download" severity="secondary" text rounded size="small" @click="handleDownloadImage" />
             <Button icon="pi pi-expand" severity="secondary" text rounded size="small" @click="handleExpandImage()" />
           </div>
@@ -140,6 +172,14 @@ function handleRegenerate() {
         </div>
       </Transition>
     </Teleport>
+
+    <InpaintingEditor
+      :visible="showInpaintEditor"
+      :source-url="message.imageUrl"
+      :disabled="disabled"
+      @close="showInpaintEditor = false"
+      @submit="handleInpaintSubmit"
+    />
 
       <!-- Actions -->
       <Transition name="fade-slide">

@@ -10,6 +10,7 @@ import {
   sendMessage as sendMessageApi,
   regenerateMessage as regenerateMessageApi,
   sendProductMessage as sendProductMessageApi,
+  sendInpaintingMessage as sendInpaintingMessageApi,
 } from '@/services/chatService'
 import type { AiMode, ConversationData, MessageData } from '@/services/chatService'
 import { useAuthStore } from '@/stores/auth'
@@ -19,9 +20,11 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   imageUrl?: string
+  maskImageUrl?: string
   videoUrl?: string
   imageStyle?: string
   productImages?: string[]
+  metadata?: Record<string, unknown> | null
   timestamp: Date
   status: 'sending' | 'processing' | 'sent' | 'error'
 }
@@ -51,14 +54,20 @@ function resolveStorageUrl(path: string | null | undefined): string | undefined 
 }
 
 function apiMsgToLocal(m: MessageData): ChatMessage {
+  const maskImageUrl = typeof m.metadata?.mask_image_url === 'string'
+    ? resolveStorageUrl(m.metadata.mask_image_url)
+    : undefined
+
   return {
     id: String(m.id),
     role: m.role,
     content: m.content,
     imageUrl: resolveStorageUrl(m.image_url),
+    maskImageUrl,
     videoUrl: resolveStorageUrl(m.video_url),
     imageStyle: m.image_style ?? undefined,
     productImages: m.product_images?.map(url => resolveStorageUrl(url)!).filter(Boolean) ?? undefined,
+    metadata: m.metadata,
     timestamp: new Date(m.created_at),
     status: m.status === 'error' ? 'error' : m.status === 'processing' ? 'processing' : m.status === 'sending' ? 'sending' : 'sent',
   }
@@ -507,6 +516,100 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function sendInpaintingMessage(content: string, image: File, maskImage: File, sourceMessageId?: number) {
+    if (activeConversationBusy.value) return
+
+    if (!activeConversationId.value) {
+      await createConversation()
+    }
+
+    const conv = conversations.value.find(c => c.id === activeConversationId.value)
+    if (!conv) return
+
+    const optimisticImageUrl = URL.createObjectURL(image)
+    const optimisticMaskImageUrl = URL.createObjectURL(maskImage)
+    const tempUserMsgId = 'tmp-inpaint-' + Date.now()
+    const userMsg: ChatMessage = {
+      id: tempUserMsgId,
+      role: 'user',
+      content,
+      imageUrl: optimisticImageUrl,
+      maskImageUrl: optimisticMaskImageUrl,
+      timestamp: new Date(),
+      status: 'sending',
+    }
+
+    conv.messages.push(userMsg)
+    conv.updatedAt = new Date()
+
+    if (conv.messages.filter(m => m.role === 'user').length === 1) {
+      conv.title = content.slice(0, 40) + (content.length > 40 ? '…' : '')
+    }
+
+    if (!conv.serverId) {
+      try {
+        const res = await createConversationApi(conv.title)
+        if (res.success && res.data) {
+          conv.serverId = res.data.id
+          conv.id = String(res.data.id)
+          activeConversationId.value = conv.id
+        }
+      } catch {
+        userMsg.status = 'error'
+        return
+      }
+    }
+
+    isAiTyping.value = true
+    quotaError.value = null
+    try {
+      const res = await sendInpaintingMessageApi(conv.serverId!, content, image, maskImage, sourceMessageId) as any
+      if (res.success && res.data) {
+        if (res.data.conversation) {
+          const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)
+          if (activeConversationId.value === conv.id || activeConversationId.value === String(conv.serverId)) {
+            activeConversationId.value = updatedConv.id
+          }
+          if (hasProcessingMessages(updatedConv)) {
+            startProcessingPoller(updatedConv.serverId!)
+          }
+        } else {
+          const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+          if (idx !== -1) {
+            conv.messages[idx] = apiMsgToLocal(res.data.user_message)
+          }
+
+          conv.messages.push(apiMsgToLocal(res.data.ai_message))
+        }
+
+        if (res.quota) {
+          const auth = useAuthStore()
+          auth.quota.credits_remaining = res.quota.remaining
+          auth.quota.warning_level = res.quota.warning
+        }
+      }
+    } catch (err: unknown) {
+      if (isAxiosError(err) && err.response?.status === 402) {
+        const body = err.response.data
+        quotaError.value = {
+          code: body.error_code ?? 'insufficient_credits',
+          message: body.message ?? 'Credits exhausted',
+        }
+        const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
+        if (idx !== -1) conv.messages.splice(idx, 1)
+        const auth = useAuthStore()
+        await auth.refreshQuota()
+      } else {
+        const recoveredConv = conv.serverId ? await refreshConversation(conv.serverId) : null
+        if (!recoveredConv) {
+          userMsg.status = 'error'
+        }
+      }
+    } finally {
+      isAiTyping.value = false
+    }
+  }
+
   async function sendProductMessage(content: string, images: File[]) {
     if (activeConversationBusy.value) return
 
@@ -638,6 +741,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     regenerateMessage,
     sendProductMessage,
+    sendInpaintingMessage,
     clearQuotaError,
     $reset,
   }

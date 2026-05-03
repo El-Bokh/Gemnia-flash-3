@@ -241,6 +241,44 @@ function handleRegenerate(messageId: string) {
   )
 }
 
+function handleInpaint(payload: { messageId?: string; content: string; image: File; mask: File }) {
+  if (!auth.isAuthenticated) {
+    void router.push({ name: 'login', query: { redirect: '/' } })
+    return
+  }
+  if (auth.noSubscription) {
+    void router.push({ name: 'pricing' })
+    return
+  }
+
+  const isNewChat = !chat.activeConversationId
+  const sourceMessageId = payload.messageId && /^\d+$/.test(payload.messageId)
+    ? Number(payload.messageId)
+    : undefined
+
+  chat.sendInpaintingMessage(payload.content, payload.image, payload.mask, sourceMessageId)
+
+  if (isNewChat) {
+    layout.sidebarCollapsed = true
+    const title = payload.content.slice(0, 40) + (payload.content.length > 40 ? '…' : '')
+    window.dispatchEvent(
+      new CustomEvent('app-toast', {
+        detail: { type: 'info', message: `${t('chat.newChatStarted')}: ${title}` },
+      }),
+    )
+  } else {
+    window.dispatchEvent(
+      new CustomEvent('app-toast', {
+        detail: { type: 'info', message: t('chat.inpaintingStarted') },
+      }),
+    )
+  }
+}
+
+function handleInputInpaint(content: string, image: File, mask: File) {
+  handleInpaint({ content, image, mask })
+}
+
 function handleSendProducts(content: string, images: File[]) {
   if (!auth.isAuthenticated) {
     void router.push({ name: 'login', query: { redirect: '/' } })
@@ -308,6 +346,7 @@ function handleSendProducts(content: string, images: File[]) {
         :disabled="inputDisabled"
         @send="handleSend"
         @send-products="handleSendProducts"
+        @inpaint="handleInputInpaint"
         @toggle-styles="showStyles = !showStyles"
         @toggle-products="showProducts = !showProducts"
       />
@@ -395,8 +434,10 @@ function handleSendProducts(content: string, images: File[]) {
             :key="msg.id"
             :message="msg"
             :is-last="idx === messages.length - 1 && !chat.isAiTyping"
+            :disabled="inputDisabled"
             @copy="handleCopy"
             @regenerate="handleRegenerate"
+            @inpaint="handleInpaint"
           />
 
           <!-- Typing indicator -->
@@ -462,6 +503,7 @@ function handleSendProducts(content: string, images: File[]) {
           :disabled="inputDisabled"
           @send="handleSend"
           @send-products="handleSendProducts"
+          @inpaint="handleInputInpaint"
           @toggle-styles="showStyles = !showStyles"
           @toggle-products="showProducts = !showProducts"
         />

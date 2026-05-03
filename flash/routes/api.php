@@ -73,6 +73,9 @@ Route::middleware(['auth:sanctum', 'platform.maintenance'])->group(function () {
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage'])
         ->name('conversations.messages')
         ->middleware('throttle:20,1');
+    Route::post('/conversations/{conversation}/inpaint', [ConversationController::class, 'inpaintImage'])
+        ->name('conversations.inpaint')
+        ->middleware('throttle:10,1');
     Route::post('/conversations/{conversation}/messages/{message}/regenerate', [ConversationController::class, 'regenerateMessage'])
         ->name('conversations.messages.regenerate')
         ->middleware('throttle:10,1');

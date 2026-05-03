@@ -117,6 +117,31 @@ export function regenerateMessage(conversationId: number, messageId: number) {
   )
 }
 
+export function sendInpaintingMessage(
+  conversationId: number,
+  content: string,
+  image: File,
+  maskImage: File,
+  sourceMessageId?: number,
+  aspectRatio?: string,
+) {
+  const form = new FormData()
+  form.append('content', content)
+  form.append('image', image)
+  form.append('mask_image', maskImage)
+  if (sourceMessageId) form.append('source_message_id', String(sourceMessageId))
+  if (aspectRatio) form.append('aspect_ratio', aspectRatio)
+
+  return apiPost<ApiResponse<SendMessageResponse>>(
+    `/conversations/${conversationId}/inpaint`,
+    form,
+    {
+      timeout: LONG_RUNNING_CHAT_TIMEOUT_MS,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  )
+}
+
 export function sendProductMessage(conversationId: number, content: string, images: File[]) {
   const form = new FormData()
   form.append('content', content)

@@ -139,6 +139,279 @@ class ConversationController extends Controller
         }
     }
 
+    /**
+     * POST /api/conversations/{conversation}/inpaint
+     */
+    public function inpaintImage(Request $request, Conversation $conversation): JsonResponse
+    {
+        if ($conversation->user_id !== $request->user()->id) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        $data = $request->validate([
+            'content' => ['required', 'string', 'max:5000'],
+            'image' => ['required', 'image', 'max:10240'],
+            'mask_image' => ['required', 'image', 'max:5120'],
+            'source_message_id' => ['nullable', 'integer'],
+            'aspect_ratio' => ['nullable', 'string', 'in:1:1,3:4,4:3,9:16,16:9'],
+        ]);
+
+        $sourceMessage = null;
+        if (! empty($data['source_message_id'])) {
+            $sourceMessage = $conversation->messages()
+                ->where('id', $data['source_message_id'])
+                ->whereNotNull('image_url')
+                ->first();
+
+            if (! $sourceMessage) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Source image message was not found.',
+                ], 422);
+            }
+        }
+
+        $usageService = new UsageService();
+        $featureSlug = 'inpainting';
+        $featureCheck = $usageService->checkFeatureLimit($request->user(), $featureSlug);
+
+        if (! $featureCheck['allowed']) {
+            $messages = [
+                'no_subscription'       => 'You need an active subscription to use this feature.',
+                'feature_not_available' => 'This feature is not available in your current plan. Please upgrade.',
+                'feature_disabled'      => 'This feature is not available in your current plan. Please upgrade.',
+                'feature_limit_reached' => "You've reached your {$featureCheck['period']} limit for this feature ({$featureCheck['used']}/{$featureCheck['limit']}). Please upgrade or wait.",
+            ];
+
+            return response()->json([
+                'success'    => false,
+                'message'    => $messages[$featureCheck['reason']] ?? 'Feature limit reached.',
+                'error_code' => $featureCheck['reason'],
+                'quota'      => [
+                    'remaining'     => 0,
+                    'feature_used'  => $featureCheck['used'],
+                    'feature_limit' => $featureCheck['limit'],
+                    'feature_period'=> $featureCheck['period'],
+                ],
+            ], 402);
+        }
+
+        $featureModel = \App\Models\Feature::where('slug', $featureSlug)->first();
+        $creditCost = $featureCheck['credits_per_use'] ?? 1;
+        $consumption = $usageService->consume($request->user(), $creditCost, 'inpainting', [
+            'feature_id' => $featureModel?->id,
+        ]);
+
+        if (! $consumption['success']) {
+            $code = $consumption['reason'] === 'no_subscription' ? 'no_subscription' : 'insufficient_credits';
+
+            return response()->json([
+                'success' => false,
+                'message' => $consumption['reason'] === 'no_subscription'
+                    ? 'You need an active subscription to use this feature.'
+                    : 'Your credits have been exhausted. Please upgrade your plan.',
+                'error_code' => $code,
+                'quota' => ['remaining' => $consumption['remaining']],
+            ], 402);
+        }
+
+        $imageFile = $request->file('image');
+        $maskFile = $request->file('mask_image');
+
+        $sourcePath = $imageFile->store('chat-inpainting/' . $request->user()->id, 'public');
+        $maskPath = $maskFile->store('chat-inpainting-masks/' . $request->user()->id, 'public');
+        $sourceUrl = '/storage/' . $sourcePath;
+        $maskUrl = '/storage/' . $maskPath;
+
+        MediaFile::create([
+            'user_id'       => $request->user()->id,
+            'file_name'     => basename($sourcePath),
+            'original_name' => $imageFile->getClientOriginalName(),
+            'file_path'     => $sourcePath,
+            'disk'          => 'public',
+            'mime_type'     => $imageFile->getMimeType(),
+            'file_size'     => $imageFile->getSize(),
+            'collection'    => 'chat',
+            'purpose'       => 'input',
+        ]);
+
+        MediaFile::create([
+            'user_id'       => $request->user()->id,
+            'file_name'     => basename($maskPath),
+            'original_name' => $maskFile->getClientOriginalName(),
+            'file_path'     => $maskPath,
+            'disk'          => 'public',
+            'mime_type'     => $maskFile->getMimeType(),
+            'file_size'     => $maskFile->getSize(),
+            'collection'    => 'chat',
+            'purpose'       => 'mask',
+        ]);
+
+        $preparedSource = $this->prepareImageForApi($imageFile->getRealPath(), $imageFile->getMimeType() ?: 'image/jpeg');
+        $preparedMask = $this->prepareImageForApi($maskFile->getRealPath(), $maskFile->getMimeType() ?: 'image/png');
+        $aspectRatio = $data['aspect_ratio'] ?? $this->inferAspectRatioFromImage($imageFile->getRealPath());
+        $userPrompt = trim($data['content']);
+        $inpaintPrompt = $this->buildInpaintingPrompt($userPrompt);
+
+        $userMsg = $conversation->messages()->create([
+            'role'       => 'user',
+            'content'    => $userPrompt,
+            'image_url'  => $sourceUrl,
+            'status'     => 'sent',
+            'metadata'   => [
+                'edit_mode' => 'inpainting',
+                'source_message_id' => $sourceMessage?->id,
+                'mask_image_url' => $maskUrl,
+            ],
+        ]);
+
+        if ($conversation->messages()->where('role', 'user')->count() === 1) {
+            $conversation->update([
+                'title' => Str::limit($userPrompt, 40),
+            ]);
+        }
+
+        $conversation->touch();
+
+        $currentParts = [
+            ['text' => $inpaintPrompt],
+            [
+                'inline_data' => [
+                    'mime_type' => $preparedSource['mime_type'],
+                    'data' => $preparedSource['data'],
+                ],
+            ],
+            [
+                'inline_data' => [
+                    'mime_type' => $preparedMask['mime_type'],
+                    'data' => $preparedMask['data'],
+                ],
+            ],
+        ];
+
+        $gemini = new GeminiService('image', $aspectRatio);
+        $startedAt = now();
+        $result = $gemini->chatWithParts([], $currentParts);
+        $completedAt = now();
+        $processingTimeMs = (int) round($startedAt->diffInMilliseconds($completedAt));
+
+        $aiRequest = AiRequest::create([
+            'user_id'            => $request->user()->id,
+            'subscription_id'    => $consumption['subscription']?->id,
+            'type'               => 'inpainting',
+            'status'             => $result['success'] ? 'completed' : 'failed',
+            'user_prompt'        => $userPrompt,
+            'processed_prompt'   => $inpaintPrompt,
+            'model_used'         => $gemini->getModel(),
+            'engine_provider'    => 'gemini',
+            'credits_consumed'   => $creditCost,
+            'input_image_path'   => $sourceUrl,
+            'mask_image_path'    => $maskUrl,
+            'processing_time_ms' => $processingTimeMs,
+            'ip_address'         => $request->ip(),
+            'user_agent'         => $request->userAgent(),
+            'request_payload'    => [
+                'prompt' => $inpaintPrompt,
+                'has_source_image' => true,
+                'has_mask_image' => true,
+                'source_message_id' => $sourceMessage?->id,
+            ],
+            'metadata'           => [
+                'source' => 'conversation',
+                'generation_mode' => 'inpainting',
+                'user_message_id' => $userMsg->id,
+                'source_message_id' => $sourceMessage?->id,
+            ],
+            'error_message'      => $result['success'] ? null : ($result['error'] ?? 'Unknown error'),
+            'started_at'         => $startedAt,
+            'completed_at'       => $completedAt,
+        ]);
+
+        if ($result['success']) {
+            $generatedImageUrl = null;
+
+            if (! empty($result['images'])) {
+                $firstImage = $result['images'][0];
+                $ext = str_contains($firstImage['mime_type'], 'png') ? 'png' : 'jpg';
+                $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $ext;
+                $imageBytes = base64_decode($firstImage['data']);
+
+                Storage::disk('public')->put($fileName, $imageBytes);
+
+                MediaFile::create([
+                    'user_id'       => $request->user()->id,
+                    'file_name'     => basename($fileName),
+                    'original_name' => 'inpainted-image.' . $ext,
+                    'file_path'     => $fileName,
+                    'disk'          => 'public',
+                    'mime_type'     => $firstImage['mime_type'],
+                    'file_size'     => strlen($imageBytes),
+                    'collection'    => 'chat',
+                    'purpose'       => 'output',
+                ]);
+
+                $generatedImageUrl = '/storage/' . $fileName;
+
+                $aiRequest->update([
+                    'output_image_path' => $generatedImageUrl,
+                ]);
+            }
+
+            $aiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
+                'role'          => 'assistant',
+                'content'       => $result['content'] ?? ($generatedImageUrl ? '' : 'No response generated.'),
+                'image_url'     => $generatedImageUrl,
+                'status'        => 'sent',
+                'metadata'      => [
+                    'edit_mode' => 'inpainting',
+                    'source_message_id' => $sourceMessage?->id,
+                    'mask_image_url' => $maskUrl,
+                    'source_image_url' => $sourceUrl,
+                ],
+            ]);
+        } else {
+            $usageService->refund($request->user(), $creditCost, 'ai_failure', [
+                'ai_request_id' => $aiRequest->id,
+                'error' => $result['error'] ?? 'Unknown error',
+            ]);
+            $consumption['remaining'] += $creditCost;
+            $aiRequest->update(['credits_consumed' => 0]);
+
+            $aiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
+                'role'          => 'assistant',
+                'content'       => $result['error'] ?? 'Image inpainting failed.',
+                'status'        => 'error',
+                'metadata'      => [
+                    'edit_mode' => 'inpainting',
+                    'source_message_id' => $sourceMessage?->id,
+                    'mask_image_url' => $maskUrl,
+                    'source_image_url' => $sourceUrl,
+                ],
+            ]);
+        }
+
+        $responseConversation = $conversation->fresh()->load('messages');
+        $quotaStats = $usageService->computeWarningLevel(
+            $consumption['remaining'],
+            $consumption['subscription']->credits_total ?? 0
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user_message' => $userMsg,
+                'ai_message' => $aiMsg,
+                'conversation' => $responseConversation,
+            ],
+            'quota' => [
+                'remaining' => $consumption['remaining'],
+                'warning' => $quotaStats,
+            ],
+        ]);
+    }
+
     private function processSendMessage(Request $request, Conversation $conversation): JsonResponse
     {
         $data = $request->validate([
@@ -1081,6 +1354,49 @@ class ConversationController extends Controller
         }
 
         return 'chat';
+    }
+
+    private function buildInpaintingPrompt(string $userPrompt): string
+    {
+        return trim(implode("\n", [
+            'Image editing task: inpaint only the masked area.',
+            'Input image 1 is the original source image.',
+            'Input image 2 is a black-and-white mask: white painted pixels are the editable area; black pixels must be preserved.',
+            'Make the requested change only inside the white mask region. Keep all unmasked pixels, objects, lighting, camera angle, composition, text, faces, and background unchanged.',
+            'Blend the edited area naturally with the surrounding image and return one final edited image.',
+            'Requested edit:',
+            $userPrompt,
+        ]));
+    }
+
+    private function inferAspectRatioFromImage(string $filePath): ?string
+    {
+        $size = @getimagesize($filePath);
+        if (! $size || empty($size[0]) || empty($size[1])) {
+            return null;
+        }
+
+        $actualRatio = $size[0] / $size[1];
+        $ratios = [
+            '1:1' => 1,
+            '3:4' => 3 / 4,
+            '4:3' => 4 / 3,
+            '9:16' => 9 / 16,
+            '16:9' => 16 / 9,
+        ];
+
+        $closest = null;
+        $closestDistance = PHP_FLOAT_MAX;
+
+        foreach ($ratios as $label => $ratio) {
+            $distance = abs($actualRatio - $ratio);
+            if ($distance < $closestDistance) {
+                $closest = $label;
+                $closestDistance = $distance;
+            }
+        }
+
+        return $closest;
     }
 
     private function normalizeFeatureConstraints(mixed $constraints): array

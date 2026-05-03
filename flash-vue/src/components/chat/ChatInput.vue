@@ -3,6 +3,7 @@ import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
 import AspectRatioSelector from '@/components/chat/AspectRatioSelector.vue'
+import InpaintingEditor from '@/components/chat/InpaintingEditor.vue'
 import Button from 'primevue/button'
 
 const { t } = useI18n()
@@ -16,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   send: [content: string, image?: File]
   sendProducts: [content: string, images: File[]]
+  inpaint: [content: string, image: File, mask: File]
   toggleStyles: []
   toggleProducts: []
   openUpload: []
@@ -49,6 +51,10 @@ const showAspectRatioPopup = ref(false)
 const aspectRatioPopupRef = ref<HTMLDivElement | null>(null)
 const attachmentTaskCount = ref(0)
 const isProcessingAttachments = computed(() => attachmentTaskCount.value > 0)
+const showInpaintEditor = ref(false)
+const inpaintSource = ref<AttachedFile | null>(null)
+const inpaintSourceFile = computed(() => inpaintSource.value?.file ?? null)
+const inpaintSourceUrl = computed(() => inpaintSource.value?.preview ?? undefined)
 const durationOptions = [4, 6, 8]
 const resolutionOptions = ['720p', '1080p'] as const
 
@@ -308,7 +314,30 @@ async function processFiles(files: File[], type: 'image' | 'file') {
 }
 
 function removeAttached(index: number) {
-  attachedFiles.value.splice(index, 1)
+  const [removed] = attachedFiles.value.splice(index, 1)
+  revokePreview(removed?.preview ?? null)
+  if (removed && inpaintSource.value?.file === removed.file) {
+    showInpaintEditor.value = false
+    inpaintSource.value = null
+  }
+}
+
+function openInpaintEditor(attachment: AttachedFile) {
+  if (props.disabled || isProcessingAttachments.value || attachment.type !== 'image') return
+  inpaintSource.value = attachment
+  showInpaintEditor.value = true
+}
+
+function handleInpaintSubmit(payload: { content: string; image: File; mask: File }) {
+  emit('inpaint', payload.content, payload.image, payload.mask)
+  message.value = ''
+  attachedFiles.value.forEach(attachment => revokePreview(attachment.preview))
+  attachedFiles.value = []
+  inpaintSource.value = null
+  showInpaintEditor.value = false
+  showLinkInput.value = false
+  linkUrl.value = ''
+  nextTick(autoResize)
 }
 
 function addLink() {
@@ -439,6 +468,15 @@ function setMode(mode: 'text' | 'image' | 'video') {
             <span class="attached-name">{{ af.file.name }}</span>
             <span class="attached-size">{{ formatSize(af.file.size) }}</span>
           </div>
+          <button
+            v-if="af.type === 'image'"
+            class="attached-inpaint"
+            :title="t('chat.editMaskedArea')"
+            :disabled="disabled || isProcessingAttachments"
+            @click="openInpaintEditor(af)"
+          >
+            <i class="pi pi-pencil" />
+          </button>
           <button class="attached-remove" @click="removeAttached(idx)">
             <i class="pi pi-times" />
           </button>
@@ -687,6 +725,16 @@ function setMode(mode: 'text' | 'image' | 'video') {
         />
       </div>
     </div>
+
+    <InpaintingEditor
+      :visible="showInpaintEditor"
+      :source-file="inpaintSourceFile"
+      :source-url="inpaintSourceUrl"
+      :initial-prompt="message"
+      :disabled="disabled"
+      @close="showInpaintEditor = false"
+      @submit="handleInpaintSubmit"
+    />
   </div>
 </template>
 
@@ -1084,6 +1132,7 @@ function setMode(mode: 'text' | 'image' | 'video') {
   color: var(--text-muted);
 }
 
+.attached-inpaint,
 .attached-remove {
   border: none;
   background: none;
@@ -1094,6 +1143,16 @@ function setMode(mode: 'text' | 'image' | 'video') {
   font-size: 0.65rem;
   flex-shrink: 0;
   transition: color 0.14s, background 0.14s;
+}
+
+.attached-inpaint:hover:not(:disabled) {
+  color: #0284c7;
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.attached-inpaint:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .attached-remove:hover {
