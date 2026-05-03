@@ -12,6 +12,8 @@ class GeminiService
 {
     private const IMAGE_REQUEST_TIMEOUT_SECONDS = 240;
     private const VIDEO_REQUEST_TIMEOUT_SECONDS = 60;
+    private const IMAGEN_MASK_EDIT_MODEL = 'imagen-3.0-capability-001';
+    private const IMAGEN_USER_MASK_DILATION = 0.025;
 
     protected string $apiKey;
     protected string $textModel;
@@ -1065,6 +1067,199 @@ SYSTEM;
         }
 
         return $segment;
+    }
+
+    public function inpaintWithMask(
+        array $sourceImage,
+        array $maskImage,
+        string $prompt,
+        ?string $editMode = 'EDIT_MODE_INPAINT_INSERTION',
+        float $maskDilation = self::IMAGEN_USER_MASK_DILATION,
+    ): array
+    {
+        $authCheck = $this->checkAuth();
+        if ($authCheck !== null) {
+            return $authCheck;
+        }
+
+        if ($this->authMethod !== 'service_account') {
+            return [
+                'success' => false,
+                'content' => null,
+                'images' => [],
+                'error' => 'Explicit mask inpainting requires Vertex AI service account authentication.',
+                'model_used' => $this->imageModel,
+                'engine_provider' => 'gemini',
+                'prompt_used' => $prompt,
+            ];
+        }
+
+        $prompt = trim($prompt);
+        if ($prompt === '') {
+            return [
+                'success' => false,
+                'content' => null,
+                'images' => [],
+                'error' => 'No prompt provided for inpainting.',
+                'model_used' => self::IMAGEN_MASK_EDIT_MODEL,
+                'engine_provider' => 'imagen',
+                'prompt_used' => $prompt,
+            ];
+        }
+
+        $sourceImageData = trim((string) ($sourceImage['data'] ?? ''));
+        $maskImageData = trim((string) ($maskImage['data'] ?? ''));
+
+        if ($sourceImageData === '' || $maskImageData === '') {
+            return [
+                'success' => false,
+                'content' => null,
+                'images' => [],
+                'error' => 'Source image or mask image is missing.',
+                'model_used' => self::IMAGEN_MASK_EDIT_MODEL,
+                'engine_provider' => 'imagen',
+                'prompt_used' => $prompt,
+            ];
+        }
+
+        $translatedPrompt = $this->translateForImageEdit($prompt);
+        $model = self::IMAGEN_MASK_EDIT_MODEL;
+        $url = $this->buildEndpointUrl($model, 'predict');
+
+        $instance = [
+            'prompt' => $translatedPrompt,
+            'referenceImages' => [
+                [
+                    'referenceId' => 1,
+                    'referenceType' => 'REFERENCE_TYPE_RAW',
+                    'referenceImage' => [
+                        'bytesBase64Encoded' => $sourceImageData,
+                        'mimeType' => $sourceImage['mime_type'] ?? 'image/png',
+                    ],
+                ],
+                [
+                    'referenceId' => 2,
+                    'referenceType' => 'REFERENCE_TYPE_MASK',
+                    'referenceImage' => [
+                        'bytesBase64Encoded' => $maskImageData,
+                        'mimeType' => $maskImage['mime_type'] ?? 'image/png',
+                    ],
+                    'maskImageConfig' => [
+                        'maskMode' => 'MASK_MODE_USER_PROVIDED',
+                        'dilation' => $maskDilation,
+                    ],
+                ],
+            ],
+        ];
+
+        Log::info('Trying Imagen explicit-mask inpainting', [
+            'model' => $model,
+            'prompt' => $translatedPrompt,
+            'auth_method' => $this->authMethod,
+            'mask_mode' => 'MASK_MODE_USER_PROVIDED',
+            'mask_dilation' => $maskDilation,
+            'edit_mode' => $editMode,
+        ]);
+
+        try {
+            $request = Http::timeout(self::IMAGE_REQUEST_TIMEOUT_SECONDS);
+            $request = $this->applyAuth($request);
+
+            $parameters = [
+                'sampleCount' => 1,
+                'outputOptions' => [
+                    'mimeType' => 'image/png',
+                ],
+            ];
+
+            if ($editMode !== null) {
+                $parameters['editMode'] = $editMode;
+            }
+
+            $response = $request->post($url, [
+                'instances' => [$instance],
+                'parameters' => $parameters,
+            ]);
+
+            if (! $response->successful()) {
+                $errorMsg = $response->json('error.message', 'Unknown Imagen API error');
+
+                Log::error('Imagen explicit-mask inpainting failed', [
+                    'model' => $model,
+                    'status' => $response->status(),
+                    'error' => $errorMsg,
+                    'response_body' => mb_substr($response->body(), 0, 2000),
+                ]);
+
+                return [
+                    'success' => false,
+                    'content' => null,
+                    'images' => [],
+                    'error' => 'Image generation failed. Please try again with a different prompt.',
+                    'model_used' => $model,
+                    'engine_provider' => 'imagen',
+                    'prompt_used' => $translatedPrompt,
+                ];
+            }
+
+            $predictions = $response->json('predictions', []);
+            $images = [];
+
+            foreach ($predictions as $prediction) {
+                $imagePayload = $prediction['_self'] ?? $prediction;
+                if (isset($imagePayload['bytesBase64Encoded'])) {
+                    $images[] = [
+                        'data' => $imagePayload['bytesBase64Encoded'],
+                        'mime_type' => $imagePayload['mimeType'] ?? 'image/png',
+                    ];
+                }
+            }
+
+            if (empty($images)) {
+                Log::error('Imagen explicit-mask inpainting returned no images', [
+                    'model' => $model,
+                    'prediction_keys' => array_map(
+                        static fn (array $prediction): array => array_keys($prediction),
+                        $predictions,
+                    ),
+                ]);
+
+                return [
+                    'success' => false,
+                    'content' => null,
+                    'images' => [],
+                    'error' => 'No image was generated. Please try again with a different prompt.',
+                    'model_used' => $model,
+                    'engine_provider' => 'imagen',
+                    'prompt_used' => $translatedPrompt,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'content' => null,
+                'images' => $images,
+                'error' => null,
+                'model_used' => $model,
+                'engine_provider' => 'imagen',
+                'prompt_used' => $translatedPrompt,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Imagen explicit-mask inpainting exception', [
+                'model' => $model,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'content' => null,
+                'images' => [],
+                'error' => 'Something went wrong while generating the image. Please try again.',
+                'model_used' => $model,
+                'engine_provider' => 'imagen',
+                'prompt_used' => $translatedPrompt,
+            ];
+        }
     }
 
     private function imagenGenerate(array $currentParts): array

@@ -122,6 +122,7 @@ export function sendInpaintingMessage(
   content: string,
   image: File,
   maskImage: File,
+  renderedImage?: File,
   sourceMessageId?: number,
   aspectRatio?: string,
 ) {
@@ -129,6 +130,7 @@ export function sendInpaintingMessage(
   form.append('content', content)
   form.append('image', image)
   form.append('mask_image', maskImage)
+  if (renderedImage) form.append('rendered_image', renderedImage)
   if (sourceMessageId) form.append('source_message_id', String(sourceMessageId))
   if (aspectRatio) form.append('aspect_ratio', aspectRatio)
 

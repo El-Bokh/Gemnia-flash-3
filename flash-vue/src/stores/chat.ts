@@ -14,6 +14,7 @@ import {
 } from '@/services/chatService'
 import type { AiMode, ConversationData, MessageData } from '@/services/chatService'
 import { useAuthStore } from '@/stores/auth'
+import { resolveMediaUrl } from '@/utils/mediaUrl'
 
 export interface ChatMessage {
   id: string
@@ -39,34 +40,20 @@ export interface Conversation {
   updatedAt: Date
 }
 
-function resolveStorageUrl(path: string | null | undefined): string | undefined {
-  if (!path) return undefined
-  if (path.startsWith('http')) return path
-  if (path.startsWith('gs://')) {
-    const gcsPath = path.slice(5)
-    const [bucket = '', ...objectParts] = gcsPath.split('/')
-    return `https://storage.googleapis.com/${encodeURIComponent(bucket)}/${objectParts.map(encodeURIComponent).join('/')}`
-  }
-  // Strip /api suffix to get the backend origin
-  const apiBase = import.meta.env.VITE_API_BASE_URL || ''
-  const origin = apiBase.replace(/\/api\/?$/, '')
-  return origin + path
-}
-
 function apiMsgToLocal(m: MessageData): ChatMessage {
   const maskImageUrl = typeof m.metadata?.mask_image_url === 'string'
-    ? resolveStorageUrl(m.metadata.mask_image_url)
+    ? resolveMediaUrl(m.metadata.mask_image_url) ?? undefined
     : undefined
 
   return {
     id: String(m.id),
     role: m.role,
     content: m.content,
-    imageUrl: resolveStorageUrl(m.image_url),
+    imageUrl: resolveMediaUrl(m.image_url) ?? undefined,
     maskImageUrl,
-    videoUrl: resolveStorageUrl(m.video_url),
+    videoUrl: resolveMediaUrl(m.video_url) ?? undefined,
     imageStyle: m.image_style ?? undefined,
-    productImages: m.product_images?.map(url => resolveStorageUrl(url)!).filter(Boolean) ?? undefined,
+    productImages: m.product_images?.map(url => resolveMediaUrl(url)).filter((url): url is string => Boolean(url)) ?? undefined,
     metadata: m.metadata,
     timestamp: new Date(m.created_at),
     status: m.status === 'error' ? 'error' : m.status === 'processing' ? 'processing' : m.status === 'sending' ? 'sending' : 'sent',
@@ -516,7 +503,13 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendInpaintingMessage(content: string, image: File, maskImage: File, sourceMessageId?: number) {
+  async function sendInpaintingMessage(
+    content: string,
+    image: File,
+    maskImage: File,
+    sourceMessageId?: number,
+    renderedImage?: File,
+  ) {
     if (activeConversationBusy.value) return
 
     if (!activeConversationId.value) {
@@ -563,7 +556,7 @@ export const useChatStore = defineStore('chat', () => {
     isAiTyping.value = true
     quotaError.value = null
     try {
-      const res = await sendInpaintingMessageApi(conv.serverId!, content, image, maskImage, sourceMessageId) as any
+      const res = await sendInpaintingMessageApi(conv.serverId!, content, image, maskImage, renderedImage, sourceMessageId) as any
       if (res.success && res.data) {
         if (res.data.conversation) {
           const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)

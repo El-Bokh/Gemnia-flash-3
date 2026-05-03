@@ -285,7 +285,7 @@ function handleRegenerate(messageId: string) {
   )
 }
 
-function handleInpaint(payload: { messageId?: string; content: string; image: File; mask: File }) {
+function handleInpaint(payload: { messageId?: string; content: string; image: File; mask: File; renderedImage?: File }) {
   if (!auth.isAuthenticated) {
     void router.push({ name: 'login', query: { redirect: '/' } })
     return
@@ -300,7 +300,7 @@ function handleInpaint(payload: { messageId?: string; content: string; image: Fi
     ? Number(payload.messageId)
     : undefined
 
-  chat.sendInpaintingMessage(payload.content, payload.image, payload.mask, sourceMessageId)
+  chat.sendInpaintingMessage(payload.content, payload.image, payload.mask, sourceMessageId, payload.renderedImage)
 
   if (isNewChat) {
     layout.sidebarCollapsed = true
@@ -319,8 +319,8 @@ function handleInpaint(payload: { messageId?: string; content: string; image: Fi
   }
 }
 
-function handleInputInpaint(content: string, image: File, mask: File) {
-  handleInpaint({ content, image, mask })
+function handleInputInpaint(content: string, image: File, mask: File, renderedImage?: File) {
+  handleInpaint({ content, image, mask, renderedImage })
 }
 
 function handleSendProducts(content: string, images: File[]) {

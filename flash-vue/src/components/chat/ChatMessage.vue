@@ -17,7 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   copy: [content: string]
   regenerate: [messageId: string]
-  inpaint: [payload: { messageId: string; content: string; image: File; mask: File }]
+  inpaint: [payload: { messageId: string; content: string; image: File; mask: File; renderedImage?: File }]
 }>()
 
 const showActions = ref(false)
@@ -78,7 +78,7 @@ function handleOpenInpaint() {
   showInpaintEditor.value = true
 }
 
-function handleInpaintSubmit(payload: { content: string; image: File; mask: File }) {
+function handleInpaintSubmit(payload: { content: string; image: File; mask: File; renderedImage?: File }) {
   emit('inpaint', {
     messageId: props.message.id,
     ...payload,

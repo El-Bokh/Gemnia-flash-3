@@ -18,7 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   send: [content: string, image?: File]
   sendProducts: [content: string, images: File[]]
-  inpaint: [content: string, image: File, mask: File]
+  inpaint: [content: string, image: File, mask: File, renderedImage?: File]
   toggleStyles: []
   toggleProducts: []
   openStyles: []
@@ -369,8 +369,8 @@ function openInpaintEditor(attachment: AttachedFile) {
   showInpaintEditor.value = true
 }
 
-function handleInpaintSubmit(payload: { content: string; image: File; mask: File }) {
-  emit('inpaint', payload.content, payload.image, payload.mask)
+function handleInpaintSubmit(payload: { content: string; image: File; mask: File; renderedImage?: File }) {
+  emit('inpaint', payload.content, payload.image, payload.mask, payload.renderedImage)
   message.value = ''
   attachedFiles.value.forEach(attachment => revokePreview(attachment.preview))
   attachedFiles.value = []
