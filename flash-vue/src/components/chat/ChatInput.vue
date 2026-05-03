@@ -49,6 +49,8 @@ const showAspectRatioPopup = ref(false)
 const aspectRatioPopupRef = ref<HTMLDivElement | null>(null)
 const attachmentTaskCount = ref(0)
 const isProcessingAttachments = computed(() => attachmentTaskCount.value > 0)
+const durationOptions = [4, 6, 8]
+const resolutionOptions = ['720p', '1080p'] as const
 
 function replaceExtension(fileName: string, extension: string) {
   return fileName.replace(/\.[^.]+$/, '') + '.' + extension
@@ -195,6 +197,7 @@ function handleSend() {
 
   // Product mode
   if (productMode.value) {
+    if (props.disabled) return
     if (isProcessingAttachments.value) return
     if (productImages.value.length < 2) return
     if (!text) return
@@ -230,6 +233,8 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function handleToolClick(tool: string) {
+  if (props.disabled) return
+
   showToolsMenu.value = false
   if (tool === 'upload') {
     imageInputRef.value?.click()
@@ -252,6 +257,8 @@ function handleToolClick(tool: string) {
 }
 
 async function handleProductSelect(e: Event) {
+  if (props.disabled) return
+
   const input = e.target as HTMLInputElement
   if (!input.files) return
   const files = Array.from(input.files).filter(file => file.type.startsWith('image/'))
@@ -278,6 +285,8 @@ function cancelProductMode() {
 }
 
 async function handleImageSelect(e: Event) {
+  if (props.disabled) return
+
   const input = e.target as HTMLInputElement
   if (!input.files) return
   await processFiles(Array.from(input.files), 'image')
@@ -285,6 +294,8 @@ async function handleImageSelect(e: Event) {
 }
 
 async function handleFileSelect(e: Event) {
+  if (props.disabled) return
+
   const input = e.target as HTMLInputElement
   if (!input.files) return
   await processFiles(Array.from(input.files), 'file')
@@ -301,6 +312,8 @@ function removeAttached(index: number) {
 }
 
 function addLink() {
+  if (props.disabled) return
+
   if (linkUrl.value.trim()) {
     message.value += (message.value ? ' ' : '') + linkUrl.value.trim()
     linkUrl.value = ''
@@ -326,6 +339,8 @@ function handleDragLeave() {
 async function handleDrop(e: DragEvent) {
   e.preventDefault()
   isDragOver.value = false
+  if (props.disabled) return
+
   if (e.dataTransfer?.files?.length) {
     await processFiles(Array.from(e.dataTransfer.files), 'file')
   }
@@ -359,6 +374,13 @@ function selectAspectRatio(value: string) {
   chat.aspectRatio = value
   showAspectRatioPopup.value = false
 }
+
+function setMode(mode: 'text' | 'image' | 'video') {
+  if (props.disabled) return
+
+  chat.aiMode = mode
+  showAspectRatioPopup.value = false
+}
 </script>
 
 <template>
@@ -375,6 +397,7 @@ function selectAspectRatio(value: string) {
       type="file"
       accept="image/*"
       multiple
+      :disabled="disabled"
       style="display: none"
       @change="handleImageSelect"
     />
@@ -382,6 +405,7 @@ function selectAspectRatio(value: string) {
       ref="fileInputRef"
       type="file"
       multiple
+      :disabled="disabled"
       style="display: none"
       @change="handleFileSelect"
     />
@@ -390,6 +414,7 @@ function selectAspectRatio(value: string) {
       type="file"
       accept="image/*"
       multiple
+      :disabled="disabled"
       style="display: none"
       @change="handleProductSelect"
     />
@@ -471,6 +496,77 @@ function selectAspectRatio(value: string) {
 
       <!-- Aspect Ratio Selector: popup triggered by button in input row (image mode only) -->
 
+      <div v-if="chat.aiMode === 'video' && !productMode" class="video-options-row">
+        <div class="video-option-group" :aria-label="t('chat.videoAspectRatio')">
+          <button
+            type="button"
+            class="video-option-btn"
+            :class="{ active: chat.videoAspectRatio === '16:9' }"
+            :disabled="disabled"
+            :title="t('chat.videoLandscape')"
+            @click="chat.videoAspectRatio = '16:9'"
+          >
+            <i class="pi pi-desktop" />
+            <span>16:9</span>
+          </button>
+          <button
+            type="button"
+            class="video-option-btn"
+            :class="{ active: chat.videoAspectRatio === '9:16' }"
+            :disabled="disabled"
+            :title="t('chat.videoPortrait')"
+            @click="chat.videoAspectRatio = '9:16'"
+          >
+            <i class="pi pi-mobile" />
+            <span>9:16</span>
+          </button>
+        </div>
+
+        <div class="video-option-group" :aria-label="t('chat.videoDuration')">
+          <button
+            v-for="duration in durationOptions"
+            :key="duration"
+            type="button"
+            class="video-option-btn"
+            :class="{ active: chat.videoDurationSeconds === duration }"
+            :disabled="disabled"
+            :title="t('chat.videoDurationValue', { seconds: duration })"
+            @click="chat.videoDurationSeconds = duration"
+          >
+            <i class="pi pi-clock" />
+            <span>{{ duration }}s</span>
+          </button>
+        </div>
+
+        <div class="video-option-group" :aria-label="t('chat.videoResolution')">
+          <button
+            v-for="resolution in resolutionOptions"
+            :key="resolution"
+            type="button"
+            class="video-option-btn"
+            :class="{ active: chat.videoResolution === resolution }"
+            :disabled="disabled"
+            :title="resolution"
+            @click="chat.videoResolution = resolution"
+          >
+            <i class="pi pi-sparkles" />
+            <span>{{ resolution }}</span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="video-option-btn audio-toggle"
+          :class="{ active: chat.videoGenerateAudio }"
+          :disabled="disabled"
+          :title="t('chat.videoAudio')"
+          @click="chat.videoGenerateAudio = !chat.videoGenerateAudio"
+        >
+          <i :class="chat.videoGenerateAudio ? 'pi pi-volume-up' : 'pi pi-volume-off'" />
+          <span>{{ t('chat.videoAudioShort') }}</span>
+        </button>
+      </div>
+
       <div class="input-row">
         <!-- Tools button -->
         <div class="tools-container">
@@ -482,6 +578,7 @@ function selectAspectRatio(value: string) {
             size="small"
             class="tools-btn"
             :class="{ active: showToolsMenu }"
+            :disabled="disabled"
             @click="showToolsMenu = !showToolsMenu"
           />
           <Transition name="pop">
@@ -514,16 +611,42 @@ function selectAspectRatio(value: string) {
           </Transition>
         </div>
 
-        <!-- Mode toggle -->
-        <button
-          class="mode-toggle"
-          :class="{ 'mode-image': chat.aiMode === 'image' }"
-          :title="chat.aiMode === 'text' ? t('chat.switchToImage') : t('chat.switchToText')"
-          @click="chat.aiMode = chat.aiMode === 'text' ? 'image' : 'text'"
-        >
-          <i :class="chat.aiMode === 'text' ? 'pi pi-comments' : 'pi pi-image'" />
-          <span class="mode-label">{{ chat.aiMode === 'text' ? t('chat.modeText') : t('chat.modeImage') }}</span>
-        </button>
+        <!-- Mode selector -->
+        <div class="mode-selector" role="group" :aria-label="t('chat.modeSelector')">
+          <button
+            type="button"
+            class="mode-toggle"
+            :class="{ active: chat.aiMode === 'text' }"
+            :disabled="disabled"
+            :title="t('chat.switchToText')"
+            @click="setMode('text')"
+          >
+            <i class="pi pi-comments" />
+            <span class="mode-label">{{ t('chat.modeText') }}</span>
+          </button>
+          <button
+            type="button"
+            class="mode-toggle"
+            :class="{ active: chat.aiMode === 'image', 'mode-image': chat.aiMode === 'image' }"
+            :disabled="disabled"
+            :title="t('chat.switchToImage')"
+            @click="setMode('image')"
+          >
+            <i class="pi pi-image" />
+            <span class="mode-label">{{ t('chat.modeImage') }}</span>
+          </button>
+          <button
+            type="button"
+            class="mode-toggle"
+            :class="{ active: chat.aiMode === 'video', 'mode-video': chat.aiMode === 'video' }"
+            :disabled="disabled"
+            :title="t('chat.switchToVideo')"
+            @click="setMode('video')"
+          >
+            <i class="pi pi-video" />
+            <span class="mode-label">{{ t('chat.modeVideo') }}</span>
+          </button>
+        </div>
 
         <!-- Textarea -->
         <textarea
@@ -541,6 +664,7 @@ function selectAspectRatio(value: string) {
           <button
             class="aspect-ratio-btn"
             :class="{ active: showAspectRatioPopup }"
+            :disabled="disabled"
             :title="t('chat.aspectRatio')"
             @click.stop="showAspectRatioPopup = !showAspectRatioPopup"
           >
@@ -558,7 +682,7 @@ function selectAspectRatio(value: string) {
           rounded
           size="small"
           class="send-btn"
-          :disabled="productMode ? (productImages.length < 2 || !message.trim() || isProcessingAttachments) : ((!message.trim() && !attachedFiles.length) || disabled || isProcessingAttachments)"
+          :disabled="productMode ? (productImages.length < 2 || !message.trim() || disabled || isProcessingAttachments) : ((!message.trim() && !attachedFiles.length) || disabled || isProcessingAttachments)"
           @click="handleSend"
         />
       </div>
@@ -638,39 +762,63 @@ function selectAspectRatio(value: string) {
   color: var(--active-color) !important;
 }
 
+.mode-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--hover-bg);
+  flex-shrink: 0;
+}
+
 /* Mode toggle */
 .mode-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border: 1px solid var(--card-border);
-  border-radius: 10px;
-  background: var(--hover-bg);
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   white-space: nowrap;
-  flex-shrink: 0;
-  height: 30px;
+  min-width: 34px;
+  height: 26px;
 }
 
 .mode-toggle:hover {
-  border-color: var(--active-color);
   color: var(--active-color);
-  background: var(--active-bg);
+}
+
+.mode-toggle.active {
+  background: var(--card-bg);
+  color: var(--active-color);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
 }
 
 .mode-toggle.mode-image {
-  border-color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.08);
+  background: rgba(139, 92, 246, 0.1);
   color: #8b5cf6;
 }
 
 .mode-toggle.mode-image:hover {
-  background: rgba(139, 92, 246, 0.14);
+  color: #8b5cf6;
+}
+
+.mode-toggle.mode-video {
+  background: rgba(20, 184, 166, 0.1);
+  color: #0d9488;
+}
+
+.mode-toggle.mode-video:hover {
+  color: #0d9488;
 }
 
 .mode-toggle i {
@@ -679,6 +827,62 @@ function selectAspectRatio(value: string) {
 
 .mode-label {
   line-height: 1;
+}
+
+.video-options-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 4px;
+}
+
+.video-option-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--hover-bg);
+}
+
+.video-option-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 34px;
+  height: 26px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.video-option-btn:hover,
+.video-option-btn.active {
+  background: rgba(20, 184, 166, 0.1);
+  color: #0d9488;
+}
+
+.video-option-btn.active {
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.video-option-btn i {
+  font-size: 0.72rem;
+}
+
+.audio-toggle {
+  background: var(--hover-bg);
 }
 
 .tools-menu {
@@ -1126,6 +1330,18 @@ function selectAspectRatio(value: string) {
 
   .tools-menu {
     min-width: 180px;
+  }
+
+  .mode-label {
+    display: none;
+  }
+
+  .video-options-row {
+    gap: 5px;
+  }
+
+  .video-option-btn {
+    padding-inline: 7px;
   }
 }
 </style>

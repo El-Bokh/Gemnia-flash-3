@@ -13,13 +13,16 @@ class ConversationMessage extends Model
         'role',
         'content',
         'image_url',
+        'video_url',
         'image_style',
         'product_images',
+        'metadata',
         'status',
     ];
 
     protected $casts = [
         'product_images' => 'array',
+        'metadata' => 'array',
     ];
 
     public function conversation(): BelongsTo

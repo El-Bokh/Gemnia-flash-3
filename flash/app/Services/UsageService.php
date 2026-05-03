@@ -269,7 +269,7 @@ class UsageService
 
         // Unlimited usage
         if ($planFeature->usage_limit === null) {
-            return ['allowed' => true, 'reason' => null, 'used' => 0, 'limit' => null, 'period' => $planFeature->limit_period, 'credits_per_use' => $planFeature->credits_per_use ?? 1];
+            return ['allowed' => true, 'reason' => null, 'used' => 0, 'limit' => null, 'period' => $planFeature->limit_period, 'credits_per_use' => $planFeature->credits_per_use ?? 1, 'constraints' => $planFeature->constraints ?? []];
         }
 
         // Count usage within the period
@@ -289,6 +289,7 @@ class UsageService
                 'limit'   => $planFeature->usage_limit,
                 'period'  => $planFeature->limit_period,
                 'credits_per_use' => $planFeature->credits_per_use ?? 1,
+                'constraints' => $planFeature->constraints ?? [],
             ];
         }
 
@@ -299,6 +300,7 @@ class UsageService
             'limit'   => $planFeature->usage_limit,
             'period'  => $planFeature->limit_period,
             'credits_per_use' => $planFeature->credits_per_use ?? 1,
+            'constraints' => $planFeature->constraints ?? [],
         ];
     }
 

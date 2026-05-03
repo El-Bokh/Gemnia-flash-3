@@ -1,1 +1,0 @@
-var e=`https://klek.studio/api`.replace(/\/api\/?$/,``);function t(t){if(!t)return null;if(/^(https?:|data:|blob:)/i.test(t))return t;let n=t.replace(/^public\//,``);return n.startsWith(`/`)?`${e}${n}`:n.startsWith(`storage/`)?`${e}/${n}`:`${e}/storage/${n}`}export{t};

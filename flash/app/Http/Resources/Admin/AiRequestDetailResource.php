@@ -38,6 +38,7 @@ class AiRequestDetailResource extends JsonResource
             // ── Input Images (for image_to_image / inpainting) ──
             'input_image_path'   => $this->input_image_path,
             'output_image_path'  => $this->output_image_path,
+            'output_video_path'  => $this->output_video_path,
             'mask_image_path'    => $this->mask_image_path,
 
             // ── Credits & Performance ──
@@ -135,6 +136,7 @@ class AiRequestDetailResource extends JsonResource
             // ── Stats ──
             'stats' => [
                 'generated_images_count' => $this->generatedImages->count() ?: ($this->output_image_path ? 1 : 0),
+                'generated_videos_count' => $this->output_video_path ? 1 : 0,
                 'usage_logs_count'       => $this->usageLogs->count(),
                 'total_credits_logged'   => $this->usageLogs->sum('credits_used'),
             ],

@@ -11,16 +11,19 @@ use Illuminate\Support\Facades\Log;
 class GeminiService
 {
     private const IMAGE_REQUEST_TIMEOUT_SECONDS = 240;
+    private const VIDEO_REQUEST_TIMEOUT_SECONDS = 60;
 
     protected string $apiKey;
     protected string $textModel;
     protected string $configuredImageModel;
     protected string $imageModel;
+    protected string $videoModel;
     protected string $activeModel;
-    protected string $mode; // 'text' or 'image'
+    protected string $mode; // 'text', 'image', 'product', or 'video'
     protected string $authMethod; // 'api_key' or 'service_account'
     protected string $projectId;
     protected string $region;
+    protected ?string $videoStorageUri = null;
     protected ?array $serviceAccount = null;
     protected ?string $explicitAspectRatio = null;
 
@@ -32,14 +35,20 @@ class GeminiService
         $this->textModel = Setting::getValue('gemini_text_model', 'gemini-2.5-flash');
         $this->configuredImageModel = Setting::getValue('gemini_image_model', 'gemini-3.1-flash-image-preview');
         $this->imageModel = $this->resolveImageModelAlias($this->configuredImageModel);
+        $this->videoModel = trim((string) Setting::getValue('gemini_video_model', 'veo-3.0-generate-001'));
 
-        $this->mode = in_array($mode, ['text', 'image', 'product']) ? $mode : 'text';
-        $this->activeModel = in_array($this->mode, ['image', 'product']) ? $this->imageModel : $this->textModel;
+        $this->mode = in_array($mode, ['text', 'image', 'product', 'video']) ? $mode : 'text';
+        $this->activeModel = match ($this->mode) {
+            'image', 'product' => $this->imageModel,
+            'video' => $this->videoModel,
+            default => $this->textModel,
+        };
         $this->explicitAspectRatio = $aspectRatio;
 
         // Vertex AI config
         $this->projectId = config('services.vertex_ai.project_id', '');
         $this->region = config('services.vertex_ai.region', 'us-central1');
+        $this->videoStorageUri = config('services.vertex_ai.video_storage_uri');
 
         // Load service account if using that auth method
         if ($this->authMethod === 'service_account') {
@@ -247,7 +256,7 @@ class GeminiService
                     : $this->configuredImageModel . ' => ' . $this->imageModel;
                 return [
                     'success' => true,
-                    'message' => "Connected via {$method}. Text model: {$this->textModel}, Image model: {$imageModel}. Response: " . \Illuminate\Support\Str::limit($text, 60),
+                    'message' => "Connected via {$method}. Text model: {$this->textModel}, Image model: {$imageModel}, Video model: {$this->videoModel}. Response: " . \Illuminate\Support\Str::limit($text, 60),
                 ];
             }
 
@@ -255,6 +264,254 @@ class GeminiService
         } catch (\Exception $e) {
             return ['success' => false, 'message' => 'Connection failed: ' . $e->getMessage()];
         }
+    }
+
+    // ──────────────────────────────────────────────
+    //  Veo (Vertex AI video generation)
+    // ──────────────────────────────────────────────
+
+    public function startVideoGeneration(string $prompt, array $options = [], ?array $referenceImage = null): array
+    {
+        $authCheck = $this->checkAuth();
+        if ($authCheck !== null) {
+            return [
+                'success' => false,
+                'error' => $authCheck['error'],
+            ];
+        }
+
+        if ($this->authMethod !== 'service_account') {
+            return [
+                'success' => false,
+                'error' => 'Veo video generation requires Vertex AI service account authentication.',
+            ];
+        }
+
+        $prompt = trim($prompt);
+        if ($prompt === '') {
+            return [
+                'success' => false,
+                'error' => 'No prompt provided for video generation.',
+            ];
+        }
+
+        $videoOptions = $this->normalizeVideoOptions($options);
+        $instance = ['prompt' => $prompt];
+
+        if ($referenceImage !== null) {
+            $imageData = $referenceImage['data'] ?? $referenceImage['bytesBase64Encoded'] ?? null;
+            if (is_string($imageData) && $imageData !== '') {
+                $instance['image'] = [
+                    'bytesBase64Encoded' => $imageData,
+                    'mimeType' => $this->normalizeImageMimeType($referenceImage['mime_type'] ?? $referenceImage['mimeType'] ?? 'image/jpeg'),
+                ];
+            }
+        }
+
+        $parameters = [
+            'sampleCount' => 1,
+            'durationSeconds' => $videoOptions['duration_seconds'],
+            'aspectRatio' => $videoOptions['aspect_ratio'],
+            'resolution' => $videoOptions['resolution'],
+            'generateAudio' => $videoOptions['generate_audio'],
+            'enhancePrompt' => true,
+            'personGeneration' => 'allow_adult',
+        ];
+
+        if ($referenceImage !== null) {
+            $parameters['resizeMode'] = $videoOptions['resize_mode'];
+        }
+
+        if (! empty($videoOptions['negative_prompt'])) {
+            $parameters['negativePrompt'] = $videoOptions['negative_prompt'];
+        }
+
+        if (is_string($this->videoStorageUri) && str_starts_with($this->videoStorageUri, 'gs://')) {
+            $parameters['storageUri'] = rtrim($this->videoStorageUri, '/') . '/';
+        }
+
+        $body = [
+            'instances' => [$instance],
+            'parameters' => $parameters,
+        ];
+
+        $url = $this->buildEndpointUrl($this->videoModel, 'predictLongRunning');
+
+        try {
+            $request = Http::timeout(self::VIDEO_REQUEST_TIMEOUT_SECONDS);
+            $request = $this->applyAuth($request);
+            $response = $request->post($url, $body);
+
+            if (! $response->successful()) {
+                $errorMsg = $response->json('error.message', 'Unknown Veo API error');
+                Log::error('Veo start operation failed', [
+                    'status' => $response->status(),
+                    'error' => $errorMsg,
+                    'model' => $this->videoModel,
+                    'body' => mb_substr($response->body(), 0, 2000),
+                ]);
+
+                return [
+                    'success' => false,
+                    'error' => $errorMsg,
+                    'request_payload' => $this->redactVideoRequestPayload($body),
+                    'response_payload' => $response->json() ?: ['body' => mb_substr($response->body(), 0, 2000)],
+                ];
+            }
+
+            $operationName = $response->json('name');
+            if (! is_string($operationName) || $operationName === '') {
+                return [
+                    'success' => false,
+                    'error' => 'Veo did not return an operation name.',
+                    'request_payload' => $this->redactVideoRequestPayload($body),
+                    'response_payload' => $response->json(),
+                ];
+            }
+
+            Log::info('Veo video operation started', [
+                'model' => $this->videoModel,
+                'operation_name' => $operationName,
+                'aspect_ratio' => $videoOptions['aspect_ratio'],
+                'duration_seconds' => $videoOptions['duration_seconds'],
+                'resolution' => $videoOptions['resolution'],
+            ]);
+
+            return [
+                'success' => true,
+                'operation_name' => $operationName,
+                'model' => $this->videoModel,
+                'request_payload' => $this->redactVideoRequestPayload($body),
+                'response_payload' => $response->json(),
+                'options' => $videoOptions,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Veo start operation exception', [
+                'model' => $this->videoModel,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Video generation could not be started. Please try again.',
+                'request_payload' => $this->redactVideoRequestPayload($body),
+            ];
+        }
+    }
+
+    public function fetchVideoOperation(string $operationName): array
+    {
+        $authCheck = $this->checkAuth();
+        if ($authCheck !== null) {
+            return [
+                'success' => false,
+                'error' => $authCheck['error'],
+            ];
+        }
+
+        $url = $this->buildEndpointUrl($this->videoModel, 'fetchPredictOperation');
+
+        try {
+            $request = Http::timeout(self::VIDEO_REQUEST_TIMEOUT_SECONDS);
+            $request = $this->applyAuth($request);
+            $response = $request->post($url, ['operationName' => $operationName]);
+
+            if (! $response->successful()) {
+                $errorMsg = $response->json('error.message', 'Unknown Veo operation error');
+                Log::error('Veo fetch operation failed', [
+                    'status' => $response->status(),
+                    'error' => $errorMsg,
+                    'operation_name' => $operationName,
+                    'body' => mb_substr($response->body(), 0, 2000),
+                ]);
+
+                return [
+                    'success' => false,
+                    'error' => $errorMsg,
+                    'response_payload' => $response->json() ?: ['body' => mb_substr($response->body(), 0, 2000)],
+                ];
+            }
+
+            $operation = $response->json();
+
+            return [
+                'success' => true,
+                'done' => (bool) ($operation['done'] ?? false),
+                'operation' => $operation,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Veo fetch operation exception', [
+                'operation_name' => $operationName,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Video generation status could not be checked. Please try again.',
+            ];
+        }
+    }
+
+    public function parseVideoOperationResult(array $operation): array
+    {
+        if (! empty($operation['error'])) {
+            return [
+                'success' => false,
+                'error' => $operation['error']['message'] ?? 'Veo video generation failed.',
+                'error_code' => $operation['error']['code'] ?? null,
+            ];
+        }
+
+        $gcsUris = [];
+        $inlineVideos = [];
+        $this->collectVideoArtifacts($operation['response'] ?? $operation, $gcsUris, $inlineVideos);
+
+        $gcsUris = array_values(array_unique(array_filter($gcsUris)));
+
+        if (empty($gcsUris) && empty($inlineVideos)) {
+            return [
+                'success' => false,
+                'error' => 'Veo completed but returned no video artifacts.',
+            ];
+        }
+
+        return [
+            'success' => true,
+            'gcs_uris' => $gcsUris,
+            'inline_videos' => $inlineVideos,
+        ];
+    }
+
+    public function normalizeVideoOptions(array $options): array
+    {
+        $duration = (int) ($options['duration_seconds'] ?? $options['durationSeconds'] ?? 8);
+        if (! in_array($duration, [4, 6, 8], true)) {
+            $duration = 8;
+        }
+
+        $aspectRatio = (string) ($options['aspect_ratio'] ?? $options['aspectRatio'] ?? $this->explicitAspectRatio ?? '16:9');
+        if (! in_array($aspectRatio, ['16:9', '9:16'], true)) {
+            $aspectRatio = '16:9';
+        }
+
+        $resolution = (string) ($options['resolution'] ?? '720p');
+        if (! in_array($resolution, ['720p', '1080p'], true)) {
+            $resolution = '720p';
+        }
+
+        $resizeMode = (string) ($options['resize_mode'] ?? $options['resizeMode'] ?? 'pad');
+        if (! in_array($resizeMode, ['pad', 'crop'], true)) {
+            $resizeMode = 'pad';
+        }
+
+        return [
+            'duration_seconds' => $duration,
+            'aspect_ratio' => $aspectRatio,
+            'resolution' => $resolution,
+            'generate_audio' => filter_var($options['generate_audio'] ?? $options['generateAudio'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            'resize_mode' => $resizeMode,
+            'negative_prompt' => trim((string) ($options['negative_prompt'] ?? $options['negativePrompt'] ?? '')),
+        ];
     }
 
     // ──────────────────────────────────────────────
@@ -1082,6 +1339,15 @@ PROMPT;
 
     private function checkAuth(): ?array
     {
+        if ($this->mode === 'video' && $this->authMethod !== 'service_account') {
+            return [
+                'success' => false,
+                'content' => null,
+                'images'  => [],
+                'error'   => 'Veo video generation requires Vertex AI service account authentication.',
+            ];
+        }
+
         if ($this->authMethod === 'service_account') {
             if ($this->serviceAccount === null) {
                 return [
@@ -1122,6 +1388,67 @@ PROMPT;
 
         // Standard Gemini API endpoint
         return "https://generativelanguage.googleapis.com/v1beta/models/{$model}:{$action}?key={$this->apiKey}";
+    }
+
+    private function redactVideoRequestPayload(array $body): array
+    {
+        $redacted = $body;
+
+        foreach ($redacted['instances'] ?? [] as &$instance) {
+            if (isset($instance['image']['bytesBase64Encoded'])) {
+                $instance['image']['bytesBase64Encoded'] = '[base64 image omitted]';
+            }
+        }
+        unset($instance);
+
+        return $redacted;
+    }
+
+    private function collectVideoArtifacts(mixed $node, array &$gcsUris, array &$inlineVideos): void
+    {
+        if (! is_array($node)) {
+            return;
+        }
+
+        if (isset($node['gcsUris']) && is_array($node['gcsUris'])) {
+            foreach ($node['gcsUris'] as $uri) {
+                if (is_string($uri)) {
+                    $gcsUris[] = $uri;
+                }
+            }
+        }
+
+        if (isset($node['gcsUri']) && is_string($node['gcsUri'])) {
+            $mimeType = (string) ($node['mimeType'] ?? $node['mime_type'] ?? '');
+            if ($mimeType === '' || str_starts_with($mimeType, 'video/') || preg_match('/\.(mp4|mov|mpeg|mpg|avi|wmv|flv)$/i', $node['gcsUri'])) {
+                $gcsUris[] = $node['gcsUri'];
+            }
+        }
+
+        if (isset($node['bytesBase64Encoded']) && is_string($node['bytesBase64Encoded'])) {
+            $mimeType = (string) ($node['mimeType'] ?? $node['mime_type'] ?? 'video/mp4');
+            if ($mimeType === '' || str_starts_with($mimeType, 'video/')) {
+                $inlineVideos[] = [
+                    'data' => $node['bytesBase64Encoded'],
+                    'mime_type' => $mimeType ?: 'video/mp4',
+                ];
+            }
+        }
+
+        foreach ($node as $child) {
+            $this->collectVideoArtifacts($child, $gcsUris, $inlineVideos);
+        }
+    }
+
+    private function normalizeImageMimeType(string $mimeType): string
+    {
+        $mimeType = strtolower(trim($mimeType));
+
+        return match ($mimeType) {
+            'image/jpg' => 'image/jpeg',
+            'image/png', 'image/jpeg' => $mimeType,
+            default => 'image/jpeg',
+        };
     }
 
     private function sendNativeImageRequest(string $model, array $contents, array $generationConfig, string $authMode): array

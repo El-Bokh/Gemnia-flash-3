@@ -91,6 +91,7 @@ class AdminDashboardSeeder extends Seeder
             ['name' => 'Image to Image',   'slug' => 'image_to_image',   'type' => 'image_to_image'],
             ['name' => 'Inpainting',       'slug' => 'inpainting',       'type' => 'inpainting'],
             ['name' => 'Upscale',          'slug' => 'upscale',          'type' => 'upscale'],
+            ['name' => 'Video Generation', 'slug' => 'video_generation', 'type' => 'other'],
         ] as $f) {
             $features[$f['slug']] = Feature::firstOrCreate(
                 ['slug' => $f['slug']],
@@ -103,7 +104,7 @@ class AdminDashboardSeeder extends Seeder
             foreach ($features as $feature) {
                 PlanFeature::firstOrCreate(
                     ['plan_id' => $plan->id, 'feature_id' => $feature->id],
-                    ['is_enabled' => true, 'usage_limit' => null, 'credits_per_use' => 1]
+                    ['is_enabled' => true, 'usage_limit' => null, 'credits_per_use' => $feature->slug === 'video_generation' ? 10 : 1]
                 );
             }
         }

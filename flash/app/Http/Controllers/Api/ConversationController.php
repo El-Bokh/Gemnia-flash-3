@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\StartVeoVideoGeneration;
 use App\Models\AiRequest;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
@@ -147,12 +148,30 @@ class ConversationController extends Controller
             'image'       => ['nullable', 'image', 'max:10240'], // 10MB
             'images'      => ['nullable', 'array', 'max:10'],
             'images.*'    => ['image', 'max:10240'],
-            'mode'        => ['nullable', 'string', 'in:text,image,product'],
+            'mode'        => ['nullable', 'string', 'in:text,image,product,video'],
             'aspect_ratio' => ['nullable', 'string', 'in:1:1,3:4,4:3,9:16,16:9'],
+            'duration_seconds' => ['nullable', 'integer', 'in:4,6,8'],
+            'resolution' => ['nullable', 'string', 'in:720p,1080p'],
+            'generate_audio' => ['nullable', 'boolean'],
         ]);
 
         $mode = $data['mode'] ?? 'text';
         $imageFollowUpContext = null;
+        $videoOptions = null;
+
+        if ($mode === 'video') {
+            $videoAspectRatio = $data['aspect_ratio'] ?? '16:9';
+            if (! in_array($videoAspectRatio, ['16:9', '9:16'], true)) {
+                $videoAspectRatio = '16:9';
+            }
+
+            $videoOptions = [
+                'duration_seconds' => (int) ($data['duration_seconds'] ?? 8),
+                'aspect_ratio' => $videoAspectRatio,
+                'resolution' => $data['resolution'] ?? '720p',
+                'generate_audio' => $request->boolean('generate_audio', true),
+            ];
+        }
 
         if ($mode === 'image') {
             if ($this->shouldTreatImagePromptAsText($data['content'])) {
@@ -196,6 +215,28 @@ class ConversationController extends Controller
                     'feature_period'=> $featureCheck['period'],
                 ],
             ], 402);
+        }
+
+        if ($mode === 'video' && $videoOptions !== null) {
+            $constraints = $this->normalizeFeatureConstraints($featureCheck['constraints'] ?? []);
+            $maxDuration = (int) ($constraints['max_duration_seconds'] ?? 0);
+            $maxResolution = (string) ($constraints['max_resolution'] ?? '');
+
+            if ($maxDuration > 0 && $videoOptions['duration_seconds'] > $maxDuration) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Your plan supports video generation up to {$maxDuration} seconds.",
+                    'error_code' => 'video_duration_not_allowed',
+                ], 402);
+            }
+
+            if ($maxResolution === '720p' && $videoOptions['resolution'] === '1080p') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your plan supports video generation up to 720p resolution.',
+                    'error_code' => 'video_resolution_not_allowed',
+                ], 402);
+            }
         }
 
         $featureModel = \App\Models\Feature::where('slug', $featureSlug)->first();
@@ -467,6 +508,71 @@ class ConversationController extends Controller
             $this->appendInlineImageFromUrl($currentParts, $imageFollowUpContext['reference_image_url']);
         }
 
+        if ($mode === 'video') {
+            $gemini = new GeminiService('video', $videoOptions['aspect_ratio'] ?? '16:9');
+            $aiRequest = AiRequest::create([
+                'user_id'          => $request->user()->id,
+                'subscription_id'  => $consumption['subscription']?->id,
+                'visual_style_id'  => isset($style) ? $style->id : null,
+                'product_id'       => $product?->id,
+                'type'             => $this->resolveAiRequestType($mode, $styleSlug, $imageBase64 !== null, $hasReferenceInput),
+                'status'           => 'pending',
+                'user_prompt'      => $userContent,
+                'processed_prompt' => $geminiPrompt !== $userContent ? $geminiPrompt : null,
+                'hidden_prompt'    => $product?->hidden_prompt,
+                'negative_prompt'  => $product?->negative_prompt,
+                'model_used'       => $gemini->getModel(),
+                'engine_provider'  => 'vertex_ai',
+                'credits_consumed' => $creditCost,
+                'input_image_path' => $imageUrl,
+                'ip_address'       => $request->ip(),
+                'user_agent'       => $request->userAgent(),
+                'request_payload'  => [
+                    'prompt' => $geminiPrompt,
+                    'parameters' => $videoOptions,
+                    'has_reference_image' => $imageUrl !== null,
+                ],
+                'metadata'         => [
+                    'source' => 'conversation',
+                    'generation_mode' => $imageUrl ? 'image_to_video' : 'text_to_video',
+                    'video_options' => $videoOptions,
+                    'user_message_id' => $userMsg->id,
+                ],
+            ]);
+
+            $aiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
+                'role'          => 'assistant',
+                'content'       => '',
+                'status'        => 'processing',
+                'metadata'      => [
+                    'ai_request_uuid' => $aiRequest->uuid,
+                    'video_options' => $videoOptions,
+                ],
+            ]);
+
+            StartVeoVideoGeneration::dispatch($aiRequest->id, $aiMsg->id);
+
+            $responseConversation = $conversation->fresh()->load('messages');
+            $quotaStats = $usageService->computeWarningLevel(
+                $consumption['remaining'],
+                $consumption['subscription']->credits_total ?? 0
+            );
+
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'user_message' => $userMsg,
+                    'ai_message'   => $aiMsg,
+                    'conversation' => $responseConversation,
+                ],
+                'quota' => [
+                    'remaining' => $consumption['remaining'],
+                    'warning'   => $quotaStats,
+                ],
+            ], 202);
+        }
+
         $gemini = new GeminiService($mode, $data['aspect_ratio'] ?? null);
         $startedAt = now();
         $result = $gemini->chatWithParts($history, $currentParts);
@@ -616,7 +722,7 @@ class ConversationController extends Controller
         // ── Quota enforcement ──
         $usageService = new UsageService();
 
-        $featureSlug = $aiMessage->image_url ? 'text_to_image' : 'chat';
+        $featureSlug = $aiMessage->video_url ? 'video_generation' : ($aiMessage->image_url ? 'text_to_image' : 'chat');
         $featureCheck = $usageService->checkFeatureLimit($request->user(), $featureSlug);
         if (! $featureCheck['allowed']) {
             return response()->json([
@@ -624,6 +730,42 @@ class ConversationController extends Controller
                 'message'    => 'Feature limit reached.',
                 'error_code' => $featureCheck['reason'],
             ], 402);
+        }
+
+        $originalAiRequest = $this->findRelatedAiRequest($request->user()->id, $userMessage, $aiMessage);
+
+        // Rebuild prompt using the original processed prompt whenever available.
+        $content = $userMessage->content;
+        $imageStyle = $userMessage->image_style;
+        $mode = $this->inferRegenerateMode($originalAiRequest, $userMessage, $aiMessage);
+        $geminiPrompt = $originalAiRequest?->processed_prompt ?: $content;
+
+        if ($mode === 'video') {
+            $regenerateVideoOptions = data_get($originalAiRequest?->metadata, 'video_options', [
+                'duration_seconds' => 8,
+                'aspect_ratio' => '16:9',
+                'resolution' => '720p',
+                'generate_audio' => true,
+            ]);
+            $constraints = $this->normalizeFeatureConstraints($featureCheck['constraints'] ?? []);
+            $maxDuration = (int) ($constraints['max_duration_seconds'] ?? 0);
+            $maxResolution = (string) ($constraints['max_resolution'] ?? '');
+
+            if ($maxDuration > 0 && (int) ($regenerateVideoOptions['duration_seconds'] ?? 8) > $maxDuration) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Your plan supports video generation up to {$maxDuration} seconds.",
+                    'error_code' => 'video_duration_not_allowed',
+                ], 402);
+            }
+
+            if ($maxResolution === '720p' && ($regenerateVideoOptions['resolution'] ?? '720p') === '1080p') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your plan supports video generation up to 720p resolution.',
+                    'error_code' => 'video_resolution_not_allowed',
+                ], 402);
+            }
         }
 
         $featureModel = \App\Models\Feature::where('slug', $featureSlug)->first();
@@ -640,14 +782,6 @@ class ConversationController extends Controller
                 'quota'      => ['remaining' => $consumption['remaining']],
             ], 402);
         }
-
-        $originalAiRequest = $this->findRelatedAiRequest($request->user()->id, $userMessage, $aiMessage);
-
-        // Rebuild prompt using the original processed prompt whenever available.
-        $content = $userMessage->content;
-        $imageStyle = $userMessage->image_style;
-        $mode = $this->inferRegenerateMode($originalAiRequest, $userMessage, $aiMessage);
-        $geminiPrompt = $originalAiRequest?->processed_prompt ?: $content;
 
         $style = null;
         if ($mode === 'image' && $geminiPrompt === $content) {
@@ -690,6 +824,75 @@ class ConversationController extends Controller
                     ],
                 ];
             }
+        }
+
+        if ($mode === 'video') {
+            $videoOptions = data_get($originalAiRequest?->metadata, 'video_options', [
+                'duration_seconds' => 8,
+                'aspect_ratio' => '16:9',
+                'resolution' => '720p',
+                'generate_audio' => true,
+            ]);
+
+            $gemini = new GeminiService('video', $videoOptions['aspect_ratio'] ?? '16:9');
+            $aiRequest = AiRequest::create([
+                'user_id'            => $request->user()->id,
+                'subscription_id'    => $consumption['subscription']?->id,
+                'type'               => $inputImageUrl ? 'image_to_video' : 'text_to_video',
+                'status'             => 'pending',
+                'user_prompt'        => $content,
+                'processed_prompt'   => $geminiPrompt !== $content ? $geminiPrompt : null,
+                'model_used'         => $gemini->getModel(),
+                'engine_provider'    => 'vertex_ai',
+                'credits_consumed'   => $creditCost,
+                'input_image_path'   => $inputImageUrl,
+                'ip_address'         => $request->ip(),
+                'user_agent'         => $request->userAgent(),
+                'request_payload'    => [
+                    'prompt' => $geminiPrompt,
+                    'parameters' => $videoOptions,
+                    'has_reference_image' => $inputImageUrl !== null,
+                ],
+                'metadata'           => [
+                    'source' => 'regenerate',
+                    'original_ai_request_id' => $originalAiRequest?->id,
+                    'original_message_id' => $aiMessage->id,
+                    'generation_mode' => $inputImageUrl ? 'image_to_video' : 'text_to_video',
+                    'video_options' => $videoOptions,
+                ],
+            ]);
+
+            $newAiMsg = $conversation->messages()->create([
+                'ai_request_id' => $aiRequest->id,
+                'role'          => 'assistant',
+                'content'       => '',
+                'status'        => 'processing',
+                'metadata'      => [
+                    'ai_request_uuid' => $aiRequest->uuid,
+                    'video_options' => $videoOptions,
+                ],
+            ]);
+
+            StartVeoVideoGeneration::dispatch($aiRequest->id, $newAiMsg->id);
+            $aiMessage->delete();
+
+            $responseConversation = $conversation->fresh()->load('messages');
+            $quotaStats = $usageService->computeWarningLevel(
+                $consumption['remaining'],
+                $consumption['subscription']->credits_total ?? 0
+            );
+
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'ai_message'   => $newAiMsg,
+                    'conversation' => $responseConversation,
+                ],
+                'quota' => [
+                    'remaining' => $consumption['remaining'],
+                    'warning'   => $quotaStats,
+                ],
+            ], 202);
         }
 
         $gemini = new GeminiService($mode);
@@ -801,6 +1004,18 @@ class ConversationController extends Controller
             return AiRequest::find($aiMessage->ai_request_id);
         }
 
+        if ($aiMessage->video_url) {
+            $byOutputVideo = AiRequest::query()
+                ->where('user_id', $userId)
+                ->where('output_video_path', $aiMessage->video_url)
+                ->latest('id')
+                ->first();
+
+            if ($byOutputVideo) {
+                return $byOutputVideo;
+            }
+        }
+
         if ($aiMessage->image_url) {
             $byOutputImage = AiRequest::query()
                 ->where('user_id', $userId)
@@ -827,6 +1042,14 @@ class ConversationController extends Controller
     private function inferRegenerateMode(?AiRequest $originalAiRequest, ConversationMessage $userMessage, ConversationMessage $aiMessage): string
     {
         if ($originalAiRequest) {
+            if ($originalAiRequest->output_video_path) {
+                return 'video';
+            }
+
+            if (in_array($originalAiRequest->type, ['text_to_video', 'image_to_video'], true)) {
+                return 'video';
+            }
+
             if ($originalAiRequest->output_image_path) {
                 return 'image';
             }
@@ -834,6 +1057,10 @@ class ConversationController extends Controller
             if (in_array($originalAiRequest->type, ['text_to_image', 'image_to_image'], true)) {
                 return 'image';
             }
+        }
+
+        if ($aiMessage->video_url) {
+            return 'video';
         }
 
         if ($aiMessage->image_url || $userMessage->image_style || $userMessage->image_url) {
@@ -845,6 +1072,10 @@ class ConversationController extends Controller
 
     private function resolveFeatureSlug(string $mode, bool $hasReferenceInput): string
     {
+        if ($mode === 'video') {
+            return 'video_generation';
+        }
+
         if ($mode === 'image') {
             return $hasReferenceInput ? 'image_to_image' : 'text_to_image';
         }
@@ -852,8 +1083,22 @@ class ConversationController extends Controller
         return 'chat';
     }
 
+    private function normalizeFeatureConstraints(mixed $constraints): array
+    {
+        if (is_string($constraints)) {
+            $decoded = json_decode($constraints, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return is_array($constraints) ? $constraints : [];
+    }
+
     private function resolveAiRequestType(string $mode, ?string $styleSlug, bool $hasUploadedImage, bool $hasReferenceInput): string
     {
+        if ($mode === 'video') {
+            return $hasReferenceInput ? 'image_to_video' : 'text_to_video';
+        }
+
         if ($mode === 'product') {
             return 'product';
         }

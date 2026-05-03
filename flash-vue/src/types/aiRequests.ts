@@ -47,6 +47,7 @@ export interface AiRequest {
   credits_consumed: number
   retry_count: number
   processing_time_ms: number | null
+  output_video_path?: string | null
   error_message?: string | null
   error_code?: string | null
   started_at: string | null
@@ -105,6 +106,7 @@ export interface AiRequestSubscriptionRef {
 
 export interface AiRequestDetailStats {
   generated_images_count: number
+  generated_videos_count: number
   usage_logs_count: number
   total_credits_logged: number
 }
@@ -135,9 +137,10 @@ export interface AiRequestDetail {
   num_images: number
   denoising_strength: number | null
 
-  // Input / Output Images
+  // Input / Output Media
   input_image_path: string | null
   output_image_path: string | null
+  output_video_path: string | null
   mask_image_path: string | null
 
   // Credits & Performance
@@ -279,7 +282,7 @@ export interface AiRequestAggregations {
 // ─── Request Payloads ───────────────────────────────────────
 
 export type AiRequestStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'timeout'
-export type AiRequestType = 'text_to_image' | 'image_to_image' | 'inpainting' | 'upscale' | 'chat' | 'styled_chat' | 'multimodal' | 'other'
+export type AiRequestType = 'text_to_image' | 'image_to_image' | 'inpainting' | 'upscale' | 'chat' | 'styled_chat' | 'multimodal' | 'regenerate' | 'product' | 'text_to_video' | 'image_to_video' | 'other'
 
 export interface ListAiRequestsParams {
   search?: string

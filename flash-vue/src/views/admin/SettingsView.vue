@@ -229,6 +229,7 @@ function settingLabel(key: string): string {
     gemini_api_key: t('settings.apiKey'),
     gemini_text_model: t('settings.textModel'),
     gemini_image_model: t('settings.imageModel'),
+    gemini_video_model: t('settings.videoModel'),
   }
   return map[key] || key
 }

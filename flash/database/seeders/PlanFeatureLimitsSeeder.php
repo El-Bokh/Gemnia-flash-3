@@ -64,6 +64,14 @@ class PlanFeatureLimitsSeeder extends Seeder
                 'is_active'   => true,
                 'sort_order'  => 10,
             ],
+            [
+                'name'        => 'Video Generation',
+                'slug'        => 'video_generation',
+                'type'        => 'other',
+                'description' => 'Generate short videos with Vertex AI Veo',
+                'is_active'   => true,
+                'sort_order'  => 11,
+            ],
         ];
 
         foreach ($additionalFeatures as $fData) {
@@ -154,6 +162,12 @@ class PlanFeatureLimitsSeeder extends Seeder
                 'professional' => [false, 0,     'month',    0,  null],
                 'enterprise'   => [true,  null,  'month',    0,  null],
             ],
+            'video_generation' => [
+                'free'         => [false, 0,     'day',      10, null],
+                'starter'      => [true,  5,     'day',      10, ['max_duration_seconds' => 4, 'max_resolution' => '720p']],
+                'professional' => [true,  20,    'day',      10, ['max_duration_seconds' => 8, 'max_resolution' => '1080p']],
+                'enterprise'   => [true,  null,  'day',      10, ['max_duration_seconds' => 8, 'max_resolution' => '1080p']],
+            ],
         ];
 
         foreach ($limitsConfig as $featureSlug => $planLimits) {
@@ -175,7 +189,7 @@ class PlanFeatureLimitsSeeder extends Seeder
                         'usage_limit'     => $usageLimit,
                         'limit_period'    => $limitPeriod,
                         'credits_per_use' => $creditsPerUse,
-                        'constraints'     => $constraints ? json_encode($constraints) : null,
+                        'constraints'     => $constraints ?: null,
                     ]
                 );
             }

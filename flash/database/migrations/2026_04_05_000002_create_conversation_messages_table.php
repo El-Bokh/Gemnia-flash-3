@@ -14,7 +14,9 @@ return new class extends Migration
             $table->enum('role', ['user', 'assistant']);
             $table->text('content');
             $table->string('image_url', 2048)->nullable();
+            $table->string('video_url', 2048)->nullable();
             $table->string('image_style')->nullable();
+            $table->json('metadata')->nullable();
             $table->string('status', 20)->default('sent');
             $table->timestamps();
         });

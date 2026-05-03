@@ -98,6 +98,18 @@ class SystemSettingsSeeder extends Seeder
                 'options' => null,
                 'sort_order' => 12,
             ],
+            [
+                'group' => 'ai_integrations',
+                'key' => 'gemini_video_model',
+                'value' => 'veo-3.0-generate-001',
+                'type' => 'string',
+                'display_name' => 'Veo Video Model',
+                'description' => 'Vertex AI Veo model used for video generation.',
+                'is_public' => false,
+                'is_encrypted' => false,
+                'options' => null,
+                'sort_order' => 13,
+            ],
         ];
 
         foreach ($settings as $setting) {

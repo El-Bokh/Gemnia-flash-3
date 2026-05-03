@@ -154,10 +154,11 @@ class AiRequestManagementService
                 }
 
                 if (in_array($newStatus, ['completed', 'failed', 'cancelled', 'timeout'])) {
-                    $updateData['completed_at'] = now();
+                    $completedAt = now();
+                    $updateData['completed_at'] = $completedAt;
 
                     if ($aiRequest->started_at) {
-                        $updateData['processing_time_ms'] = (int) now()->diffInMilliseconds($aiRequest->started_at);
+                        $updateData['processing_time_ms'] = max(0, (int) round($aiRequest->started_at->diffInMilliseconds($completedAt)));
                     }
                 }
             }

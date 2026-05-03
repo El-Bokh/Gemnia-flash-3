@@ -213,6 +213,7 @@ function buildMockRequest(requestId: number): AiRequestDetail {
     denoising_strength: null,
     input_image_path: null,
     output_image_path: null,
+    output_video_path: null,
     mask_image_path: null,
     credits_consumed: 12,
     processing_time_ms: 4200,
@@ -240,7 +241,7 @@ function buildMockRequest(requestId: number): AiRequestDetail {
       { id: 1, action: 'generation', credits_used: 8, feature: { id: 1, name: 'Text to Image', slug: 'text-to-image' }, created_at: '2026-04-04T08:30:04Z' },
       { id: 2, action: 'premium_queue', credits_used: 4, feature: { id: 5, name: 'Priority Queue', slug: 'priority-queue' }, created_at: '2026-04-04T08:30:04Z' },
     ],
-    stats: { generated_images_count: 2, usage_logs_count: 2, total_credits_logged: 12 },
+    stats: { generated_images_count: 2, generated_videos_count: 0, usage_logs_count: 2, total_credits_logged: 12 },
   }
 }
 
@@ -260,6 +261,13 @@ function typeLabel(type: string) {
   return {
     text_to_image: 'Text→Image',
     image_to_image: 'Image→Image',
+    text_to_video: 'Text→Video',
+    image_to_video: 'Image→Video',
+    chat: 'Chat',
+    styled_chat: 'Styled Chat',
+    multimodal: 'Multimodal',
+    regenerate: 'Regenerate',
+    product: 'Product',
     inpainting: 'Inpainting',
     upscale: 'Upscale',
     other: 'Other',
@@ -303,6 +311,11 @@ function canCancel(status: string) {
 function resolveImageUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined
   if (path.startsWith('http')) return path
+  if (path.startsWith('gs://')) {
+    const gcsPath = path.slice(5)
+    const [bucket = '', ...objectParts] = gcsPath.split('/')
+    return `https://storage.googleapis.com/${encodeURIComponent(bucket)}/${objectParts.map(encodeURIComponent).join('/')}`
+  }
   const apiBase = import.meta.env.VITE_API_BASE_URL || ''
   const origin = apiBase.replace(/\/api\/?$/, '')
   if (!path.startsWith('/')) return `${origin}/storage/${path}`
@@ -362,6 +375,11 @@ const expandedImage = ref<string | null>(null)
             <span class="stat-k">{{ t('aiDetail.images') }}</span>
             <strong>{{ detail.output_image_path ? 1 : detail.stats.generated_images_count }}</strong>
             <small>{{ t('aiDetail.requested', { count: detail.num_images }) }}</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-k">{{ t('aiDetail.videos') }}</span>
+            <strong>{{ detail.output_video_path ? 1 : detail.stats.generated_videos_count }}</strong>
+            <small>{{ typeLabel(detail.type) }}</small>
           </article>
           <article class="stat-card">
             <span class="stat-k">{{ t('aiDetail.duration') }}</span>
@@ -447,6 +465,17 @@ const expandedImage = ref<string | null>(null)
           </TabPanel>
 
           <TabPanel value="outputs">
+            <section v-if="detail.output_video_path" class="info-card">
+              <h3 class="section-title">{{ t('aiDetail.generatedVideos') }}</h3>
+              <article class="video-card">
+                <video :src="resolveImageUrl(detail.output_video_path)" controls preload="metadata" playsinline />
+                <div class="image-copy">
+                  <span class="image-name">Generated Video</span>
+                  <span class="image-meta">{{ typeLabel(detail.type) }} · {{ detail.model_used || '—' }}</span>
+                </div>
+              </article>
+            </section>
+
             <section class="info-card">
               <h3 class="section-title">{{ t('aiDetail.generatedImages') }}</h3>
 
@@ -478,14 +507,14 @@ const expandedImage = ref<string | null>(null)
                 </article>
               </div>
 
-              <div v-else class="empty-outputs">
+              <div v-else-if="!detail.output_video_path" class="empty-outputs">
                 <i class="pi pi-image" />
                 <span>No images generated</span>
               </div>
             </section>
 
             <!-- Text output (processed prompt / response) -->
-            <section v-if="detail.response_payload && !detail.output_image_path && !(detail.generated_images || []).length" class="info-card" style="margin-top: 8px">
+            <section v-if="detail.response_payload && !detail.output_image_path && !detail.output_video_path && !(detail.generated_images || []).length" class="info-card" style="margin-top: 8px">
               <h3 class="section-title">Text Output</h3>
               <div class="prompt-block">
                 <pre style="margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.72rem; color: var(--text-primary)">{{ formatJson(detail.response_payload) }}</pre>
@@ -696,6 +725,10 @@ const expandedImage = ref<string | null>(null)
   padding: 10px;
 }
 
+.info-card + .info-card {
+  margin-top: 8px;
+}
+
 .payload-card pre {
   margin: 0;
   white-space: pre-wrap;
@@ -810,6 +843,24 @@ const expandedImage = ref<string | null>(null)
 }
 .image-name { font-size: 0.7rem; font-weight: 600; color: var(--text-primary); }
 .image-meta { font-size: 0.62rem; color: var(--text-muted); }
+
+.video-card {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.video-card video {
+  width: 100%;
+  max-height: 380px;
+  display: block;
+  background: #0f172a;
+}
+
+.video-card .image-copy {
+  background: var(--card-bg);
+}
 
 .log-list { display: flex; flex-direction: column; gap: 8px; }
 .log-row {

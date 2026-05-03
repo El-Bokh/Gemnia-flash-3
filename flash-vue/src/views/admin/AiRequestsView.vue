@@ -72,6 +72,8 @@ const typeOptions = computed(() => [
   { label: t('aiRequests.allTypes'), value: 'all' },
   { label: t('aiRequests.textToImage'), value: 'text_to_image' },
   { label: t('aiRequests.imageToImage'), value: 'image_to_image' },
+  { label: t('aiRequests.textToVideo'), value: 'text_to_video' },
+  { label: t('aiRequests.imageToVideo'), value: 'image_to_video' },
   { label: t('aiRequests.inpainting'), value: 'inpainting' },
   { label: t('aiRequests.upscale'), value: 'upscale' },
   { label: t('aiRequests.chat'), value: 'chat' },
@@ -381,6 +383,8 @@ function typeLabel(type: string) {
   return {
     text_to_image: 'Text→Image',
     image_to_image: 'Image→Image',
+    text_to_video: 'Text→Video',
+    image_to_video: 'Image→Video',
     inpainting: 'Inpainting',
     upscale: 'Upscale',
     chat: 'Chat',

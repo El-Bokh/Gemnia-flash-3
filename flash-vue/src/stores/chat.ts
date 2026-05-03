@@ -11,7 +11,7 @@ import {
   regenerateMessage as regenerateMessageApi,
   sendProductMessage as sendProductMessageApi,
 } from '@/services/chatService'
-import type { ConversationData, MessageData } from '@/services/chatService'
+import type { AiMode, ConversationData, MessageData } from '@/services/chatService'
 import { useAuthStore } from '@/stores/auth'
 
 export interface ChatMessage {
@@ -19,10 +19,11 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   imageUrl?: string
+  videoUrl?: string
   imageStyle?: string
   productImages?: string[]
   timestamp: Date
-  status: 'sending' | 'sent' | 'error'
+  status: 'sending' | 'processing' | 'sent' | 'error'
 }
 
 export interface Conversation {
@@ -38,6 +39,11 @@ export interface Conversation {
 function resolveStorageUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined
   if (path.startsWith('http')) return path
+  if (path.startsWith('gs://')) {
+    const gcsPath = path.slice(5)
+    const [bucket = '', ...objectParts] = gcsPath.split('/')
+    return `https://storage.googleapis.com/${encodeURIComponent(bucket)}/${objectParts.map(encodeURIComponent).join('/')}`
+  }
   // Strip /api suffix to get the backend origin
   const apiBase = import.meta.env.VITE_API_BASE_URL || ''
   const origin = apiBase.replace(/\/api\/?$/, '')
@@ -50,10 +56,11 @@ function apiMsgToLocal(m: MessageData): ChatMessage {
     role: m.role,
     content: m.content,
     imageUrl: resolveStorageUrl(m.image_url),
+    videoUrl: resolveStorageUrl(m.video_url),
     imageStyle: m.image_style ?? undefined,
     productImages: m.product_images?.map(url => resolveStorageUrl(url)!).filter(Boolean) ?? undefined,
     timestamp: new Date(m.created_at),
-    status: m.status === 'error' ? 'error' : m.status === 'sending' ? 'sending' : 'sent',
+    status: m.status === 'error' ? 'error' : m.status === 'processing' ? 'processing' : m.status === 'sending' ? 'sending' : 'sent',
   }
 }
 
@@ -100,12 +107,24 @@ export const useChatStore = defineStore('chat', () => {
   const loaded = ref(false)
   const quotaError = ref<{ code: string; message: string } | null>(null)
 
-  const aiMode = ref<'text' | 'image'>('text')
+  const aiMode = ref<AiMode>('text')
   const aspectRatio = ref<string>('1:1')
+  const videoAspectRatio = ref<string>('16:9')
+  const videoDurationSeconds = ref<number>(8)
+  const videoResolution = ref<'720p' | '1080p'>('720p')
+  const videoGenerateAudio = ref(true)
+  const processingPollers = new Map<number, number>()
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeConversationId.value) ?? null,
   )
+
+  const activeConversationBusy = computed(() => {
+    const conv = activeConversation.value
+
+    return isAiTyping.value
+      || conv?.messages.some(message => message.status === 'sending' || message.status === 'processing') === true
+  })
 
   const pinnedConversations = computed(() =>
     conversations.value.filter(c => c.pinned),
@@ -131,6 +150,11 @@ export const useChatStore = defineStore('chat', () => {
       const res = await fetchConversationsApi()
       if (res.success && res.data) {
         conversations.value = res.data.map(apiConvToLocal)
+        conversations.value.forEach(conv => {
+          if (conv.serverId && hasProcessingMessages(conv)) {
+            startProcessingPoller(conv.serverId)
+          }
+        })
         loaded.value = true
       }
     } catch {
@@ -146,10 +170,26 @@ export const useChatStore = defineStore('chat', () => {
         if (activeConversationId.value === String(serverId)) {
           activeConversationId.value = conv.id
         }
+        if (hasProcessingMessages(conv)) {
+          startProcessingPoller(serverId)
+        }
         return conv
       }
-    } catch {
-      // Ignore refresh failures and let the original error handling run
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        stopProcessingPoller(serverId)
+
+        const staleIndex = conversations.value.findIndex(c => c.serverId === serverId)
+        if (staleIndex !== -1) {
+          const staleConversation = conversations.value[staleIndex]
+          if (!staleConversation) return null
+
+          conversations.value.splice(staleIndex, 1)
+          if (activeConversationId.value === staleConversation.id || activeConversationId.value === String(serverId)) {
+            activeConversationId.value = null
+          }
+        }
+      }
     }
 
     return null
@@ -199,6 +239,10 @@ export const useChatStore = defineStore('chat', () => {
 
     const idx = conversations.value.findIndex(c => c.id === id)
     if (idx !== -1) {
+      const conversation = conversations.value[idx]
+      if (conversation?.serverId) {
+        stopProcessingPoller(conversation.serverId)
+      }
       conversations.value.splice(idx, 1)
       if (activeConversationId.value === id) {
         activeConversationId.value = null
@@ -249,6 +293,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function sendMessage(content: string, imageStyle?: string, image?: File, product?: string) {
+    if (activeConversationBusy.value) return
+
     if (!activeConversationId.value) {
       await createConversation()
     }
@@ -257,7 +303,18 @@ export const useChatStore = defineStore('chat', () => {
     if (!conv) return
 
     const currentMode = aiMode.value
-    const currentAspectRatio = currentMode === 'image' ? aspectRatio.value : undefined
+    const currentAspectRatio = currentMode === 'image'
+      ? aspectRatio.value
+      : currentMode === 'video'
+        ? videoAspectRatio.value
+        : undefined
+    const currentVideoOptions = currentMode === 'video'
+      ? {
+          durationSeconds: videoDurationSeconds.value,
+          resolution: videoResolution.value,
+          generateAudio: videoGenerateAudio.value,
+        }
+      : undefined
 
     // Build optimistic preview URL for attached image
     const optimisticImageUrl = image ? URL.createObjectURL(image) : undefined
@@ -298,12 +355,15 @@ export const useChatStore = defineStore('chat', () => {
     isAiTyping.value = true
     quotaError.value = null
     try {
-      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product, currentAspectRatio) as any
+      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product, currentAspectRatio, currentVideoOptions) as any
       if (res.success && res.data) {
         if (res.data.conversation) {
           const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)
           if (activeConversationId.value === conv.id || activeConversationId.value === String(conv.serverId)) {
             activeConversationId.value = updatedConv.id
+          }
+          if (hasProcessingMessages(updatedConv)) {
+            startProcessingPoller(updatedConv.serverId!)
           }
         } else {
           const idx = conv.messages.findIndex(m => m.id === tempUserMsgId)
@@ -312,6 +372,9 @@ export const useChatStore = defineStore('chat', () => {
           }
 
           conv.messages.push(apiMsgToLocal(res.data.ai_message))
+          if (conv.serverId && hasProcessingMessages(conv)) {
+            startProcessingPoller(conv.serverId)
+          }
         }
 
         // Update quota from response
@@ -352,7 +415,40 @@ export const useChatStore = defineStore('chat', () => {
     quotaError.value = null
   }
 
+  function hasProcessingMessages(conv: Conversation): boolean {
+    return conv.messages.some(message => message.status === 'processing')
+  }
+
+  function stopProcessingPoller(serverId: number) {
+    const poller = processingPollers.get(serverId)
+    if (!poller) return
+
+    window.clearInterval(poller)
+    processingPollers.delete(serverId)
+  }
+
+  function startProcessingPoller(serverId: number) {
+    if (processingPollers.has(serverId)) return
+
+    let attempts = 0
+    const maxAttempts = 120
+
+    const tick = async () => {
+      attempts += 1
+      const conv = await refreshConversation(serverId)
+
+      if (!conv || !hasProcessingMessages(conv) || attempts >= maxAttempts) {
+        stopProcessingPoller(serverId)
+      }
+    }
+
+    const poller = window.setInterval(() => { void tick() }, 5000)
+    processingPollers.set(serverId, poller)
+  }
+
   async function regenerateMessage(messageId: string) {
+    if (activeConversationBusy.value) return
+
     const conv = conversations.value.find(c => c.id === activeConversationId.value)
     if (!conv || !conv.serverId) return
 
@@ -370,12 +466,18 @@ export const useChatStore = defineStore('chat', () => {
           if (activeConversationId.value === String(conv.serverId)) {
             activeConversationId.value = updatedConv.id
           }
+          if (hasProcessingMessages(updatedConv)) {
+            startProcessingPoller(updatedConv.serverId!)
+          }
         } else if (res.data.ai_message) {
           const regeneratedMessage = apiMsgToLocal(res.data.ai_message)
           if (regeneratedMessage.status === 'sent') {
             conv.messages.splice(aiMsgIdx, 1, regeneratedMessage)
           } else {
             conv.messages.splice(aiMsgIdx + 1, 0, regeneratedMessage)
+          }
+          if (conv.serverId && regeneratedMessage.status === 'processing') {
+            startProcessingPoller(conv.serverId)
           }
         } else {
           await refreshConversation(conv.serverId)
@@ -406,6 +508,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function sendProductMessage(content: string, images: File[]) {
+    if (activeConversationBusy.value) return
+
     if (!activeConversationId.value) {
       await createConversation()
     }
@@ -496,6 +600,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function $reset() {
+    processingPollers.forEach(poller => window.clearInterval(poller))
+    processingPollers.clear()
     conversations.value = []
     activeConversationId.value = null
     loaded.value = false
@@ -506,6 +612,7 @@ export const useChatStore = defineStore('chat', () => {
     conversations,
     activeConversationId,
     activeConversation,
+    activeConversationBusy,
     pinnedConversations,
     unpinnedConversations,
     filteredConversations,
@@ -516,6 +623,10 @@ export const useChatStore = defineStore('chat', () => {
     quotaError,
     aiMode,
     aspectRatio,
+    videoAspectRatio,
+    videoDurationSeconds,
+    videoResolution,
+    videoGenerateAudio,
     loadConversations,
     setActiveConversation,
     createConversation,

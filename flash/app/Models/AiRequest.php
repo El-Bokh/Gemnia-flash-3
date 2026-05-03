@@ -37,6 +37,7 @@ class AiRequest extends Model
         'credits_consumed',
         'input_image_path',
         'output_image_path',
+        'output_video_path',
         'mask_image_path',
         'denoising_strength',
         'error_message',

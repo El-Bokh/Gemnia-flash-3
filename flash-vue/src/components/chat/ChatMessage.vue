@@ -33,6 +33,19 @@ function handleDownloadImage() {
   document.body.removeChild(link)
 }
 
+function handleDownloadVideo() {
+  const src = props.message.videoUrl
+  if (!src) return
+
+  const link = document.createElement('a')
+  link.href = src
+  link.download = `generated-video-${props.message.id}.mp4`
+  link.target = '_blank'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 function handleExpandImage(src?: string) {
   fullscreenImageSrc.value = src || props.message.imageUrl || ''
   showFullscreen.value = true
@@ -63,7 +76,9 @@ function handleRegenerate() {
       message.role,
       {
         'has-image': message.imageUrl,
+        'has-video': message.videoUrl,
         'image-only': message.imageUrl && !message.productImages?.length && !message.content?.trim(),
+        'media-only': (message.imageUrl || message.videoUrl) && !message.productImages?.length && !message.content?.trim(),
       },
     ]"
     @mouseenter="showActions = true"
@@ -90,7 +105,12 @@ function handleRegenerate() {
           </div>
         </div>
 
-        <p class="msg-text">{{ message.content }}</p>
+        <p v-if="message.content?.trim()" class="msg-text">{{ message.content }}</p>
+
+        <div v-if="message.status === 'processing'" class="processing-pill">
+          <i class="pi pi-spin pi-spinner" />
+          <span>{{ t('chat.videoProcessing') }}</span>
+        </div>
 
         <!-- Generated image (single) -->
         <div v-if="message.imageUrl && !message.productImages?.length" class="msg-image-wrap">
@@ -98,6 +118,14 @@ function handleRegenerate() {
           <div class="image-overlay">
             <Button icon="pi pi-download" severity="secondary" text rounded size="small" @click="handleDownloadImage" />
             <Button icon="pi pi-expand" severity="secondary" text rounded size="small" @click="handleExpandImage()" />
+          </div>
+        </div>
+
+        <!-- Generated video -->
+        <div v-if="message.videoUrl" class="msg-video-wrap">
+          <video :src="message.videoUrl" class="msg-video" controls preload="metadata" playsinline />
+          <div class="video-overlay">
+            <Button icon="pi pi-download" severity="secondary" text rounded size="small" :title="t('chat.downloadVideo')" @click="handleDownloadVideo" />
           </div>
         </div>
       </div>
@@ -194,7 +222,8 @@ function handleRegenerate() {
   max-width: 560px;
 }
 
-.chat-message.assistant.image-only .msg-bubble {
+.chat-message.assistant.image-only .msg-bubble,
+.chat-message.assistant.media-only .msg-bubble {
   flex: 0 1 auto;
   max-width: 364px;
 }
@@ -217,7 +246,8 @@ function handleRegenerate() {
   border-start-start-radius: 4px;
 }
 
-.chat-message.assistant.image-only .msg-content {
+.chat-message.assistant.image-only .msg-content,
+.chat-message.assistant.media-only .msg-content {
   display: inline-block;
 }
 
@@ -305,6 +335,63 @@ function handleRegenerate() {
 }
 
 .image-overlay :deep(.p-button) {
+  background: rgba(0, 0, 0, 0.6) !important;
+  color: #fff !important;
+  backdrop-filter: blur(4px);
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.processing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(20, 184, 166, 0.08);
+  color: #0d9488;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.processing-pill:first-child {
+  margin-top: 0;
+}
+
+.msg-video-wrap {
+  position: relative;
+  margin-top: 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.chat-message.assistant.media-only .msg-video-wrap {
+  margin-top: 0;
+}
+
+.msg-video {
+  width: min(360px, 70vw);
+  max-height: 420px;
+  display: block;
+  border-radius: 10px;
+  background: #0f172a;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.msg-video-wrap:hover .video-overlay {
+  opacity: 1;
+}
+
+.video-overlay :deep(.p-button) {
   background: rgba(0, 0, 0, 0.6) !important;
   color: #fff !important;
   backdrop-filter: blur(4px);
@@ -469,8 +556,13 @@ function handleRegenerate() {
     max-width: 100%;
   }
 
-  .chat-message.assistant.image-only .msg-bubble {
+  .chat-message.assistant.image-only .msg-bubble,
+  .chat-message.assistant.media-only .msg-bubble {
     max-width: 100%;
+  }
+
+  .msg-video {
+    width: min(100%, 82vw);
   }
 
   .product-img-item {

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('subscription_id')->nullable()->constrained('subscriptions')->nullOnDelete();
             $table->foreignId('visual_style_id')->nullable()->constrained('visual_styles')->nullOnDelete();
-            $table->enum('type', ['text_to_image', 'image_to_image', 'inpainting', 'upscale', 'chat', 'styled_chat', 'multimodal', 'regenerate', 'product', 'other'])->default('chat');
+            $table->enum('type', ['text_to_image', 'image_to_image', 'inpainting', 'upscale', 'chat', 'styled_chat', 'multimodal', 'regenerate', 'product', 'text_to_video', 'image_to_video', 'other'])->default('chat');
             $table->enum('status', ['pending', 'processing', 'completed', 'failed', 'cancelled', 'timeout'])->default('pending');
             $table->text('user_prompt');
             $table->text('processed_prompt')->nullable();
@@ -31,6 +31,7 @@ return new class extends Migration
             $table->unsignedInteger('num_images')->default(1);
             $table->unsignedInteger('credits_consumed')->default(0);
             $table->string('input_image_path')->nullable();
+            $table->string('output_video_path', 2048)->nullable();
             $table->string('mask_image_path')->nullable();
             $table->decimal('denoising_strength', 3, 2)->nullable();
             $table->text('error_message')->nullable();

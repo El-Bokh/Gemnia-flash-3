@@ -9,8 +9,10 @@ export interface MessageData {
   role: 'user' | 'assistant'
   content: string
   image_url: string | null
+  video_url: string | null
   image_style: string | null
   product_images: string[] | null
+  metadata: Record<string, unknown> | null
   status: string
   created_at: string
   updated_at: string
@@ -33,6 +35,7 @@ export interface SendMessageResponse {
 }
 
 const LONG_RUNNING_CHAT_TIMEOUT_MS = 240_000
+export type AiMode = 'text' | 'image' | 'video'
 
 // ─── Service ────────────────────────────────────────────────
 
@@ -56,8 +59,17 @@ export function deleteConversation(id: number) {
   return apiDelete<ApiResponse<null>>(`/conversations/${id}`)
 }
 
-export function sendMessage(conversationId: number, content: string, imageStyle?: string, image?: File, mode?: 'text' | 'image', product?: string, aspectRatio?: string) {
-  const requestConfig = mode === 'image'
+export function sendMessage(
+  conversationId: number,
+  content: string,
+  imageStyle?: string,
+  image?: File,
+  mode?: AiMode,
+  product?: string,
+  aspectRatio?: string,
+  videoOptions?: { durationSeconds?: number; resolution?: string; generateAudio?: boolean },
+) {
+  const requestConfig = mode === 'image' || mode === 'video'
     ? { timeout: LONG_RUNNING_CHAT_TIMEOUT_MS }
     : undefined
 
@@ -68,6 +80,9 @@ export function sendMessage(conversationId: number, content: string, imageStyle?
     if (product) form.append('product', product)
     if (mode) form.append('mode', mode)
     if (aspectRatio) form.append('aspect_ratio', aspectRatio)
+    if (mode === 'video' && videoOptions?.durationSeconds) form.append('duration_seconds', String(videoOptions.durationSeconds))
+    if (mode === 'video' && videoOptions?.resolution) form.append('resolution', videoOptions.resolution)
+    if (mode === 'video' && videoOptions?.generateAudio !== undefined) form.append('generate_audio', videoOptions.generateAudio ? '1' : '0')
     form.append('image', image)
     return apiPost<ApiResponse<SendMessageResponse>>(
       `/conversations/${conversationId}/messages`,
@@ -80,7 +95,16 @@ export function sendMessage(conversationId: number, content: string, imageStyle?
   }
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,
-    { content, image_style: imageStyle, product, mode: mode ?? 'text', aspect_ratio: aspectRatio },
+    {
+      content,
+      image_style: imageStyle,
+      product,
+      mode: mode ?? 'text',
+      aspect_ratio: aspectRatio,
+      duration_seconds: mode === 'video' ? videoOptions?.durationSeconds : undefined,
+      resolution: mode === 'video' ? videoOptions?.resolution : undefined,
+      generate_audio: mode === 'video' ? videoOptions?.generateAudio : undefined,
+    },
     requestConfig,
   )
 }

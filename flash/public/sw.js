@@ -1,5 +1,5 @@
-// 1776873174 is replaced by deploy.sh on each deploy
-const CACHE_NAME = 'klek-ai-v2-1776873174';
+// __DEPLOY_TIMESTAMP__ is replaced by deploy.sh on each deploy
+const CACHE_NAME = 'klek-ai-v2-__DEPLOY_TIMESTAMP__';
 
 const PRECACHE_URLS = [
   '/',
@@ -7,7 +7,7 @@ const PRECACHE_URLS = [
   '/newlogo.png',
 ];
 
-// Install â€” precache shell & force activate
+// Install — precache shell & force activate
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
@@ -15,7 +15,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate â€” delete ALL old caches
+// Activate — delete ALL old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch â€” network-first for everything (prevents stale deploys)
+// Fetch — network-first for everything (prevents stale deploys)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
@@ -35,7 +35,7 @@ self.addEventListener('fetch', (event) => {
   // Skip chrome-extension and other non-http(s) requests
   if (!request.url.startsWith('http')) return;
 
-  // Navigation requests â€” network first, fallback to cache
+  // Navigation requests — network first, fallback to cache
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -49,7 +49,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets â€” network first, fallback to cache
+  // Static assets — network first, fallback to cache
   if (request.url.match(/\.(js|css|png|jpg|jpeg|svg|gif|woff2?|ttf|ico)$/)) {
     event.respondWith(
       fetch(request)
@@ -63,7 +63,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls â€” network only (with fallback for offline)
+  // API calls — network only (with fallback for offline)
   event.respondWith(
     fetch(request).catch(() =>
       new Response(JSON.stringify({ success: false, message: 'Network unavailable' }), {

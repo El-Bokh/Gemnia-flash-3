@@ -23,6 +23,7 @@ class AiRequestResource extends JsonResource
             'credits_consumed'  => $this->credits_consumed,
             'retry_count'       => $this->retry_count,
             'processing_time_ms'=> $this->processing_time_ms,
+            'output_video_path' => $this->output_video_path,
             'error_message'     => $this->when($this->status === 'failed', $this->error_message),
             'error_code'        => $this->when($this->status === 'failed', $this->error_code),
             'started_at'        => $this->started_at?->toIso8601String(),

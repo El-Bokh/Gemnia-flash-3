@@ -42,9 +42,12 @@ return [
     ],
 
     'vertex_ai' => [
-        'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS') ?: storage_path('app/google/service-account.json'),
+        'credentials_path' => env('VERTEX_AI_CREDENTIALS_PATH') ?: env('GOOGLE_APPLICATION_CREDENTIALS') ?: storage_path('app/google/service-account.json'),
         'project_id' => env('VERTEX_AI_PROJECT_ID', ''),
         'region' => env('VERTEX_AI_REGION', 'us-central1'),
+        'video_storage_uri' => env('VERTEX_AI_VIDEO_STORAGE_URI'),
+        'video_poll_interval_seconds' => (int) env('VERTEX_AI_VIDEO_POLL_INTERVAL_SECONDS', 15),
+        'video_max_polls' => (int) env('VERTEX_AI_VIDEO_MAX_POLLS', 80),
     ],
 
     'gumroad' => [

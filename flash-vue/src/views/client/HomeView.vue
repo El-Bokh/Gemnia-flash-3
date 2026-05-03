@@ -63,6 +63,7 @@ watch(() => chat.quotaError, (err) => {
 
 const hasActiveChat = computed(() => !!chat.activeConversation)
 const messages = computed(() => chat.activeConversation?.messages ?? [])
+const inputDisabled = computed(() => chat.activeConversationBusy || auth.quotaDepleted)
 
 const suggestions = computed(() => [
   {
@@ -304,6 +305,7 @@ function handleSendProducts(content: string, images: File[]) {
 
       <!-- Prompt box for empty state -->
       <ChatInput
+        :disabled="inputDisabled"
         @send="handleSend"
         @send-products="handleSendProducts"
         @toggle-styles="showStyles = !showStyles"
@@ -457,7 +459,7 @@ function handleSendProducts(content: string, images: File[]) {
         </div>
 
         <ChatInput
-          :disabled="chat.isAiTyping || auth.quotaDepleted"
+          :disabled="inputDisabled"
           @send="handleSend"
           @send-products="handleSendProducts"
           @toggle-styles="showStyles = !showStyles"
