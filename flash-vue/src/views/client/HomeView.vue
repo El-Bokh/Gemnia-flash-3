@@ -53,6 +53,27 @@ const selectedProductName = ref('')
 const selectedProductThumb = ref<string | null>(null)
 const showScrollBtn = ref(false)
 const showQuotaModal = ref(false)
+const chatInputRef = ref<{
+  applySuggestionAction: (action: {
+    prompt?: string
+    mode?: 'text' | 'image' | 'video'
+    open?: 'upload' | 'styles' | 'products' | 'productGallery' | 'none'
+  }) => void
+} | null>(null)
+
+interface SuggestionOption {
+  label: string
+  prompt: string
+  mode: 'text' | 'image' | 'video'
+  open?: 'upload' | 'styles' | 'products' | 'productGallery' | 'none'
+}
+
+interface SuggestionGroup {
+  icon: string
+  label: string
+  color: string
+  subs: SuggestionOption[]
+}
 
 // Watch for quota errors from the chat store
 watch(() => chat.quotaError, (err) => {
@@ -65,41 +86,41 @@ const hasActiveChat = computed(() => !!chat.activeConversation)
 const messages = computed(() => chat.activeConversation?.messages ?? [])
 const inputDisabled = computed(() => chat.activeConversationBusy || auth.quotaDepleted)
 
-const suggestions = computed(() => [
+const suggestions = computed<SuggestionGroup[]>(() => [
   {
     icon: 'pi pi-image', label: t('client.suggestDesign'), color: '#8b5cf6',
     subs: [
-      t('chat.suggestLogoMinimalist'),
-      t('chat.suggestLogoVintage'),
-      t('chat.suggestLogoBold'),
-      t('chat.suggestLogoElegant'),
+      { label: t('chat.suggestLogoMinimalist'), prompt: t('chat.suggestLogoMinimalist'), mode: 'image', open: 'none' },
+      { label: t('chat.suggestLogoVintage'), prompt: t('chat.suggestLogoVintage'), mode: 'image', open: 'none' },
+      { label: t('chat.suggestLogoBold'), prompt: t('chat.suggestLogoBold'), mode: 'image', open: 'none' },
+      { label: t('chat.suggestLogoElegant'), prompt: t('chat.suggestLogoElegant'), mode: 'image', open: 'none' },
     ],
   },
   {
     icon: 'pi pi-pencil', label: t('client.suggestEdit'), color: '#0ea5e9',
     subs: [
-      t('chat.suggestEditBackground'),
-      t('chat.suggestEditLighting'),
-      t('chat.suggestEditFilters'),
-      t('chat.suggestEditResize'),
+      { label: t('chat.suggestEditBackground'), prompt: t('chat.suggestEditBackground'), mode: 'image', open: 'upload' },
+      { label: t('chat.suggestEditLighting'), prompt: t('chat.suggestEditLighting'), mode: 'image', open: 'upload' },
+      { label: t('chat.suggestEditFilters'), prompt: t('chat.suggestEditFilters'), mode: 'image', open: 'upload' },
+      { label: t('chat.suggestEditResize'), prompt: t('chat.suggestEditResize'), mode: 'image', open: 'upload' },
     ],
   },
   {
     icon: 'pi pi-palette', label: t('client.suggestStyle'), color: '#f59e0b',
     subs: [
-      t('chat.suggestStyleOil'),
-      t('chat.suggestStyleWatercolor'),
-      t('chat.suggestStyleComic'),
-      t('chat.suggestStylePixel'),
+      { label: t('chat.suggestStyleOil'), prompt: t('chat.suggestStyleOil'), mode: 'image', open: 'styles' },
+      { label: t('chat.suggestStyleWatercolor'), prompt: t('chat.suggestStyleWatercolor'), mode: 'image', open: 'styles' },
+      { label: t('chat.suggestStyleComic'), prompt: t('chat.suggestStyleComic'), mode: 'image', open: 'styles' },
+      { label: t('chat.suggestStylePixel'), prompt: t('chat.suggestStylePixel'), mode: 'image', open: 'styles' },
     ],
   },
   {
     icon: 'pi pi-sparkles', label: t('client.suggestCreate'), color: '#10b981',
     subs: [
-      t('chat.suggestCreateForest'),
-      t('chat.suggestCreateCity'),
-      t('chat.suggestCreateCharacter'),
-      t('chat.suggestCreateProduct'),
+      { label: t('chat.suggestCreateForest'), prompt: t('chat.suggestCreateForest'), mode: 'image', open: 'none' },
+      { label: t('chat.suggestCreateCity'), prompt: t('chat.suggestCreateCity'), mode: 'image', open: 'none' },
+      { label: t('chat.suggestCreateCharacter'), prompt: t('chat.suggestCreateCharacter'), mode: 'image', open: 'none' },
+      { label: t('chat.suggestCreateProduct'), prompt: t('chat.suggestCreateProduct'), mode: 'image', open: 'none' },
     ],
   },
 ])
@@ -177,31 +198,54 @@ function handleSend(content: string, image?: File) {
   }
 }
 
-function useSuggestion(text: string) {
-  // Guest → must login first
+function openStylesPanel() {
+  showProducts.value = false
+  showStyles.value = true
+}
+
+function toggleStylesPanel() {
+  showProducts.value = false
+  showStyles.value = !showStyles.value
+}
+
+function openProductsPanel() {
+  showStyles.value = false
+  showProducts.value = true
+}
+
+function toggleProductsPanel() {
+  showStyles.value = false
+  showProducts.value = !showProducts.value
+}
+
+function prepareSuggestion(suggestion: SuggestionOption) {
   if (!auth.isAuthenticated) {
     void router.push({ name: 'login', query: { redirect: '/' } })
     return
   }
-  // Authenticated but no subscription → go to pricing
   if (auth.noSubscription) {
     void router.push({ name: 'pricing' })
     return
   }
 
-  const isNewChat = !chat.activeConversationId
-  if (!chat.activeConversationId) {
-    chat.createConversation()
+  selectedProduct.value = ''
+  selectedProductName.value = ''
+  selectedProductThumb.value = null
+  showProducts.value = false
+
+  if (suggestion.open !== 'styles') {
+    showStyles.value = false
   }
-  chat.sendMessage(text)
-  if (isNewChat) {
-    layout.sidebarCollapsed = true
-    const title = text.slice(0, 40) + (text.length > 40 ? '…' : '')
-    window.dispatchEvent(
-      new CustomEvent('app-toast', {
-        detail: { type: 'info', message: `${t('chat.newChatStarted')}: ${title}` },
-      }),
-    )
+
+  activeSuggestionIndex.value = null
+  chatInputRef.value?.applySuggestionAction({
+    prompt: suggestion.prompt,
+    mode: suggestion.mode,
+    open: suggestion.open ?? 'none',
+  })
+
+  if (suggestion.open === 'styles') {
+    openStylesPanel()
   }
 }
 
@@ -343,12 +387,15 @@ function handleSendProducts(content: string, images: File[]) {
 
       <!-- Prompt box for empty state -->
       <ChatInput
+        ref="chatInputRef"
         :disabled="inputDisabled"
         @send="handleSend"
         @send-products="handleSendProducts"
         @inpaint="handleInputInpaint"
-        @toggle-styles="showStyles = !showStyles"
-        @toggle-products="showProducts = !showProducts"
+        @toggle-styles="toggleStylesPanel"
+        @toggle-products="toggleProductsPanel"
+        @open-styles="openStylesPanel"
+        @open-products="openProductsPanel"
       />
 
       <!-- Style selector -->
@@ -393,10 +440,10 @@ function handleSendProducts(content: string, images: File[]) {
               v-for="(sub, si) in suggestions[activeSuggestionIndex]?.subs"
               :key="si"
               class="sub-suggestion-chip"
-              @click="useSuggestion(sub); activeSuggestionIndex = null"
+              @click="prepareSuggestion(sub)"
             >
               <i class="pi pi-arrow-up-right" />
-              <span>{{ sub }}</span>
+              <span>{{ sub.label }}</span>
             </button>
           </div>
         </div>
@@ -500,12 +547,15 @@ function handleSendProducts(content: string, images: File[]) {
         </div>
 
         <ChatInput
+          ref="chatInputRef"
           :disabled="inputDisabled"
           @send="handleSend"
           @send-products="handleSendProducts"
           @inpaint="handleInputInpaint"
-          @toggle-styles="showStyles = !showStyles"
-          @toggle-products="showProducts = !showProducts"
+          @toggle-styles="toggleStylesPanel"
+          @toggle-products="toggleProductsPanel"
+          @open-styles="openStylesPanel"
+          @open-products="openProductsPanel"
         />
 
         <div class="chat-footer-disclaimer">

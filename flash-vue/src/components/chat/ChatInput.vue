@@ -2,6 +2,7 @@
 import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
+import type { AiMode } from '@/services/chatService'
 import AspectRatioSelector from '@/components/chat/AspectRatioSelector.vue'
 import InpaintingEditor from '@/components/chat/InpaintingEditor.vue'
 import Button from 'primevue/button'
@@ -20,8 +21,16 @@ const emit = defineEmits<{
   inpaint: [content: string, image: File, mask: File]
   toggleStyles: []
   toggleProducts: []
+  openStyles: []
+  openProducts: []
   openUpload: []
 }>()
+
+interface SuggestionAction {
+  prompt?: string
+  mode?: AiMode
+  open?: 'upload' | 'styles' | 'products' | 'productGallery' | 'none'
+}
 
 interface AttachedFile {
   file: File
@@ -37,6 +46,7 @@ const IMAGE_FALLBACK_QUALITY = 0.68
 
 const message = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const showAddMenu = ref(false)
 const showToolsMenu = ref(false)
 const isDragOver = ref(false)
 const attachedFiles = ref<AttachedFile[]>([])
@@ -57,6 +67,16 @@ const inpaintSourceFile = computed(() => inpaintSource.value?.file ?? null)
 const inpaintSourceUrl = computed(() => inpaintSource.value?.preview ?? undefined)
 const durationOptions = [4, 6, 8]
 const resolutionOptions = ['720p', '1080p'] as const
+const currentModeLabel = computed(() => {
+  if (chat.aiMode === 'image') return t('chat.modeImage')
+  if (chat.aiMode === 'video') return t('chat.modeVideo')
+  return t('chat.modeText')
+})
+const currentModeIcon = computed(() => {
+  if (chat.aiMode === 'image') return 'pi pi-image'
+  if (chat.aiMode === 'video') return 'pi pi-video'
+  return 'pi pi-comments'
+})
 
 function replaceExtension(fileName: string, extension: string) {
   return fileName.replace(/\.[^.]+$/, '') + '.' + extension
@@ -241,7 +261,7 @@ function handleKeydown(e: KeyboardEvent) {
 function handleToolClick(tool: string) {
   if (props.disabled) return
 
-  showToolsMenu.value = false
+  showAddMenu.value = false
   if (tool === 'upload') {
     imageInputRef.value?.click()
   } else if (tool === 'file') {
@@ -260,6 +280,27 @@ function handleToolClick(tool: string) {
     productMode.value = true
     nextTick(() => productInputRef.value?.click())
   }
+}
+
+function handleModeToolClick(mode: AiMode) {
+  if (props.disabled) return
+
+  setMode(mode)
+  showToolsMenu.value = false
+}
+
+function toggleAddMenu() {
+  if (props.disabled) return
+
+  showToolsMenu.value = false
+  showAddMenu.value = !showAddMenu.value
+}
+
+function toggleToolsMenu() {
+  if (props.disabled) return
+
+  showAddMenu.value = false
+  showToolsMenu.value = !showToolsMenu.value
 }
 
 async function handleProductSelect(e: Event) {
@@ -375,10 +416,14 @@ async function handleDrop(e: DragEvent) {
   }
 }
 
+const addMenuRef = ref<HTMLDivElement | null>(null)
 const toolsMenuRef = ref<HTMLDivElement | null>(null)
 
 function onDocClick(e: MouseEvent) {
   const target = e.target as Node
+  if (showAddMenu.value && !addMenuRef.value?.contains(target)) {
+    showAddMenu.value = false
+  }
   if (showToolsMenu.value && !toolsMenuRef.value?.contains(target)) {
     showToolsMenu.value = false
   }
@@ -410,6 +455,42 @@ function setMode(mode: 'text' | 'image' | 'video') {
   chat.aiMode = mode
   showAspectRatioPopup.value = false
 }
+
+function applySuggestionAction(action: SuggestionAction) {
+  if (props.disabled) return
+
+  if (action.mode) {
+    setMode(action.mode)
+  }
+
+  if (typeof action.prompt === 'string') {
+    message.value = action.prompt
+    nextTick(autoResize)
+  }
+
+  showAddMenu.value = false
+  showToolsMenu.value = false
+
+  if (action.open === 'upload') {
+    imageInputRef.value?.click()
+    return
+  }
+
+  if (action.open === 'styles') {
+    emit('openStyles')
+  } else if (action.open === 'products') {
+    productMode.value = true
+    nextTick(() => productInputRef.value?.click())
+  } else if (action.open === 'productGallery') {
+    emit('openProducts')
+  }
+
+  nextTick(() => textareaRef.value?.focus())
+}
+
+defineExpose({
+  applySuggestionAction,
+})
 </script>
 
 <template>
@@ -606,7 +687,7 @@ function setMode(mode: 'text' | 'image' | 'video') {
       </div>
 
       <div class="input-row">
-        <!-- Tools button -->
+        <!-- Add / input actions -->
         <div class="tools-container">
           <Button
             icon="pi pi-plus"
@@ -614,76 +695,84 @@ function setMode(mode: 'text' | 'image' | 'video') {
             text
             rounded
             size="small"
-            class="tools-btn"
-            :class="{ active: showToolsMenu }"
+            class="add-btn"
+            :class="{ active: showAddMenu }"
             :disabled="disabled"
-            @click="showToolsMenu = !showToolsMenu"
+            @click="toggleAddMenu"
           />
           <Transition name="pop">
-            <div v-if="showToolsMenu" ref="toolsMenuRef" class="tools-menu">
-              <button class="tool-item" @click="handleToolClick('upload')">
-                <i class="pi pi-image" />
-                <span>{{ t('chat.uploadImage') }}</span>
-              </button>
-              <button class="tool-item" @click="handleToolClick('file')">
-                <i class="pi pi-file" />
-                <span>{{ t('chat.uploadFile') }}</span>
-              </button>
-              <button class="tool-item" @click="handleToolClick('link')">
-                <i class="pi pi-link" />
-                <span>{{ t('chat.pasteLink') }}</span>
-              </button>
-              <button class="tool-item" @click="handleToolClick('products')">
-                <i class="pi pi-box" />
-                <span>{{ t('chat.uploadProducts') }}</span>
-              </button>
-              <button class="tool-item" @click="handleToolClick('styles')">
-                <i class="pi pi-palette" />
-                <span>{{ t('chat.imageStyles') }}</span>
-              </button>
-              <button class="tool-item" @click="handleToolClick('productGallery')">
-                <i class="pi pi-shopping-bag" />
-                <span>{{ t('chat.productGallery') }}</span>
-              </button>
+            <div v-if="showAddMenu" ref="addMenuRef" class="tools-menu add-menu">
+              <div class="tools-menu-section">
+                <p class="tools-menu-label">{{ t('chat.inputTools') }}</p>
+                <button class="tool-item" @click="handleToolClick('upload')">
+                  <i class="pi pi-image" />
+                  <span>{{ t('chat.uploadImage') }}</span>
+                </button>
+                <button class="tool-item" @click="handleToolClick('file')">
+                  <i class="pi pi-file" />
+                  <span>{{ t('chat.uploadFile') }}</span>
+                </button>
+                <button class="tool-item" @click="handleToolClick('link')">
+                  <i class="pi pi-link" />
+                  <span>{{ t('chat.pasteLink') }}</span>
+                </button>
+                <button class="tool-item" @click="handleToolClick('products')">
+                  <i class="pi pi-box" />
+                  <span>{{ t('chat.uploadProducts') }}</span>
+                </button>
+                <button class="tool-item" @click="handleToolClick('styles')">
+                  <i class="pi pi-palette" />
+                  <span>{{ t('chat.imageStyles') }}</span>
+                </button>
+                <button class="tool-item" @click="handleToolClick('productGallery')">
+                  <i class="pi pi-shopping-bag" />
+                  <span>{{ t('chat.productGallery') }}</span>
+                </button>
+              </div>
             </div>
           </Transition>
         </div>
 
-        <!-- Mode selector -->
-        <div class="mode-selector" role="group" :aria-label="t('chat.modeSelector')">
+        <!-- Tools / models only -->
+        <div class="tools-container">
           <button
             type="button"
-            class="mode-toggle"
-            :class="{ active: chat.aiMode === 'text' }"
+            class="tools-trigger"
+            :class="{ active: showToolsMenu }"
             :disabled="disabled"
-            :title="t('chat.switchToText')"
-            @click="setMode('text')"
+            :aria-expanded="showToolsMenu"
+            :title="t('chat.tools')"
+            @click="toggleToolsMenu"
           >
-            <i class="pi pi-comments" />
-            <span class="mode-label">{{ t('chat.modeText') }}</span>
+            <span class="tools-trigger-label">
+              <i class="pi pi-wrench" />
+              <span>{{ t('chat.tools') }}</span>
+            </span>
+            <span class="tools-trigger-current" :class="`mode-${chat.aiMode}`">
+              <i :class="currentModeIcon" />
+              <span>{{ currentModeLabel }}</span>
+            </span>
+            <i class="pi pi-chevron-down tools-trigger-chevron" />
           </button>
-          <button
-            type="button"
-            class="mode-toggle"
-            :class="{ active: chat.aiMode === 'image', 'mode-image': chat.aiMode === 'image' }"
-            :disabled="disabled"
-            :title="t('chat.switchToImage')"
-            @click="setMode('image')"
-          >
-            <i class="pi pi-image" />
-            <span class="mode-label">{{ t('chat.modeImage') }}</span>
-          </button>
-          <button
-            type="button"
-            class="mode-toggle"
-            :class="{ active: chat.aiMode === 'video', 'mode-video': chat.aiMode === 'video' }"
-            :disabled="disabled"
-            :title="t('chat.switchToVideo')"
-            @click="setMode('video')"
-          >
-            <i class="pi pi-video" />
-            <span class="mode-label">{{ t('chat.modeVideo') }}</span>
-          </button>
+          <Transition name="pop">
+            <div v-if="showToolsMenu" ref="toolsMenuRef" class="tools-menu">
+              <div class="tools-menu-section">
+                <p class="tools-menu-label">{{ t('chat.aiModes') }}</p>
+                <button class="tool-item" :class="{ active: chat.aiMode === 'text' }" @click="handleModeToolClick('text')">
+                  <i class="pi pi-comments" />
+                  <span>{{ t('chat.modeText') }}</span>
+                </button>
+                <button class="tool-item" :class="{ active: chat.aiMode === 'image' }" @click="handleModeToolClick('image')">
+                  <i class="pi pi-image" />
+                  <span>{{ t('chat.modeImage') }}</span>
+                </button>
+                <button class="tool-item" :class="{ active: chat.aiMode === 'video' }" @click="handleModeToolClick('video')">
+                  <i class="pi pi-video" />
+                  <span>{{ t('chat.modeVideo') }}</span>
+                </button>
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <!-- Textarea -->
@@ -798,83 +887,81 @@ function setMode(mode: 'text' | 'image' | 'video') {
   flex-shrink: 0;
 }
 
-.tools-btn {
+.add-btn {
   width: 30px !important;
   height: 30px !important;
   color: var(--text-muted) !important;
   transition: transform 0.2s, color 0.2s !important;
 }
 
-.tools-btn.active {
+.add-btn.active {
   transform: rotate(45deg);
   color: var(--active-color) !important;
 }
 
-.mode-selector {
+.tools-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
   border: 1px solid var(--card-border);
   border-radius: 10px;
   background: var(--hover-bg);
-  flex-shrink: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
 
-/* Mode toggle */
-.mode-toggle {
+.tools-trigger:hover,
+.tools-trigger.active {
+  border-color: var(--active-color);
+  color: var(--text-primary);
+}
+
+.tools-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tools-trigger-label,
+.tools-trigger-current {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 3px 7px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.68rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+  gap: 5px;
   white-space: nowrap;
-  min-width: 34px;
-  height: 26px;
 }
 
-.mode-toggle:hover {
-  color: var(--active-color);
+.tools-trigger-label {
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
-.mode-toggle.active {
-  background: var(--card-bg);
-  color: var(--active-color);
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+.tools-trigger-current {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
-.mode-toggle.mode-image {
-  background: rgba(139, 92, 246, 0.1);
+.tools-trigger-current.mode-image {
   color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.12);
 }
 
-.mode-toggle.mode-image:hover {
-  color: #8b5cf6;
-}
-
-.mode-toggle.mode-video {
-  background: rgba(20, 184, 166, 0.1);
+.tools-trigger-current.mode-video {
   color: #0d9488;
+  background: rgba(20, 184, 166, 0.12);
 }
 
-.mode-toggle.mode-video:hover {
-  color: #0d9488;
+.tools-trigger-current.mode-text {
+  color: var(--active-color);
+  background: var(--active-bg);
 }
 
-.mode-toggle i {
-  font-size: 0.78rem;
-}
-
-.mode-label {
-  line-height: 1;
+.tools-trigger-chevron {
+  font-size: 0.72rem;
 }
 
 .video-options-row {
@@ -947,6 +1034,31 @@ function setMode(mode: 'text' | 'image' | 'video') {
   z-index: 20;
 }
 
+.add-menu {
+  min-width: 200px;
+}
+
+.tools-menu-section {
+  display: grid;
+  gap: 2px;
+}
+
+.tools-menu-label {
+  margin: 0;
+  padding: 6px 10px 4px;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tools-menu-divider {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--card-border);
+}
+
 .tool-item {
   display: flex;
   align-items: center;
@@ -965,6 +1077,11 @@ function setMode(mode: 'text' | 'image' | 'video') {
 .tool-item:hover {
   background: var(--hover-bg);
   color: var(--text-primary);
+}
+
+.tool-item.active {
+  background: var(--active-bg);
+  color: var(--active-color);
 }
 
 .tool-item i {
@@ -1388,11 +1505,7 @@ function setMode(mode: 'text' | 'image' | 'video') {
   }
 
   .tools-menu {
-    min-width: 180px;
-  }
-
-  .mode-label {
-    display: none;
+    min-width: 220px;
   }
 
   .video-options-row {
@@ -1401,6 +1514,19 @@ function setMode(mode: 'text' | 'image' | 'video') {
 
   .video-option-btn {
     padding-inline: 7px;
+  }
+
+  .tools-trigger {
+    padding-inline: 8px;
+    gap: 6px;
+  }
+
+  .add-menu {
+    min-width: 180px;
+  }
+
+  .tools-trigger-label span {
+    display: none;
   }
 }
 </style>
