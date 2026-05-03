@@ -29,9 +29,13 @@ class DashboardService
             'subscriptions_per_plan'   => $this->getSubscriptionsPerPlan(),
             'images_generated_today'   => $this->countImagesGenerated($today),
             'images_generated_week'    => $this->countImagesGenerated($weekStart),
+            'videos_generated_today'   => $this->countVideosGenerated($today),
+            'videos_generated_week'    => $this->countVideosGenerated($weekStart),
+            'video_requests_processing' => $this->countVideoRequestsInProgress($today),
             'revenue_today'            => $this->getRevenue($today),
             'revenue_week'             => $this->getRevenue($weekStart),
             'ai_requests_pending'      => $this->countAiRequestsByStatus('pending'),
+            'ai_requests_processing'   => $this->countAiRequestsByStatus('processing'),
             'ai_requests_completed'    => $this->countAiRequestsByStatus('completed'),
             'ai_requests_failed'       => $this->countAiRequestsByStatus('failed'),
         ];
@@ -67,13 +71,37 @@ class DashboardService
 
     private function countImagesGenerated(Carbon $since): int
     {
-        // Count from media_files (where images are actually stored) + generated_images
         $mediaCount = MediaFile::where('purpose', 'output')
+            ->where('mime_type', 'like', 'image/%')
             ->where('created_at', '>=', $since)
             ->count();
         $legacyCount = GeneratedImage::where('created_at', '>=', $since)->count();
 
         return $mediaCount + $legacyCount;
+    }
+
+    private function countVideosGenerated(Carbon $since): int
+    {
+        return AiRequest::query()
+            ->whereIn('type', $this->videoRequestTypes())
+            ->where('status', 'completed')
+            ->whereNotNull('output_video_path')
+            ->where('completed_at', '>=', $since)
+            ->count();
+    }
+
+    private function countVideoRequestsInProgress(Carbon $since): int
+    {
+        return AiRequest::query()
+            ->whereIn('type', $this->videoRequestTypes())
+            ->whereIn('status', ['pending', 'processing'])
+            ->where('created_at', '>=', $since)
+            ->count();
+    }
+
+    private function videoRequestTypes(): array
+    {
+        return ['text_to_video', 'image_to_video', 'video'];
     }
 
     private function getRevenue(Carbon $since): array

@@ -150,4 +150,35 @@ class GeminiServiceTest extends TestCase
                 && (float) ($payload['instances'][0]['referenceImages'][1]['maskImageConfig']['dilation'] ?? -1) === 0.0;
         });
     }
+
+    public function test_veo_start_marks_inline_reference_image_417_as_retryable(): void
+    {
+        Http::fake([
+            'https://us-central1-aiplatform.googleapis.com/*' => Http::response(
+                '<html><body><h1>We\'re sorry...</h1><p>your computer or network may be sending automated queries.</p><p>Google</p></body></html>',
+                417,
+                ['Content-Type' => 'text/html'],
+            ),
+        ]);
+
+        $service = new GeminiService('video');
+
+        $result = $service->startVideoGeneration(
+            'Animate the latest generated image with subtle camera movement.',
+            ['duration_seconds' => 4, 'aspect_ratio' => '16:9', 'resolution' => '720p', 'generate_audio' => false],
+            ['data' => base64_encode('source-image-binary'), 'mime_type' => 'image/png'],
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(417, $result['status_code']);
+        $this->assertTrue($result['retry_without_reference']);
+        $this->assertStringContainsString('inline reference image', $result['error']);
+        $this->assertSame(417, $result['response_payload']['status']);
+
+        Http::assertSent(function (Request $request): bool {
+            $payload = json_decode($request->body(), true);
+
+            return ($payload['parameters']['personGeneration'] ?? null) === 'allowAll';
+        });
+    }
 }

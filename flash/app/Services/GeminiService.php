@@ -317,7 +317,7 @@ class GeminiService
             'resolution' => $videoOptions['resolution'],
             'generateAudio' => $videoOptions['generate_audio'],
             'enhancePrompt' => true,
-            'personGeneration' => 'allow_adult',
+            'personGeneration' => $videoOptions['person_generation'],
         ];
 
         if ($referenceImage !== null) {
@@ -345,7 +345,7 @@ class GeminiService
             $response = $request->post($url, $body);
 
             if (! $response->successful()) {
-                $errorMsg = $response->json('error.message', 'Unknown Veo API error');
+                $errorMsg = $this->extractVeoErrorMessage($response->status(), $response->body(), 'Unknown Veo API error');
                 Log::error('Veo start operation failed', [
                     'status' => $response->status(),
                     'error' => $errorMsg,
@@ -356,8 +356,13 @@ class GeminiService
                 return [
                     'success' => false,
                     'error' => $errorMsg,
+                    'status_code' => $response->status(),
+                    'retry_without_reference' => $referenceImage !== null && $this->isGoogleAutomatedQueryBlock($response->status(), $response->body()),
                     'request_payload' => $this->redactVideoRequestPayload($body),
-                    'response_payload' => $response->json() ?: ['body' => mb_substr($response->body(), 0, 2000)],
+                    'response_payload' => $response->json() ?: [
+                        'status' => $response->status(),
+                        'body' => mb_substr($response->body(), 0, 2000),
+                    ],
                 ];
             }
 
@@ -399,6 +404,25 @@ class GeminiService
                 'request_payload' => $this->redactVideoRequestPayload($body),
             ];
         }
+    }
+
+    private function extractVeoErrorMessage(int $statusCode, string $body, string $fallback): string
+    {
+        if ($this->isGoogleAutomatedQueryBlock($statusCode, $body)) {
+            return 'Veo rejected the inline reference image with a Google automated-query protection page.';
+        }
+
+        $decoded = json_decode($body, true);
+        $message = data_get($decoded, 'error.message');
+
+        return is_string($message) && $message !== '' ? $message : $fallback;
+    }
+
+    private function isGoogleAutomatedQueryBlock(int $statusCode, string $body): bool
+    {
+        return $statusCode === 417
+            && str_contains($body, 'automated queries')
+            && str_contains($body, 'Google');
     }
 
     public function fetchVideoOperation(string $operationName): array
@@ -506,12 +530,21 @@ class GeminiService
             $resizeMode = 'pad';
         }
 
+        $personGeneration = (string) ($options['person_generation'] ?? $options['personGeneration'] ?? 'allowAll');
+        if ($personGeneration === 'allow_all') {
+            $personGeneration = 'allowAll';
+        }
+        if (! in_array($personGeneration, ['dont_allow', 'allow_adult', 'allowAll'], true)) {
+            $personGeneration = 'allowAll';
+        }
+
         return [
             'duration_seconds' => $duration,
             'aspect_ratio' => $aspectRatio,
             'resolution' => $resolution,
             'generate_audio' => filter_var($options['generate_audio'] ?? $options['generateAudio'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'resize_mode' => $resizeMode,
+            'person_generation' => $personGeneration,
             'negative_prompt' => trim((string) ($options['negative_prompt'] ?? $options['negativePrompt'] ?? '')),
         ];
     }

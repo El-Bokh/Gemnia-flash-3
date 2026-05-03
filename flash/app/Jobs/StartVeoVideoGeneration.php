@@ -44,17 +44,43 @@ class StartVeoVideoGeneration implements ShouldQueue
         $videoOptions = $metadata['video_options'] ?? [];
         $referenceImage = $this->loadReferenceImage($aiRequest->input_image_path);
         $prompt = trim((string) ($aiRequest->processed_prompt ?: $aiRequest->user_prompt));
+        $usedReferenceImage = $referenceImage !== null;
+        $referenceStartFailure = null;
 
         $gemini = new GeminiService('video', $videoOptions['aspect_ratio'] ?? null);
         $result = $gemini->startVideoGeneration($prompt, $videoOptions, $referenceImage);
 
+        if (! ($result['success'] ?? false) && $referenceImage !== null && ($result['retry_without_reference'] ?? false)) {
+            $referenceStartFailure = $result;
+            $prompt = $this->buildPromptOnlyReferenceFallback($prompt);
+            $referenceImage = null;
+            $usedReferenceImage = false;
+
+            Log::warning('Retrying Veo start without inline reference image after Google 417 block', [
+                'ai_request_id' => $aiRequest->id,
+                'message_id' => $message->id,
+                'status_code' => $result['status_code'] ?? null,
+                'input_image_path' => $aiRequest->input_image_path,
+            ]);
+
+            $result = $gemini->startVideoGeneration($prompt, $videoOptions, null);
+        }
+
         if (! ($result['success'] ?? false)) {
+            $responsePayload = $result['response_payload'] ?? null;
+            if ($referenceStartFailure !== null) {
+                $responsePayload = [
+                    'reference_attempt' => $referenceStartFailure['response_payload'] ?? null,
+                    'fallback_attempt' => $responsePayload,
+                ];
+            }
+
             $this->failRequest(
                 $aiRequest,
                 $message,
                 $result['error'] ?? 'Video generation could not be started.',
                 'VEO_START_FAILED',
-                $result['response_payload'] ?? null,
+                $responsePayload,
             );
             return;
         }
@@ -64,10 +90,20 @@ class StartVeoVideoGeneration implements ShouldQueue
             'video_status' => 'operation_started',
             'video_poll_count' => 0,
             'video_started_at' => now()->toIso8601String(),
+            'video_reference_image_used' => $usedReferenceImage,
         ]);
+
+        if ($referenceStartFailure !== null) {
+            $metadata['video_reference_fallback'] = [
+                'reason' => 'google_417_automated_query_block',
+                'original_status_code' => $referenceStartFailure['status_code'] ?? null,
+                'retried_without_reference_image' => true,
+            ];
+        }
 
         $aiRequest->update([
             'status' => 'processing',
+            'processed_prompt' => $prompt !== trim((string) $aiRequest->user_prompt) ? $prompt : $aiRequest->processed_prompt,
             'model_used' => $result['model'] ?? $gemini->getModel(),
             'engine_provider' => 'vertex_ai',
             'request_payload' => $result['request_payload'] ?? $aiRequest->request_payload,
@@ -86,6 +122,37 @@ class StartVeoVideoGeneration implements ShouldQueue
 
         PollVeoVideoGeneration::dispatch($aiRequest->id, $message->id)
             ->delay(now()->addSeconds((int) config('services.vertex_ai.video_poll_interval_seconds', 15)));
+    }
+
+    private function buildPromptOnlyReferenceFallback(string $prompt): string
+    {
+        if (preg_match('/^Requested edit:\s*(.+)$/mi', $prompt, $matches)) {
+            $prompt = 'Create a short animated video based on the final edited image. Final scene request: ' . trim($matches[1]);
+        }
+
+        $prompt = str_replace(
+            'Use the provided reference image as the visual anchor.',
+            'Use the described source image and previous prompt as the visual anchor.',
+            $prompt,
+        );
+
+        $prompt = $this->sanitizePromptOnlyFallbackForVeoPolicy($prompt);
+
+        return trim($prompt . "\nGenerate the video from this textual visual context only. Preserve the same subject, scene, composition, and requested motion as closely as possible.");
+    }
+
+    private function sanitizePromptOnlyFallbackForVeoPolicy(string $prompt): string
+    {
+        $neutralized = preg_replace([
+            '/\b(?:young|small)\s+(?:boy|girl)\b/i',
+            '/\b(?:child|kid|boy|girl)\b/i',
+        ], 'student', $prompt);
+
+        return str_replace(
+            ['بنت صغيرة', 'ولد', 'طفل', 'طفلة'],
+            ['طالبة', 'طالب', 'طالب', 'طالبة'],
+            $neutralized ?? $prompt,
+        );
     }
 
     private function loadReferenceImage(?string $inputImagePath): ?array

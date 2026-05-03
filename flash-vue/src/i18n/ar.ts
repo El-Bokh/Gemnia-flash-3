@@ -142,6 +142,8 @@ export default {
     aiCompleted: 'طلبات AI مكتملة',
     aiFailed: 'طلبات AI فاشلة',
     imagesToday: 'الصور اليوم',
+    videosToday: 'الفيديوهات اليوم',
+    videoProcessing: 'فيديوهات قيد المعالجة',
     revenueToday: 'إيرادات اليوم',
     revenueWeek: 'إيرادات الأسبوع',
     pendingUsers: 'المستخدمين المعلّقين',

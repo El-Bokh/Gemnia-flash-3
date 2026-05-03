@@ -68,12 +68,13 @@ export function sendMessage(
   product?: string,
   aspectRatio?: string,
   videoOptions?: { durationSeconds?: number; resolution?: string; generateAudio?: boolean },
+  productReferenceSheet?: File,
 ) {
   const requestConfig = mode === 'image' || mode === 'video'
     ? { timeout: LONG_RUNNING_CHAT_TIMEOUT_MS }
     : undefined
 
-  if (image) {
+  if (image || productReferenceSheet) {
     const form = new FormData()
     form.append('content', content)
     if (imageStyle) form.append('image_style', imageStyle)
@@ -83,7 +84,8 @@ export function sendMessage(
     if (mode === 'video' && videoOptions?.durationSeconds) form.append('duration_seconds', String(videoOptions.durationSeconds))
     if (mode === 'video' && videoOptions?.resolution) form.append('resolution', videoOptions.resolution)
     if (mode === 'video' && videoOptions?.generateAudio !== undefined) form.append('generate_audio', videoOptions.generateAudio ? '1' : '0')
-    form.append('image', image)
+    if (image) form.append('image', image)
+    if (productReferenceSheet) form.append('product_reference_sheet', productReferenceSheet)
     return apiPost<ApiResponse<SendMessageResponse>>(
       `/conversations/${conversationId}/messages`,
       form,
@@ -144,10 +146,12 @@ export function sendInpaintingMessage(
   )
 }
 
-export function sendProductMessage(conversationId: number, content: string, images: File[]) {
+export function sendProductMessage(conversationId: number, content: string, images: File[], product?: string, productReferenceSheet?: File) {
   const form = new FormData()
   form.append('content', content)
   form.append('mode', 'product')
+  if (product) form.append('product', product)
+  if (productReferenceSheet) form.append('product_reference_sheet', productReferenceSheet)
   images.forEach((img, i) => form.append(`images[${i}]`, img))
   return apiPost<ApiResponse<SendMessageResponse>>(
     `/conversations/${conversationId}/messages`,

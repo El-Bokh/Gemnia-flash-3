@@ -142,6 +142,8 @@ export default {
     aiCompleted: 'AI Completed',
     aiFailed: 'AI Failed',
     imagesToday: 'Images Today',
+    videosToday: 'Videos Today',
+    videoProcessing: 'Videos Processing',
     revenueToday: 'Revenue Today',
     revenueWeek: 'Revenue Week',
     pendingUsers: 'Pending Users',

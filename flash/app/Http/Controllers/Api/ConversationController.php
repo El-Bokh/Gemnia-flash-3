@@ -493,6 +493,7 @@ class ConversationController extends Controller
             'image_style' => ['nullable', 'string', 'max:100'],
             'product'     => ['nullable', 'string', 'max:100'],
             'image'       => ['nullable', 'image', 'max:10240'], // 10MB
+            'product_reference_sheet' => ['nullable', 'image', 'max:10240'],
             'images'      => ['nullable', 'array', 'max:10'],
             'images.*'    => ['image', 'max:10240'],
             'mode'        => ['nullable', 'string', 'in:text,image,product,video'],
@@ -504,7 +505,17 @@ class ConversationController extends Controller
 
         $mode = $data['mode'] ?? 'text';
         $imageFollowUpContext = null;
+        $videoFollowUpContext = null;
         $videoOptions = null;
+        $productSlug = $data['product'] ?? null;
+        $product = null;
+        $productTemplateImageUrl = null;
+
+        if ($productSlug) {
+            $product = Product::where('slug', $productSlug)->where('is_active', true)->first();
+            $productTemplateImageUrl = $this->productTemplateImageUrl($product);
+            $mode = $this->normalizeModeForProductTemplate($mode, $product);
+        }
 
         if ($mode === 'video') {
             $videoAspectRatio = $data['aspect_ratio'] ?? '16:9';
@@ -521,9 +532,9 @@ class ConversationController extends Controller
         }
 
         if ($mode === 'image') {
-            if ($this->shouldTreatImagePromptAsText($data['content'])) {
+            if (! $product && $this->shouldTreatImagePromptAsText($data['content'])) {
                 $mode = 'text';
-            } elseif (! $request->hasFile('image') && ! $request->hasFile('images')) {
+            } elseif (! $product && ! $request->hasFile('image') && ! $request->hasFile('images')) {
                 $imageFollowUpContext = $this->resolveImageFollowUpContext(
                     $conversation,
                     $request->user()->id,
@@ -532,9 +543,20 @@ class ConversationController extends Controller
             }
         }
 
+        if ($mode === 'video' && ! $request->hasFile('image')) {
+            $videoFollowUpContext = $this->resolveVideoFollowUpContext(
+                $conversation,
+                $request->user()->id,
+                $data['content'],
+            );
+        }
+
         $hasReferenceInput = $request->hasFile('image')
+            || $request->hasFile('product_reference_sheet')
             || $request->hasFile('images')
-            || ! empty($imageFollowUpContext['reference_image_url']);
+            || $productTemplateImageUrl !== null
+            || ! empty($imageFollowUpContext['reference_image_url'])
+            || ! empty($videoFollowUpContext['reference_image_url']);
 
         // ── Quota enforcement (concurrency-safe) ──
         $usageService = new UsageService();
@@ -610,8 +632,10 @@ class ConversationController extends Controller
 
         // Handle uploaded image
         $imageUrl = null;
+        $imageStoragePath = null;
         $imageBase64 = null;
         $imageMime = null;
+        $clientProductReferenceSheet = null;
 
         if ($request->hasFile('image')) {
             $file = $request->file('image');
@@ -630,9 +654,21 @@ class ConversationController extends Controller
             ]);
 
             $imageUrl = '/storage/' . $path;
+            $imageStoragePath = $path;
             $preparedImage = $this->prepareImageForApi($file->getRealPath(), $file->getMimeType() ?: 'image/jpeg');
             $imageBase64 = $preparedImage['data'];
             $imageMime = $preparedImage['mime_type'];
+        }
+
+        if ($request->hasFile('product_reference_sheet')) {
+            $referenceSheetFile = $request->file('product_reference_sheet');
+            $preparedSheet = $this->prepareImageForApi($referenceSheetFile->getRealPath(), $referenceSheetFile->getMimeType() ?: 'image/jpeg');
+            if ($preparedSheet['data'] !== '') {
+                $clientProductReferenceSheet = [
+                    'mime_type' => $preparedSheet['mime_type'],
+                    'data' => $preparedSheet['data'],
+                ];
+            }
         }
 
         // Handle multiple product images
@@ -658,9 +694,10 @@ class ConversationController extends Controller
                 $preparedImage = $this->prepareImageForApi($file->getRealPath(), $file->getMimeType() ?: 'image/jpeg');
 
                 $productImagesData[] = [
-                    'url'    => '/storage/' . $path,
-                    'base64' => $preparedImage['data'],
-                    'mime'   => $preparedImage['mime_type'],
+                    'url'          => '/storage/' . $path,
+                    'storage_path' => $path,
+                    'base64'       => $preparedImage['data'],
+                    'mime'         => $preparedImage['mime_type'],
                 ];
             }
 
@@ -697,21 +734,14 @@ class ConversationController extends Controller
         // Build the prompt — inject hidden base + style prompts
         $userContent = $data['content'];
         $styleSlug = $data['image_style'] ?? null;
-        $productSlug = $data['product'] ?? null;
         $baseImagePrompt = $imageFollowUpContext['prompt'] ?? $userContent;
         $geminiPrompt = $userContent;
-
-        // Fetch product if selected (for hidden_prompt injection)
-        $product = null;
-        if ($productSlug) {
-            $product = Product::where('slug', $productSlug)->where('is_active', true)->first();
-        }
+        $style = null;
 
         if ($mode === 'image') {
             $parts = [];
 
             // Inject hidden style prompt if a style is selected
-            $style = null;
             if ($styleSlug) {
                 $style = VisualStyle::where('slug', $styleSlug)->where('is_active', true)->first();
                 if ($style && $style->prompt_prefix) {
@@ -720,12 +750,17 @@ class ConversationController extends Controller
             }
 
             // Inject product hidden_prompt if a product is selected
-            if ($product && $product->hidden_prompt) {
-                $parts[] = $product->hidden_prompt;
+            if ($product) {
+                $parts[] = $this->buildProductTemplatePrompt(
+                    $product,
+                    $baseImagePrompt,
+                    $imageBase64 !== null || ! empty($productImagesData),
+                    $productTemplateImageUrl !== null,
+                );
+            } else {
+                // User prompt (keep it clean - enhancePromptForImagen will handle quality keywords)
+                $parts[] = $baseImagePrompt;
             }
-
-            // User prompt (keep it clean - enhancePromptForImagen will handle quality keywords)
-            $parts[] = $baseImagePrompt;
 
             // Style suffix (if any)
             if ($style && $style->prompt_suffix) {
@@ -738,6 +773,13 @@ class ConversationController extends Controller
             }
 
             $geminiPrompt = implode(', ', $parts);
+        } elseif ($mode === 'product' && $product) {
+            $geminiPrompt = $this->buildProductTemplatePrompt(
+                $product,
+                $userContent,
+                ! empty($productImagesData),
+                $productTemplateImageUrl !== null,
+            );
         } elseif ($styleSlug) {
             // Text mode with style — just wrap with prefix/suffix
             $style = VisualStyle::where('slug', $styleSlug)->where('is_active', true)->first();
@@ -823,9 +865,27 @@ class ConversationController extends Controller
 
         // Add current message with enhanced prompt
         $currentParts = [['text' => $geminiPrompt]];
+        $productReferenceSheet = $product ? $clientProductReferenceSheet : null;
+        $productReferenceSheetSource = $productReferenceSheet !== null ? 'client_combined_sheet' : null;
+        $productReferencePaths = array_values(array_filter(array_merge(
+            $imageStoragePath ? [$imageStoragePath] : [],
+            array_map(fn ($img) => $img['storage_path'] ?? null, $productImagesData),
+        )));
+
+        if ($productReferenceSheet === null && $product && $productTemplateImageUrl !== null && ! empty($productReferencePaths)) {
+            $productReferenceSheet = $this->buildProductTemplateReferenceSheet($productReferencePaths, $productTemplateImageUrl);
+            $productReferenceSheetSource = $productReferenceSheet !== null ? 'server_combined_sheet' : null;
+        }
 
         // If user uploaded an image, include it as inline data for Gemini multimodal
-        if ($imageBase64 && $imageMime) {
+        if ($productReferenceSheet !== null) {
+            $currentParts[] = [
+                'inline_data' => [
+                    'mime_type' => $productReferenceSheet['mime_type'],
+                    'data'      => $productReferenceSheet['data'],
+                ],
+            ];
+        } elseif ($imageBase64 && $imageMime) {
             $currentParts[] = [
                 'inline_data' => [
                     'mime_type' => $imageMime,
@@ -835,7 +895,7 @@ class ConversationController extends Controller
         }
 
         // Product mode: include all product images as inline data
-        if ($mode === 'product' && ! empty($productImagesData)) {
+        if ($productReferenceSheet === null && $mode === 'product' && ! empty($productImagesData)) {
             foreach ($productImagesData as $pImg) {
                 $currentParts[] = [
                     'inline_data' => [
@@ -844,6 +904,10 @@ class ConversationController extends Controller
                     ],
                 ];
             }
+        }
+
+        if ($productReferenceSheet === null && in_array($mode, ['image', 'product'], true) && $productTemplateImageUrl !== null) {
+            $this->appendInlineImageFromUrl($currentParts, $productTemplateImageUrl);
         }
 
         if (
@@ -856,34 +920,43 @@ class ConversationController extends Controller
         }
 
         if ($mode === 'video') {
+            $videoPrompt = $videoFollowUpContext['prompt'] ?? $geminiPrompt;
+            $videoReferenceImageUrl = $imageUrl ?: ($videoFollowUpContext['reference_image_url'] ?? null);
             $gemini = new GeminiService('video', $videoOptions['aspect_ratio'] ?? '16:9');
             $aiRequest = AiRequest::create([
                 'user_id'          => $request->user()->id,
                 'subscription_id'  => $consumption['subscription']?->id,
                 'visual_style_id'  => isset($style) ? $style->id : null,
                 'product_id'       => $product?->id,
-                'type'             => $this->resolveAiRequestType($mode, $styleSlug, $imageBase64 !== null, $hasReferenceInput),
+                'type'             => $this->resolveAiRequestType($mode, $styleSlug, $imageBase64 !== null, $videoReferenceImageUrl !== null),
                 'status'           => 'pending',
                 'user_prompt'      => $userContent,
-                'processed_prompt' => $geminiPrompt !== $userContent ? $geminiPrompt : null,
+                'processed_prompt' => $videoPrompt !== $userContent ? $videoPrompt : null,
                 'hidden_prompt'    => $product?->hidden_prompt,
                 'negative_prompt'  => $product?->negative_prompt,
                 'model_used'       => $gemini->getModel(),
                 'engine_provider'  => 'vertex_ai',
                 'credits_consumed' => $creditCost,
-                'input_image_path' => $imageUrl,
+                'input_image_path' => $videoReferenceImageUrl,
                 'ip_address'       => $request->ip(),
                 'user_agent'       => $request->userAgent(),
                 'request_payload'  => [
-                    'prompt' => $geminiPrompt,
+                    'prompt' => $videoPrompt,
                     'parameters' => $videoOptions,
-                    'has_reference_image' => $imageUrl !== null,
+                    'has_reference_image' => $videoReferenceImageUrl !== null,
+                    'reference_ai_request_id' => $videoFollowUpContext['reference_ai_request_id'] ?? null,
+                    'reference_message_id' => $videoFollowUpContext['reference_message_id'] ?? null,
                 ],
                 'metadata'         => [
                     'source' => 'conversation',
-                    'generation_mode' => $imageUrl ? 'image_to_video' : 'text_to_video',
+                    'generation_mode' => $videoReferenceImageUrl ? 'image_to_video' : 'text_to_video',
                     'video_options' => $videoOptions,
                     'user_message_id' => $userMsg->id,
+                    'reference_ai_request_id' => $videoFollowUpContext['reference_ai_request_id'] ?? null,
+                    'reference_message_id' => $videoFollowUpContext['reference_message_id'] ?? null,
+                    'reference_source' => $videoFollowUpContext['source'] ?? null,
+                    'source_video_url' => $videoFollowUpContext['source_video_url'] ?? null,
+                    'source_image_url' => $videoReferenceImageUrl,
                 ],
             ]);
 
@@ -945,9 +1018,24 @@ class ConversationController extends Controller
             'processing_time_ms' => $processingTimeMs,
             'ip_address'       => $request->ip(),
             'user_agent'       => $request->userAgent(),
+            'request_payload'  => [
+                'mode' => $mode,
+                'prompt' => $geminiPrompt,
+                'has_uploaded_image' => $imageBase64 !== null || ! empty($productImagesData),
+                'has_reference_input' => $hasReferenceInput,
+                'product_template_slug' => $product?->slug,
+                'product_template_image_url' => $productTemplateImageUrl,
+                'product_template_reference_used' => $productTemplateImageUrl !== null,
+                'product_template_reference_layout' => $productReferenceSheetSource ?? ($productTemplateImageUrl !== null ? 'separate_images' : null),
+            ],
             'error_message'    => $result['success'] ? null : ($result['error'] ?? 'Unknown error'),
             'started_at'       => $startedAt,
             'completed_at'     => $completedAt,
+            'metadata'         => [
+                'product_template_image_url' => $productTemplateImageUrl,
+                'product_template_reference_used' => $productTemplateImageUrl !== null,
+                'product_template_reference_layout' => $productReferenceSheetSource ?? ($productTemplateImageUrl !== null ? 'separate_images' : null),
+            ],
         ]);
 
         if ($result['success']) {
@@ -1174,6 +1262,23 @@ class ConversationController extends Controller
 
         // If the original request had an input image, re-include it.
         $inputImageUrl = $originalAiRequest?->input_image_path ?: $userMessage->image_url;
+
+        $regenerateVideoFollowUpContext = null;
+        if ($mode === 'video' && ! $inputImageUrl) {
+            $regenerateVideoFollowUpContext = $this->resolveVideoFollowUpContext(
+                $conversation,
+                $request->user()->id,
+                $content,
+                $userMessage->id,
+            );
+
+            if ($regenerateVideoFollowUpContext) {
+                $geminiPrompt = $regenerateVideoFollowUpContext['prompt'];
+                $inputImageUrl = $regenerateVideoFollowUpContext['reference_image_url'] ?? null;
+                $currentParts = [['text' => $geminiPrompt]];
+            }
+        }
+
         if ($inputImageUrl) {
             $imagePath = str_replace('/storage/', '', $inputImageUrl);
             $fullPath = Storage::disk('public')->path($imagePath);
@@ -1213,6 +1318,8 @@ class ConversationController extends Controller
                     'prompt' => $geminiPrompt,
                     'parameters' => $videoOptions,
                     'has_reference_image' => $inputImageUrl !== null,
+                    'reference_ai_request_id' => $regenerateVideoFollowUpContext['reference_ai_request_id'] ?? data_get($originalAiRequest?->metadata, 'reference_ai_request_id'),
+                    'reference_message_id' => $regenerateVideoFollowUpContext['reference_message_id'] ?? data_get($originalAiRequest?->metadata, 'reference_message_id'),
                 ],
                 'metadata'           => [
                     'source' => 'regenerate',
@@ -1220,6 +1327,11 @@ class ConversationController extends Controller
                     'original_message_id' => $aiMessage->id,
                     'generation_mode' => $inputImageUrl ? 'image_to_video' : 'text_to_video',
                     'video_options' => $videoOptions,
+                    'reference_ai_request_id' => $regenerateVideoFollowUpContext['reference_ai_request_id'] ?? data_get($originalAiRequest?->metadata, 'reference_ai_request_id'),
+                    'reference_message_id' => $regenerateVideoFollowUpContext['reference_message_id'] ?? data_get($originalAiRequest?->metadata, 'reference_message_id'),
+                    'reference_source' => $regenerateVideoFollowUpContext['source'] ?? data_get($originalAiRequest?->metadata, 'reference_source'),
+                    'source_video_url' => $regenerateVideoFollowUpContext['source_video_url'] ?? data_get($originalAiRequest?->metadata, 'source_video_url'),
+                    'source_image_url' => $inputImageUrl,
                 ],
             ]);
 
@@ -1792,11 +1904,220 @@ class ConversationController extends Controller
             return 'video_generation';
         }
 
-        if ($mode === 'image') {
+        if ($mode === 'image' || $mode === 'product') {
             return $hasReferenceInput ? 'image_to_image' : 'text_to_image';
         }
 
         return 'chat';
+    }
+
+    private function normalizeModeForProductTemplate(string $mode, ?Product $product): string
+    {
+        if ($product && $mode === 'text') {
+            return 'image';
+        }
+
+        return $mode;
+    }
+
+    private function productTemplateImageUrl(?Product $product): ?string
+    {
+        $thumbnail = trim((string) ($product?->thumbnail ?? ''));
+
+        if ($thumbnail === '' || preg_match('/^https?:\/\//i', $thumbnail) === 1) {
+            return null;
+        }
+
+        if (str_starts_with($thumbnail, '/storage/')) {
+            return $thumbnail;
+        }
+
+        $path = ltrim($thumbnail, '/');
+
+        if (str_starts_with($path, 'storage/')) {
+            return '/' . $path;
+        }
+
+        return '/storage/' . $path;
+    }
+
+    private function buildProductTemplatePrompt(Product $product, string $userPrompt, bool $hasUploadedProductImage, bool $hasTemplateReference): string
+    {
+        $templatePrompt = $this->sanitizeProductTemplatePrompt((string) $product->hidden_prompt);
+
+        $lines = [
+            'Product template application task.',
+            $hasUploadedProductImage
+                ? 'Use the uploaded product reference image as the exact product to advertise. If a single split reference image is provided, the left/product-photo panel is the uploaded product. Preserve its product type, silhouette, proportions, color palette, material texture, handles, straps, hardware, labels, and distinctive details.'
+                : 'Create a product showcase using the selected product template.',
+            $hasTemplateReference
+                ? 'Use the selected template reference image only for scene layout, camera angle, lighting mood, background, surface, framing, and composition. If a single split reference image is provided, the right/template panel is the selected template. Do not copy the item from the template over the uploaded product.'
+                : 'Use the selected template prompt for scene layout, camera angle, lighting mood, background, surface, framing, and composition.',
+        ];
+
+        if ($templatePrompt !== '') {
+            $lines[] = 'Template prompt: ' . $templatePrompt;
+        }
+
+        $lines[] = 'User request: ' . trim($userPrompt);
+        $lines[] = 'Hard constraints: the final image must feature the uploaded product when one is provided, not a generic replacement. Do not invent, add, or alter brand names, logos, monograms, readable text, watermark, measurement marks, UI overlays, or typography anywhere in the image unless they already exist on the uploaded product. If props such as books, boxes, cards, labels, tags, packaging, posters, or papers appear, keep them blank and unbranded with no readable letters or symbols. Return exactly one clean product showcase image.';
+
+        return trim(implode("\n", $lines));
+    }
+
+    private function sanitizeProductTemplatePrompt(string $templatePrompt): string
+    {
+        $sanitized = str_ireplace(
+            ['luxury branding style', 'branding style', 'brand style', 'branded style'],
+            ['luxury commercial style without brand marks', 'commercial style without brand marks', 'commercial style without brand marks', 'commercial style without brand marks'],
+            $templatePrompt,
+        );
+
+        return trim($sanitized);
+    }
+
+    private function buildProductTemplateReferenceSheet(array $productImageStoragePaths, string $templateImageUrl): ?array
+    {
+        if (! function_exists('imagecreatefromstring') || ! function_exists('imagejpeg')) {
+            return null;
+        }
+
+        $templateStoragePath = $this->storagePathFromUrl($templateImageUrl);
+        if (! $templateStoragePath) {
+            return null;
+        }
+
+        $templateFullPath = Storage::disk('public')->path($templateStoragePath);
+        if (! file_exists($templateFullPath)) {
+            return null;
+        }
+
+        $productImages = [];
+        foreach (array_slice($productImageStoragePaths, 0, 4) as $productImageStoragePath) {
+            $fullPath = Storage::disk('public')->path(ltrim((string) $productImageStoragePath, '/\\'));
+            $image = $this->loadGdImage($fullPath);
+            if ($image) {
+                $productImages[] = $image;
+            }
+        }
+
+        $templateImage = $this->loadGdImage($templateFullPath);
+        if (empty($productImages) || ! $templateImage) {
+            $this->destroyGdImages($productImages);
+            if ($templateImage) {
+                imagedestroy($templateImage);
+            }
+            return null;
+        }
+
+        $canvasWidth = 1024;
+        $canvasHeight = 512;
+        $halfWidth = (int) ($canvasWidth / 2);
+        $padding = 18;
+
+        $canvas = imagecreatetruecolor($canvasWidth, $canvasHeight);
+        $background = imagecolorallocate($canvas, 248, 248, 248);
+        $divider = imagecolorallocate($canvas, 220, 220, 220);
+        imagefilledrectangle($canvas, 0, 0, $canvasWidth, $canvasHeight, $background);
+        imagefilledrectangle($canvas, $halfWidth - 1, 0, $halfWidth + 1, $canvasHeight, $divider);
+
+        $productPanelX = $padding;
+        $productPanelY = $padding;
+        $productPanelWidth = $halfWidth - ($padding * 2);
+        $productPanelHeight = $canvasHeight - ($padding * 2);
+
+        if (count($productImages) === 1) {
+            $this->drawContainedGdImage($canvas, $productImages[0], $productPanelX, $productPanelY, $productPanelWidth, $productPanelHeight);
+        } else {
+            $columns = 2;
+            $rows = (int) ceil(count($productImages) / $columns);
+            $gap = 12;
+            $cellWidth = (int) (($productPanelWidth - $gap) / $columns);
+            $cellHeight = (int) (($productPanelHeight - ($gap * ($rows - 1))) / $rows);
+
+            foreach ($productImages as $index => $productImage) {
+                $column = $index % $columns;
+                $row = (int) floor($index / $columns);
+                $cellX = $productPanelX + ($column * ($cellWidth + $gap));
+                $cellY = $productPanelY + ($row * ($cellHeight + $gap));
+                $this->drawContainedGdImage($canvas, $productImage, $cellX, $cellY, $cellWidth, $cellHeight);
+            }
+        }
+
+        $templatePanelX = $halfWidth + $padding;
+        $templatePanelY = $padding;
+        $templatePanelWidth = $halfWidth - ($padding * 2);
+        $templatePanelHeight = $canvasHeight - ($padding * 2);
+        $this->drawContainedGdImage($canvas, $templateImage, $templatePanelX, $templatePanelY, $templatePanelWidth, $templatePanelHeight);
+
+        ob_start();
+        imagejpeg($canvas, null, 88);
+        $imageBytes = ob_get_clean();
+
+        imagedestroy($canvas);
+        imagedestroy($templateImage);
+        $this->destroyGdImages($productImages);
+
+        if (! is_string($imageBytes) || $imageBytes === '') {
+            return null;
+        }
+
+        return [
+            'mime_type' => 'image/jpeg',
+            'data' => base64_encode($imageBytes),
+        ];
+    }
+
+    private function loadGdImage(string $filePath): mixed
+    {
+        if (! file_exists($filePath)) {
+            return null;
+        }
+
+        $imageBytes = file_get_contents($filePath);
+        if ($imageBytes === false) {
+            return null;
+        }
+
+        return @imagecreatefromstring($imageBytes) ?: null;
+    }
+
+    private function drawContainedGdImage(mixed $canvas, mixed $sourceImage, int $x, int $y, int $width, int $height): void
+    {
+        $sourceWidth = imagesx($sourceImage);
+        $sourceHeight = imagesy($sourceImage);
+
+        if ($sourceWidth <= 0 || $sourceHeight <= 0 || $width <= 0 || $height <= 0) {
+            return;
+        }
+
+        $scale = min($width / $sourceWidth, $height / $sourceHeight);
+        $targetWidth = max(1, (int) floor($sourceWidth * $scale));
+        $targetHeight = max(1, (int) floor($sourceHeight * $scale));
+        $targetX = $x + (int) floor(($width - $targetWidth) / 2);
+        $targetY = $y + (int) floor(($height - $targetHeight) / 2);
+
+        imagecopyresampled(
+            $canvas,
+            $sourceImage,
+            $targetX,
+            $targetY,
+            0,
+            0,
+            $targetWidth,
+            $targetHeight,
+            $sourceWidth,
+            $sourceHeight,
+        );
+    }
+
+    private function destroyGdImages(array $images): void
+    {
+        foreach ($images as $image) {
+            if ($image) {
+                imagedestroy($image);
+            }
+        }
     }
 
     private function buildInpaintingPrompt(string $userPrompt): string
@@ -2094,9 +2415,129 @@ class ConversationController extends Controller
         ];
     }
 
+    private function resolveVideoFollowUpContext(Conversation $conversation, int $userId, string $content, ?int $beforeMessageId = null): ?array
+    {
+        $ordinal = $this->extractReferencedOrdinal($content);
+        if ($ordinal === null && ! $this->isVideoFollowUpPrompt($content)) {
+            return null;
+        }
+
+        $query = $conversation->messages()
+            ->with('aiRequest')
+            ->where('role', 'assistant')
+            ->orderBy('id');
+
+        if ($beforeMessageId !== null) {
+            $query->where('id', '<', $beforeMessageId);
+        }
+
+        $visualMessages = $query->get()
+            ->filter(fn (ConversationMessage $message) => $this->messageHasReusableVideoContext($message))
+            ->values();
+
+        if ($visualMessages->isEmpty()) {
+            return null;
+        }
+
+        $referencedMessage = null;
+        if ($ordinal !== null && $ordinal >= 1 && $ordinal <= $visualMessages->count()) {
+            $referencedMessage = $visualMessages->get($ordinal - 1);
+        }
+
+        if (! $referencedMessage) {
+            $referencedMessage = $this->findBestMatchingVisualMessage($visualMessages, $content, true);
+        }
+
+        if (! $referencedMessage || ! $referencedMessage->aiRequest) {
+            return null;
+        }
+
+        $referencedRequest = $referencedMessage->aiRequest;
+        $basePrompt = $this->videoBasePromptForReferencedRequest($referencedRequest);
+
+        if (! $basePrompt) {
+            return null;
+        }
+
+        $referenceImageUrl = $this->extractVideoReferenceImageUrl($referencedMessage);
+
+        return [
+            'prompt' => $this->mergeVideoFollowUpPrompt($basePrompt, $content, $referenceImageUrl !== null, $ordinal !== null),
+            'reference_image_url' => $referenceImageUrl,
+            'reference_ai_request_id' => $referencedRequest->id,
+            'reference_message_id' => $referencedMessage->id,
+            'reference_user_id' => $userId,
+            'source' => $referenceImageUrl ? 'image_reference' : 'prompt_context',
+            'source_video_url' => $referencedMessage->video_url ?: $referencedRequest->output_video_path,
+        ];
+    }
+
+    private function videoBasePromptForReferencedRequest(AiRequest $referencedRequest): ?string
+    {
+        if ($referencedRequest->type === 'inpainting' || $referencedRequest->mask_image_path) {
+            return $referencedRequest->user_prompt ?: $referencedRequest->processed_prompt;
+        }
+
+        return $referencedRequest->processed_prompt ?: $referencedRequest->user_prompt;
+    }
+
+    private function messageHasReusableVideoContext(ConversationMessage $message): bool
+    {
+        return (bool) (
+            $message->image_url
+            || $message->video_url
+            || $message->aiRequest?->input_image_path
+            || $message->aiRequest?->output_image_path
+            || $message->aiRequest?->output_video_path
+        );
+    }
+
+    private function extractVideoReferenceImageUrl(ConversationMessage $message): ?string
+    {
+        $candidates = [
+            $message->image_url,
+            $message->aiRequest?->output_image_path,
+            $message->aiRequest?->input_image_path,
+            data_get($message->metadata, 'source_image_url'),
+            data_get($message->aiRequest?->metadata, 'source_image_url'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && str_starts_with($candidate, '/storage/')) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function isVideoFollowUpPrompt(string $content): bool
+    {
+        $normalized = $this->normalizePrompt($content);
+
+        $patterns = [
+            '/\b(previous|last|same|this|that|edit|change|make it|turn it|recolor|replace|remove|regenerate|again|use it)\b/u',
+            '/(السابق|السابقة|اللي|اللى|الي|إلي|الى|هذا|هذه|ده|دي|دى|نفس|تعديل|عدّل|عدل|غيّر|غير|خلّي|خلي|خليلي|حوّل|حول|لوّن|لون|استبدل|بدّل|بدل|شيل|احذف|اعادة|إعادة|كرر|كرّر|الفيديو|المشهد|الاعلان|الإعلان)/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function findBestMatchingImageMessage($imageMessages, string $content): ?ConversationMessage
     {
+        return $this->findBestMatchingVisualMessage($imageMessages, $content);
+    }
+
+    private function findBestMatchingVisualMessage($imageMessages, string $content, bool $skipExactPrompt = false): ?ConversationMessage
+    {
         $keywords = $this->extractReferenceKeywords($content);
+        $normalizedContent = $this->normalizePrompt($content);
 
         if (empty($keywords)) {
             return $imageMessages->last();
@@ -2106,6 +2547,10 @@ class ConversationController extends Controller
         $bestScore = 0;
 
         foreach ($imageMessages as $message) {
+            if ($skipExactPrompt && $message->aiRequest && $this->normalizePrompt((string) $message->aiRequest->user_prompt) === $normalizedContent) {
+                continue;
+            }
+
             $haystack = $this->normalizePrompt(implode(' ', array_filter([
                 $message->aiRequest?->user_prompt,
                 $message->aiRequest?->processed_prompt,
@@ -2161,10 +2606,12 @@ class ConversationController extends Controller
             'رقم', 'number', 'image', 'photo', 'picture',
             'الصورة', 'الصوره', 'صورة', 'صوره',
             'اعمل', 'اعملي', 'أنشئ', 'انشئ', 'ولد', 'ولد', 'عيد', 'اعد', 'أعد',
+            'خلي', 'خلّي', 'خليلي', 'اجعل', 'إجعل', 'حول', 'حوّل', 'غير', 'غيّر', 'لون', 'لوّن',
             'مرة', 'مره', 'تاني', 'ثاني', 'ثانية', 'ثانيه',
             'نفس', 'مثلها', 'زيها', 'نسخة', 'نسخه',
             'ابعاد', 'أبعاد', 'مقاس', 'نسبة', 'aspect', 'ratio', 'size', 'dimensions',
             'new', 'different', 'الجديدة', 'جديدة', 'بتاع', 'بتاعت',
+            'red', 'blue', 'green', 'yellow', 'black', 'white', 'احمر', 'أحمر', 'حمراء', 'ازرق', 'أزرق', 'اخضر', 'أخضر', 'اصفر', 'أصفر', 'اسود', 'أسود', 'ابيض', 'أبيض',
             '16:9', '9:16', '4:3', '3:4', '1:1',
         ];
 
@@ -2182,6 +2629,25 @@ class ConversationController extends Controller
         }
 
         return trim($basePrompt) . "\nWith these modifications: " . trim($followUpPrompt);
+    }
+
+    private function mergeVideoFollowUpPrompt(string $basePrompt, string $followUpPrompt, bool $hasReferenceImage, bool $resolvedByOrdinal = false): string
+    {
+        if ($this->isReferenceOnlyImageFollowUp($followUpPrompt, $resolvedByOrdinal)) {
+            return $basePrompt;
+        }
+
+        $contextInstruction = $hasReferenceImage
+            ? 'Use the provided reference image as the visual anchor.'
+            : 'Use the previous video prompt as the visual anchor.';
+
+        return trim(implode("\n", [
+            trim($basePrompt),
+            $contextInstruction,
+            'Follow-up edit: ' . trim($followUpPrompt),
+            'Keep the same main subject, product, setting, composition, camera style, and visual continuity unless the follow-up explicitly changes them.',
+            'Do not introduce unrelated people, faces, objects, locations, or a different product.',
+        ]));
     }
 
     private function isReferenceOnlyImageFollowUp(string $content, bool $resolvedByOrdinal = false): bool

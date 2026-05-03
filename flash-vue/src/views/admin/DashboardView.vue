@@ -54,9 +54,10 @@ const kpiCards = computed(() => {
     { label: t('dashboard.aiCompleted'), value: k.ai_requests_completed, sub: `${k.ai_requests_pending} ${t('common.pending')}`, icon: 'pi pi-microchip-ai', color: '#8b5cf6' },
     { label: t('dashboard.aiFailed'), value: k.ai_requests_failed, sub: t('common.requests'), icon: 'pi pi-exclamation-triangle', color: '#ef4444' },
     { label: t('dashboard.imagesToday'), value: k.images_generated_today, sub: `${k.images_generated_week} ${t('common.thisWeek')}`, icon: 'pi pi-image', color: '#f59e0b' },
+    { label: t('dashboard.videosToday'), value: k.videos_generated_today, sub: `${k.videos_generated_week} ${t('common.thisWeek')}`, icon: 'pi pi-video', color: '#06b6d4' },
     { label: t('dashboard.revenueToday'), value: `$${k.revenue_today.total.toLocaleString()}`, sub: `${k.revenue_today.count} ${t('common.txns')}`, icon: 'pi pi-dollar', color: '#10b981' },
     { label: t('dashboard.revenueWeek'), value: `$${k.revenue_week.total.toLocaleString()}`, sub: `${k.revenue_week.count} ${t('common.txns')}`, icon: 'pi pi-chart-line', color: '#06b6d4' },
-    { label: t('dashboard.pendingUsers'), value: k.users.pending, sub: t('common.awaitingApproval'), icon: 'pi pi-clock', color: '#f97316' },
+    { label: t('dashboard.videoProcessing'), value: k.video_requests_processing, sub: t('aiRequests.processing'), icon: 'pi pi-spin pi-spinner', color: '#14b8a6' },
   ]
 })
 

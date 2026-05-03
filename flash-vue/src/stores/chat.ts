@@ -288,7 +288,7 @@ export const useChatStore = defineStore('chat', () => {
     editingConversationId.value = null
   }
 
-  async function sendMessage(content: string, imageStyle?: string, image?: File, product?: string) {
+  async function sendMessage(content: string, imageStyle?: string, image?: File, product?: string, productReferenceSheet?: File) {
     if (activeConversationBusy.value) return
 
     if (!activeConversationId.value) {
@@ -351,7 +351,7 @@ export const useChatStore = defineStore('chat', () => {
     isAiTyping.value = true
     quotaError.value = null
     try {
-      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product, currentAspectRatio, currentVideoOptions) as any
+      const res = await sendMessageApi(conv.serverId!, content, imageStyle, image, currentMode, product, currentAspectRatio, currentVideoOptions, productReferenceSheet) as any
       if (res.success && res.data) {
         if (res.data.conversation) {
           const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)
@@ -603,7 +603,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendProductMessage(content: string, images: File[]) {
+  async function sendProductMessage(content: string, images: File[], product?: string, productReferenceSheet?: File) {
     if (activeConversationBusy.value) return
 
     if (!activeConversationId.value) {
@@ -649,7 +649,7 @@ export const useChatStore = defineStore('chat', () => {
     isAiTyping.value = true
     quotaError.value = null
     try {
-      const res = await sendProductMessageApi(conv.serverId!, content, images) as any
+      const res = await sendProductMessageApi(conv.serverId!, content, images, product, productReferenceSheet) as any
       if (res.success && res.data) {
         if (res.data.conversation) {
           const updatedConv = upsertConversationFromApi(conversations.value, res.data.conversation)

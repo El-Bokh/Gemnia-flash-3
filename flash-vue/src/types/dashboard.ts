@@ -43,9 +43,13 @@ export interface DashboardKpis {
   subscriptions_per_plan: SubscriptionPerPlan[]
   images_generated_today: number
   images_generated_week: number
+  videos_generated_today: number
+  videos_generated_week: number
+  video_requests_processing: number
   revenue_today: RevenueKpi
   revenue_week: RevenueKpi
   ai_requests_pending: number
+  ai_requests_processing: number
   ai_requests_completed: number
   ai_requests_failed: number
 }

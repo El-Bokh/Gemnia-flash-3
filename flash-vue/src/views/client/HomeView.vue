@@ -165,7 +165,7 @@ onMounted(() => {
   }
 })
 
-function handleSend(content: string, image?: File) {
+async function handleSend(content: string, image?: File) {
   // Guest → must login first
   if (!auth.isAuthenticated) {
     void router.push({ name: 'login', query: { redirect: '/' } })
@@ -178,7 +178,14 @@ function handleSend(content: string, image?: File) {
   }
 
   const isNewChat = !chat.activeConversationId
-  chat.sendMessage(content, selectedStyle.value || undefined, image, selectedProduct.value || undefined)
+  const productSlug = selectedProduct.value || undefined
+  let productReferenceSheet: File | undefined
+
+  if (productSlug && image && selectedProductThumb.value) {
+    productReferenceSheet = await createProductReferenceSheet([image], selectedProductThumb.value) ?? undefined
+  }
+
+  chat.sendMessage(content, selectedStyle.value || undefined, image, productSlug, productReferenceSheet)
   selectedStyle.value = ''
   selectedStyleName.value = ''
   selectedStyleThumb.value = null
@@ -196,6 +203,98 @@ function handleSend(content: string, image?: File) {
       }),
     )
   }
+}
+
+async function createProductReferenceSheet(productImages: File[], templateUrl: string): Promise<File | null> {
+  try {
+    const selectedProductImages = productImages.slice(0, 4)
+    const [productBitmaps, templateBitmap] = await Promise.all([
+      Promise.all(selectedProductImages.map(image => createImageBitmap(image))),
+      loadImageBitmapFromUrl(templateUrl),
+    ])
+
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = 512
+
+    const context = canvas.getContext('2d')
+    if (!context) {
+      productBitmaps.forEach(bitmap => bitmap.close())
+      templateBitmap.close()
+      return null
+    }
+
+    context.fillStyle = '#f8f8f8'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.fillStyle = '#dedede'
+    context.fillRect(511, 0, 2, canvas.height)
+
+    drawProductBitmapGrid(context, productBitmaps, 18, 18, 476, 476)
+    drawContainedBitmap(context, templateBitmap, 530, 18, 476, 476)
+
+    const blob = await canvasToBlob(canvas, 'image/jpeg', 0.88)
+    productBitmaps.forEach(bitmap => bitmap.close())
+    templateBitmap.close()
+
+    if (!blob) return null
+
+    return new File([blob], `product-template-reference-${Date.now()}.jpg`, { type: 'image/jpeg' })
+  } catch {
+    return null
+  }
+}
+
+function drawProductBitmapGrid(context: CanvasRenderingContext2D, bitmaps: ImageBitmap[], x: number, y: number, width: number, height: number) {
+  if (bitmaps.length <= 1) {
+    if (bitmaps[0]) drawContainedBitmap(context, bitmaps[0], x, y, width, height)
+    return
+  }
+
+  const columns = 2
+  const rows = Math.ceil(bitmaps.length / columns)
+  const gap = 12
+  const cellWidth = Math.floor((width - gap) / columns)
+  const cellHeight = Math.floor((height - (gap * (rows - 1))) / rows)
+
+  bitmaps.forEach((bitmap, index) => {
+    const column = index % columns
+    const row = Math.floor(index / columns)
+    drawContainedBitmap(
+      context,
+      bitmap,
+      x + column * (cellWidth + gap),
+      y + row * (cellHeight + gap),
+      cellWidth,
+      cellHeight,
+    )
+  })
+}
+
+async function loadImageBitmapFromUrl(url: string): Promise<ImageBitmap> {
+  const response = await fetch(resolveStorageProxyUrl(url))
+  const blob = await response.blob()
+  return createImageBitmap(blob)
+}
+
+function resolveStorageProxyUrl(url: string): string {
+  const parsed = new URL(url, window.location.origin)
+  if (parsed.pathname.startsWith('/storage/')) {
+    return `${parsed.pathname}${parsed.search}`
+  }
+  return parsed.toString()
+}
+
+function drawContainedBitmap(context: CanvasRenderingContext2D, bitmap: ImageBitmap, x: number, y: number, width: number, height: number) {
+  const scale = Math.min(width / bitmap.width, height / bitmap.height)
+  const targetWidth = Math.max(1, Math.floor(bitmap.width * scale))
+  const targetHeight = Math.max(1, Math.floor(bitmap.height * scale))
+  const targetX = x + Math.floor((width - targetWidth) / 2)
+  const targetY = y + Math.floor((height - targetHeight) / 2)
+  context.drawImage(bitmap, targetX, targetY, targetWidth, targetHeight)
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+  return new Promise(resolve => canvas.toBlob(resolve, type, quality))
 }
 
 function openStylesPanel() {
@@ -253,18 +352,19 @@ function handleStyleSelect(info: { slug: string; name: string; thumbnail: string
   selectedStyle.value = info.slug
   selectedStyleName.value = info.name
   selectedStyleThumb.value = info.thumbnail
-    if (info.slug) {
-      showStyles.value = false
-    }
+  if (info.slug) {
+    showStyles.value = false
+  }
 }
 
 function handleProductSelect(info: { slug: string; name: string; thumbnail: string | null }) {
   selectedProduct.value = info.slug
   selectedProductName.value = info.name
   selectedProductThumb.value = info.thumbnail
-    if (info.slug) {
-      showProducts.value = false
-    }
+  if (info.slug) {
+    chat.aiMode = 'image'
+    showProducts.value = false
+  }
 }
 
 function handleCopy(content: string) {
@@ -323,7 +423,7 @@ function handleInputInpaint(content: string, image: File, mask: File, renderedIm
   handleInpaint({ content, image, mask, renderedImage })
 }
 
-function handleSendProducts(content: string, images: File[]) {
+async function handleSendProducts(content: string, images: File[]) {
   if (!auth.isAuthenticated) {
     void router.push({ name: 'login', query: { redirect: '/' } })
     return
@@ -334,7 +434,16 @@ function handleSendProducts(content: string, images: File[]) {
   }
 
   const isNewChat = !chat.activeConversationId
-  chat.sendProductMessage(content, images)
+  const productSlug = selectedProduct.value || undefined
+  const productReferenceSheet = productSlug && selectedProductThumb.value
+    ? await createProductReferenceSheet(images, selectedProductThumb.value) ?? undefined
+    : undefined
+
+  chat.sendProductMessage(content, images, productSlug, productReferenceSheet)
+  selectedProduct.value = ''
+  selectedProductName.value = ''
+  selectedProductThumb.value = null
+  showProducts.value = false
   if (isNewChat) {
     layout.sidebarCollapsed = true
     const title = content.slice(0, 40) + (content.length > 40 ? '…' : '')
