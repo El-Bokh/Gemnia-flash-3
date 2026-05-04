@@ -698,7 +698,7 @@ class GeminiService
     private function geminiNativeImageGenerate(array $history, array $currentParts): array
     {
         if (function_exists('set_time_limit')) {
-            @set_time_limit(180);
+            @set_time_limit(240);
         }
 
         // Extract the raw text from current parts
@@ -1897,30 +1897,72 @@ PROMPT;
 
     private function sendNativeImageRequest(string $model, array $contents, array $generationConfig, string $authMode): array
     {
-        // Use a shorter timeout than PHP's max_execution_time (180s) so we can
-        // fail fast and return a clean error to the client instead of letting
-        // PHP kill the script mid-flight when Google hangs the connection.
-        $request = Http::timeout(120)->connectTimeout(10);
+        $url = $authMode === 'service_account'
+            ? "https://aiplatform.googleapis.com/v1beta1/projects/{$this->projectId}/locations/global/publishers/google/models/{$model}:generateContent"
+            : "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
 
-        if ($authMode === 'service_account') {
-            $url = "https://aiplatform.googleapis.com/v1beta1/projects/{$this->projectId}/locations/global/publishers/google/models/{$model}:generateContent";
-            $request = $request->withHeaders([
-                'Authorization' => 'Bearer ' . $this->getAccessToken(),
-            ]);
-        } else {
-            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
-            if (! empty($this->apiKey)) {
-                $url .= "?key={$this->apiKey}";
+        if ($authMode !== 'service_account' && ! empty($this->apiKey)) {
+            $url .= "?key={$this->apiKey}";
+        }
+
+        $post = function (array $config, int $timeoutSeconds) use ($authMode, $url, $contents) {
+            $request = Http::timeout($timeoutSeconds)->connectTimeout(10);
+
+            if ($authMode === 'service_account') {
+                $request = $request->withHeaders([
+                    'Authorization' => 'Bearer ' . $this->getAccessToken(),
+                ]);
             }
+
+            return $request->post($url, [
+                'contents'         => $contents,
+                'generationConfig' => $config,
+            ]);
+        };
+
+        try {
+            $response = $post($generationConfig, 90);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            if (! $this->shouldRetryNativeImageAtLowerSize($contents, $generationConfig)) {
+                throw $e;
+            }
+
+            $generationConfig['imageConfig']['imageSize'] = '1K';
+            Log::warning('Retrying Gemini native image generation at 1K after timeout', [
+                'model' => $model,
+                'auth_method' => $authMode,
+                'message' => $e->getMessage(),
+            ]);
+
+            $response = $post($generationConfig, 75);
         }
 
         return [
-            $request->post($url, [
-                'contents'         => $contents,
-                'generationConfig' => $generationConfig,
-            ]),
+            $response,
             $url,
         ];
+    }
+
+    private function shouldRetryNativeImageAtLowerSize(array $contents, array $generationConfig): bool
+    {
+        if (($generationConfig['imageConfig']['imageSize'] ?? null) === '1K') {
+            return false;
+        }
+
+        return ! $this->nativeImageContentsHaveInlineImages($contents);
+    }
+
+    private function nativeImageContentsHaveInlineImages(array $contents): bool
+    {
+        foreach ($contents as $turn) {
+            foreach (($turn['parts'] ?? []) as $part) {
+                if (isset($part['inline_data']) || isset($part['inlineData'])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function applyAuth($request)

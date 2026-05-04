@@ -1094,6 +1094,8 @@ class ConversationController extends Controller
                 'prompt' => $geminiPrompt,
                 'has_uploaded_image' => $imageBase64 !== null || ! empty($productImagesData),
                 'has_reference_input' => $hasReferenceInput,
+                    'reference_ai_request_id' => $imageFollowUpContext['reference_ai_request_id'] ?? null,
+                    'image_follow_up_regeneration' => $imageFollowUpContext['is_regeneration'] ?? null,
                 'product_template_slug' => $product?->slug,
                 'product_template_image_url' => $productTemplateImageUrl,
                 'product_template_reference_used' => $productTemplateImageUrl !== null,
@@ -1103,6 +1105,11 @@ class ConversationController extends Controller
             'started_at'       => $startedAt,
             'completed_at'     => $completedAt,
             'metadata'         => [
+                'image_follow_up_context' => $imageFollowUpContext ? [
+                    'reference_ai_request_id' => $imageFollowUpContext['reference_ai_request_id'] ?? null,
+                    'is_regeneration' => $imageFollowUpContext['is_regeneration'] ?? null,
+                    'source' => 'prompt_context',
+                ] : null,
                 'product_template_image_url' => $productTemplateImageUrl,
                 'product_template_reference_used' => $productTemplateImageUrl !== null,
                 'product_template_reference_layout' => $productReferenceSheetSource ?? ($productTemplateImageUrl !== null ? 'separate_images' : null),
@@ -2264,15 +2271,18 @@ class ConversationController extends Controller
             return null;
         }
 
-        $referencedMessage = null;
         $ordinal = $this->extractReferencedOrdinal($content);
+        $isRegeneration = $this->isReferenceOnlyImageFollowUp($content, $ordinal !== null);
+        $referencedMessage = null;
 
         if ($ordinal !== null && $ordinal >= 1 && $ordinal <= $imageMessages->count()) {
             $referencedMessage = $imageMessages->get($ordinal - 1);
         }
 
         if (! $referencedMessage) {
-            $referencedMessage = $this->findBestMatchingImageMessage($imageMessages, $content);
+            $referencedMessage = $isRegeneration
+                ? $imageMessages->last()
+                : $this->findBestMatchingImageMessage($imageMessages, $content);
         }
 
         if (! $referencedMessage || ! $referencedMessage->aiRequest) {
@@ -2280,15 +2290,11 @@ class ConversationController extends Controller
         }
 
         $referencedRequest = $referencedMessage->aiRequest;
-        // Use user_prompt (raw) so the image-generation enhancer can re-enhance it.
-        // processed_prompt is already enhanced and would be double-enhanced.
-        $basePrompt = $referencedRequest->user_prompt ?: $referencedRequest->processed_prompt;
+        $basePrompt = $this->imageBasePromptForReferencedRequest($referencedRequest);
 
         if (! $basePrompt) {
             return null;
         }
-
-        $isRegeneration = $this->isReferenceOnlyImageFollowUp($content, $ordinal !== null);
 
         // Never attach inline reference images to text follow-ups: sending base64
         // image data to gemini-3.1-flash-image-preview triggers Google 417
@@ -2302,6 +2308,25 @@ class ConversationController extends Controller
             'reference_user_id' => $userId,
             'is_regeneration' => $isRegeneration,
         ];
+    }
+
+    private function imageBasePromptForReferencedRequest(AiRequest $referencedRequest): ?string
+    {
+        $userPrompt = trim((string) $referencedRequest->user_prompt);
+        $processedPrompt = trim((string) $referencedRequest->processed_prompt);
+
+        if (
+            $processedPrompt !== ''
+            && (
+                $userPrompt === ''
+                || $this->isReferenceOnlyImageFollowUp($userPrompt)
+                || str_contains($processedPrompt, 'With these modifications:')
+            )
+        ) {
+            return $processedPrompt;
+        }
+
+        return $userPrompt !== '' ? $userPrompt : ($processedPrompt !== '' ? $processedPrompt : null);
     }
 
     private function resolveVideoFollowUpContext(Conversation $conversation, int $userId, string $content, ?int $beforeMessageId = null): ?array
@@ -2494,6 +2519,7 @@ class ConversationController extends Controller
         $stopwords = [
             'رقم', 'number', 'image', 'photo', 'picture',
             'الصورة', 'الصوره', 'صورة', 'صوره',
+            'make', 'another', 'shot', 'again', 'same', 'remake', 'redo', 'variation', 'version', 'scene', 'one', 'more', 'give', 'please',
             'اعمل', 'اعملي', 'أنشئ', 'انشئ', 'ولد', 'ولد', 'عيد', 'اعد', 'أعد',
             'خلي', 'خلّي', 'خليلي', 'اجعل', 'إجعل', 'حول', 'حوّل', 'غير', 'غيّر', 'لون', 'لوّن',
             'مرة', 'مره', 'تاني', 'ثاني', 'ثانية', 'ثانيه',
@@ -2545,7 +2571,7 @@ class ConversationController extends Controller
         $stripped = preg_replace([
             '/(?:رقم|number|#)\s*\d+/iu',
             '/\b\d+\b/u',
-            '/(الصورة|الصوره|صورة|صوره|نفس|مثلها|زيها|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|ابعاد|أبعاد|مقاس|نسبة|الجديدة|جديدة|بتاع|بتاعت|عايز|عاوز|ابي|ابغى|أبي|أبغى|ممكن|شوت|لقطه|لقطة|مشهد|اخر|آخر|اخرى|أخرى|جديد|جديده|طيب|اوكي|اوك|حاضر|ماشي|يلا|كمان|واحد|واحده|aspect|ratio|size|dimensions|same|again|remake|redo|variation|version|new|different|another|shot|scene|one more|give me|ok|okay|sure|yes|please)/u',
+            '/(الصورة|الصوره|صورة|صوره|نفس|مثلها|زيها|أعد|اعد|عيد|كرر|كرّر|مرة|مره|تاني|ثاني|ثانية|ثانيه|ابعاد|أبعاد|مقاس|نسبة|الجديدة|جديدة|بتاع|بتاعت|عايز|عاوز|ابي|ابغى|أبي|أبغى|ممكن|شوت|لقطه|لقطة|مشهد|اخر|آخر|اخرى|أخرى|جديد|جديده|طيب|اوكي|اوك|حاضر|ماشي|يلا|كمان|واحد|واحده|aspect|ratio|size|dimensions|same|again|make|remake|redo|variation|version|new|different|another|shot|scene|one more|give me|ok|okay|sure|yes|please)/u',
             '/\b(?:16:9|9:16|4:3|3:4|1:1)\b/u',
         ], ' ', $normalized);
 
