@@ -245,6 +245,7 @@ export interface UserAggregations {
 // ─── Request Payloads (matches Form Requests) ───────────────
 
 export interface ListUsersParams {
+  page?: number
   search?: string
   status?: 'active' | 'suspended' | 'banned' | 'pending'
   role?: string

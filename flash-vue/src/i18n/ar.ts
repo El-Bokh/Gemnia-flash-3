@@ -436,7 +436,7 @@ export default {
     editUser: 'تعديل المستخدم',
     createUser: 'إنشاء مستخدم',
     fullName: 'الاسم الكامل',
-    emailPlaceholder: 'user@domain.com',
+    emailPlaceholder: "user{'@'}domain.com",
     passwordKeep: 'اتركه فارغاً للإبقاء',
     passwordMin: '8 أحرف كحد أدنى',
     phonePlaceholder: '+20 100 000 0000',

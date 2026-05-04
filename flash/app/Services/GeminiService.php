@@ -488,9 +488,26 @@ class GeminiService
             ];
         }
 
+        $response = $operation['response'] ?? $operation;
+        $raiFilteredCount = (int) ($response['raiMediaFilteredCount'] ?? 0);
+        if ($raiFilteredCount > 0) {
+            $reasons = $response['raiMediaFilteredReasons'] ?? [];
+            $reason = is_array($reasons)
+                ? $this->firstNonEmptyString($reasons)
+                : (is_string($reasons) ? trim($reasons) : '');
+
+            return [
+                'success' => false,
+                'error' => $reason !== ''
+                    ? $reason
+                    : 'Veo could not generate a video from this prompt. Please try rephrasing it with a clear, safe scene and motion.',
+                'error_code' => 'VEO_RAI_FILTERED',
+            ];
+        }
+
         $gcsUris = [];
         $inlineVideos = [];
-        $this->collectVideoArtifacts($operation['response'] ?? $operation, $gcsUris, $inlineVideos);
+        $this->collectVideoArtifacts($response, $gcsUris, $inlineVideos);
 
         $gcsUris = array_values(array_unique(array_filter($gcsUris)));
 
@@ -506,6 +523,17 @@ class GeminiService
             'gcs_uris' => $gcsUris,
             'inline_videos' => $inlineVideos,
         ];
+    }
+
+    private function firstNonEmptyString(array $values): string
+    {
+        foreach ($values as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return '';
     }
 
     public function normalizeVideoOptions(array $options): array

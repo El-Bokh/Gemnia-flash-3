@@ -436,7 +436,7 @@ export default {
     editUser: 'Edit User',
     createUser: 'Create User',
     fullName: 'Full name',
-    emailPlaceholder: 'user@domain.com',
+    emailPlaceholder: "user{'@'}domain.com",
     passwordKeep: 'Leave blank to keep',
     passwordMin: 'Min 8 characters',
     phonePlaceholder: '+20 100 000 0000',

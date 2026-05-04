@@ -365,6 +365,8 @@ Run-Or-Fail '4/5  Clearing Laravel caches on server...' {
         'test -f public/build/asset-manifest.json'
         'test -f resources/views/spa.blade.php'
         'chmod -R 755 public/assets public/build public/icons public/landing-images 2>/dev/null || true'
+        'find app bootstrap config database resources routes -type d -exec chmod 755 {} +'
+        'find app bootstrap config database resources routes -type f -exec chmod 644 {} +'
         'rm -f bootstrap/cache/*.php'
         'if command -v composer >/dev/null 2>&1; then composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader; fi'
         'php artisan config:clear'
@@ -377,6 +379,8 @@ Run-Or-Fail '4/5  Clearing Laravel caches on server...' {
         'php artisan view:cache'
         'if test -L public/storage; then true; elif test -e public/storage; then rm -rf public/storage && php artisan storage:link; else php artisan storage:link; fi'
         'if id www-data >/dev/null 2>&1; then mkdir -p storage/app/google; chown -R www-data:www-data storage/app/google; chmod 750 storage/app/google; if test -f storage/app/google/service-account.json; then chmod 640 storage/app/google/service-account.json; fi; fi'
+        'if id www-data >/dev/null 2>&1; then mkdir -p storage/app/public/ai-generated-videos; chown -R www-data:www-data storage/app/public/ai-generated-videos; find storage/app/public/ai-generated-videos -type d -exec chmod 775 {} +; find storage/app/public/ai-generated-videos -type f -exec chmod 664 {} +; fi'
+        'if systemctl list-unit-files klek-queue.service >/dev/null 2>&1; then systemctl restart klek-queue.service; fi'
         'systemctl restart php*-fpm'
     )
 

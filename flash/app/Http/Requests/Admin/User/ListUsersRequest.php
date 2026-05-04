@@ -22,6 +22,7 @@ class ListUsersRequest extends FormRequest
             'subscription_status' => ['nullable', Rule::in(['active', 'cancelled', 'expired', 'past_due', 'trialing', 'paused', 'pending'])],
             'sort_by'       => ['nullable', Rule::in(['name', 'email', 'created_at', 'last_login_at', 'status'])],
             'sort_dir'      => ['nullable', Rule::in(['asc', 'desc'])],
+            'page'          => ['nullable', 'integer', 'min:1'],
             'per_page'      => ['nullable', 'integer', 'min:1', 'max:100'],
             'with_trashed'  => ['nullable', 'boolean'],
         ];

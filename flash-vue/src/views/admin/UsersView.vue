@@ -24,6 +24,7 @@ const search = ref('')
 const statusFilter = ref<string | undefined>(undefined)
 const sortField = ref('created_at')
 const sortOrder = ref<'asc' | 'desc'>('desc')
+const firstRecord = computed(() => (currentPage.value - 1) * perPage.value)
 
 // Dialogs
 const showForm = ref(false)
@@ -49,6 +50,7 @@ async function fetchUsers() {
   loading.value = true
   try {
     const params: ListUsersParams = {
+      page: currentPage.value,
       per_page: perPage.value,
       sort_by: sortField.value as ListUsersParams['sort_by'],
       sort_dir: sortOrder.value,
@@ -56,10 +58,11 @@ async function fetchUsers() {
     if (search.value) params.search = search.value
     if (statusFilter.value) params.status = statusFilter.value as ListUsersParams['status']
 
-    // page param appended manually
-    const res = await getUsers({ ...params, per_page: perPage.value } as any)
+    const res = await getUsers(params)
     users.value = res.data
     totalRecords.value = res.meta.total
+    currentPage.value = res.meta.current_page || currentPage.value
+    perPage.value = res.meta.per_page || perPage.value
   } catch {
     // API unavailable
   } finally {
@@ -72,20 +75,29 @@ onMounted(fetchUsers)
 let searchTimeout: ReturnType<typeof setTimeout>
 watch(search, () => {
   clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(fetchUsers, 400)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    fetchUsers()
+  }, 400)
 })
-watch(statusFilter, fetchUsers)
+watch(statusFilter, () => {
+  currentPage.value = 1
+  fetchUsers()
+})
 
 // ── Sort handler ────────────────────────────────────────────
 function onSort(event: any) {
   sortField.value = event.sortField
   sortOrder.value = event.sortOrder === 1 ? 'asc' : 'desc'
+  currentPage.value = 1
   fetchUsers()
 }
 
 // ── Page handler ────────────────────────────────────────────
 function onPage(event: any) {
-  currentPage.value = Math.floor(event.first / perPage.value) + 1
+  const nextRows = Number(event.rows || perPage.value)
+  perPage.value = nextRows
+  currentPage.value = Math.floor(Number(event.first || 0) / nextRows) + 1
   fetchUsers()
 }
 
@@ -182,6 +194,7 @@ function initials(name: string) {
         :value="users"
         :loading="loading"
         :rows="perPage"
+        :first="firstRecord"
         :totalRecords="totalRecords"
         :lazy="true"
         :paginator="true"

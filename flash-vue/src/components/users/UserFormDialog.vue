@@ -21,6 +21,10 @@ const emit = defineEmits<{
 }>()
 
 const isEdit = computed(() => !!props.user)
+const dialogVisible = computed({
+  get: () => props.visible,
+  set: (value: boolean) => emit('update:visible', value),
+})
 const saving = ref(false)
 const errors = ref<Record<string, string>>({})
 const { t } = useI18n()
@@ -155,8 +159,7 @@ function close() {
 
 <template>
   <Dialog
-    :visible="visible"
-    @update:visible="close"
+    v-model:visible="dialogVisible"
     :header="isEdit ? t('userForm.editUser') : t('userForm.createUser')"
     :modal="true"
     :style="{ width: '500px', maxWidth: '95vw' }"

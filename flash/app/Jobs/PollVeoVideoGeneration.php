@@ -149,7 +149,9 @@ class PollVeoVideoGeneration implements ShouldQueue
             $extension = $this->extensionForMimeType($mimeType);
             $fileName = 'ai-generated-videos/' . $aiRequest->user_id . '/' . Str::uuid() . '.' . $extension;
 
-            Storage::disk('public')->put($fileName, $binary);
+            if (! Storage::disk('public')->put($fileName, $binary)) {
+                return null;
+            }
 
             MediaFile::create([
                 'user_id' => $aiRequest->user_id,
