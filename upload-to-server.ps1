@@ -241,6 +241,11 @@ Run-Or-Fail '2/5  Preparing local deploy bundle...' {
         Copy-Item -Recurse $iconsDir (Join-Path $LOCAL_DEPLOY_PUBLIC_DIR 'icons')
     }
 
+    $landingImagesDir = Join-Path $VUE_DIR 'dist/landing-images'
+    if (Test-Path $landingImagesDir) {
+        Copy-Item -Recurse $landingImagesDir (Join-Path $LOCAL_DEPLOY_PUBLIC_DIR 'landing-images')
+    }
+
     $frontendPublicFiles = @('manifest.json','robots.txt','sitemap.xml','favicon.ico','newlogo.png',
                              'klek-ai-mark.svg','flash-ai-mark.svg')
     foreach ($f in $frontendPublicFiles) {
@@ -296,6 +301,9 @@ Run-Or-Fail '3/5  Uploading files to server...' {
         if (Test-Path icons) {
             $publicUploadPaths += 'icons'
         }
+        if (Test-Path 'landing-images') {
+            $publicUploadPaths += 'landing-images'
+        }
 
         foreach ($f in $publicFiles) {
             if (Test-Path $f) {
@@ -308,10 +316,11 @@ Run-Or-Fail '3/5  Uploading files to server...' {
 
     $publishPublicCommands = @(
         "test -f ${remotePublicStage}/build/asset-manifest.json"
-        "rm -rf ${remotePub}/assets ${remotePub}/build ${remotePub}/icons"
+        "rm -rf ${remotePub}/assets ${remotePub}/build ${remotePub}/icons ${remotePub}/landing-images"
         "mv ${remotePublicStage}/assets ${remotePub}/assets"
         "mv ${remotePublicStage}/build ${remotePub}/build"
         "if test -d ${remotePublicStage}/icons; then mv ${remotePublicStage}/icons ${remotePub}/icons; fi"
+        "if test -d ${remotePublicStage}/landing-images; then mv ${remotePublicStage}/landing-images ${remotePub}/landing-images; fi"
     )
 
     foreach ($f in $publicFiles) {
@@ -319,7 +328,7 @@ Run-Or-Fail '3/5  Uploading files to server...' {
     }
 
     $publishPublicCommands += @(
-        'for dir in public/assets public/build public/icons; do if test -d "$dir"; then find "$dir" -type d -exec chmod 755 {} +; find "$dir" -type f -exec chmod 644 {} +; fi; done'
+        'for dir in public/assets public/build public/icons public/landing-images; do if test -d "$dir"; then find "$dir" -type d -exec chmod 755 {} +; find "$dir" -type f -exec chmod 644 {} +; fi; done'
         "rm -rf ${remotePublicStage}"
     )
 
@@ -355,7 +364,7 @@ Run-Or-Fail '4/5  Clearing Laravel caches on server...' {
         "cd $REMOTE_ROOT/flash"
         'test -f public/build/asset-manifest.json'
         'test -f resources/views/spa.blade.php'
-        'chmod -R 755 public/assets public/build public/icons 2>/dev/null || true'
+        'chmod -R 755 public/assets public/build public/icons public/landing-images 2>/dev/null || true'
         'rm -f bootstrap/cache/*.php'
         'if command -v composer >/dev/null 2>&1; then composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader; fi'
         'php artisan config:clear'

@@ -44,6 +44,18 @@ const heroHighlights = computed(() => [
 const primaryActionLabel = computed(() => auth.isAuthenticated ? t('landing.chat') : t('client.startNow'))
 const primaryActionIcon = computed(() => auth.isAuthenticated ? 'pi pi-comments' : 'pi pi-arrow-right')
 
+const landingImages = [
+  '/landing-images/landing-01.jpg',
+  '/landing-images/landing-02.jpg',
+  '/landing-images/landing-03.jpg',
+  '/landing-images/landing-04.jpg',
+  '/landing-images/landing-05.jpg',
+  '/landing-images/landing-06.jpg',
+  '/landing-images/landing-07.jpg',
+  '/landing-images/landing-08.jpg',
+  '/landing-images/landing-09.jpg',
+]
+
 // Scroll reveal
 let observer: IntersectionObserver | null = null
 
@@ -127,6 +139,19 @@ function goPrimary() {
 
     <!-- ═══ Hero ═══ -->
     <section class="hero-section">
+      <div class="hero-media-bg" aria-hidden="true">
+        <div class="hero-media-grid">
+          <img
+            v-for="(image, index) in landingImages"
+            :key="image"
+            :src="image"
+            :class="['hero-media-img', `hero-media-img-${index + 1}`]"
+            alt=""
+            decoding="async"
+          >
+        </div>
+        <div class="hero-media-shade" />
+      </div>
       <div class="hero-shell hero-shell-simple">
         <div class="hero-content hero-content-centered reveal">
           <h1 class="hero-title">
@@ -412,9 +437,71 @@ function goPrimary() {
 .hero-section {
   position: relative;
   z-index: 1;
-  padding: 152px 24px 64px;
+  min-height: 520px;
+  padding: 148px 24px 86px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #08090f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+}
+.hero-media-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #090a10;
+}
+.hero-media-grid {
+  position: absolute;
+  inset: -28px -26px -42px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.82fr 1fr 0.82fr 1.05fr;
+  grid-template-rows: repeat(2, minmax(210px, 1fr));
+  gap: 16px;
+  transform: rotate(-4deg) scale(1.04);
+  transform-origin: center;
+  filter: blur(2px) saturate(1.08) brightness(0.88);
+  opacity: 0.92;
+}
+.hero-media-img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  border-radius: 18px;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.34);
+}
+.hero-media-img-1 { grid-column: 1; grid-row: 1; }
+.hero-media-img-2 { grid-column: 1; grid-row: 2; }
+.hero-media-img-3 { grid-column: 2; grid-row: 1 / span 2; }
+.hero-media-img-4 { grid-column: 3; grid-row: 1; }
+.hero-media-img-5 { grid-column: 3; grid-row: 2; }
+.hero-media-img-6 { grid-column: 4; grid-row: 1 / span 2; }
+.hero-media-img-7 { grid-column: 5; grid-row: 1; }
+.hero-media-img-8 { grid-column: 5; grid-row: 2; }
+.hero-media-img-9 { grid-column: 4 / span 2; grid-row: 2; opacity: 0.86; }
+.hero-media-img-1,
+.hero-media-img-4,
+.hero-media-img-8 {
+  transform: translateY(22px);
+}
+.hero-media-img-3,
+.hero-media-img-6,
+.hero-media-img-9 {
+  transform: translateY(-14px);
+}
+.hero-media-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(6, 7, 12, 0.74) 0%, rgba(6, 7, 12, 0.54) 31%, rgba(6, 7, 12, 0.2) 56%, rgba(6, 7, 12, 0.28) 100%),
+    linear-gradient(180deg, rgba(6, 7, 12, 0.48) 0%, rgba(6, 7, 12, 0.24) 46%, rgba(6, 7, 12, 0.62) 82%, var(--lp-bg) 100%);
 }
 .hero-shell {
+  position: relative;
+  z-index: 1;
   max-width: 1100px;
   margin: 0 auto;
   display: grid;
@@ -427,6 +514,7 @@ function goPrimary() {
   grid-template-columns: 1fr;
 }
 .hero-content {
+  position: relative;
   text-align: start;
   max-width: 680px;
   display: flex;
@@ -439,6 +527,9 @@ function goPrimary() {
   margin: 0 auto;
   text-align: center;
   align-items: center;
+  padding: 34px 34px 30px;
+  border-radius: 28px;
+  background: radial-gradient(ellipse at center, rgba(6, 7, 12, 0.52) 0%, rgba(6, 7, 12, 0.32) 58%, rgba(6, 7, 12, 0) 76%);
 }
 .hero-badge {
   display: inline-flex;
@@ -457,22 +548,24 @@ function goPrimary() {
   font-size: 3rem;
   font-weight: 900;
   line-height: 1.1;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   margin: 0;
-  color: var(--lp-text);
+  color: #fff;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.45);
 }
 .hero-highlight {
-  background: linear-gradient(135deg, #9580ff 0%, #b8a4ff 50%, #c9b8ff 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #55f5be 42%, #b8a4ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .hero-sub {
   font-size: 1rem;
-  color: var(--lp-text-dim);
+  color: rgba(255, 255, 255, 0.86);
   line-height: 1.7;
   margin: 0;
   max-width: 620px;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.42);
 }
 .hero-actions {
   display: flex;
@@ -516,11 +609,13 @@ function goPrimary() {
 .hero-highlight-pill {
   padding: 9px 14px;
   border-radius: 999px;
-  background: var(--lp-card);
-  border: 1px solid var(--lp-card-border);
+  background: rgba(8, 10, 18, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
   font-size: 0.76rem;
   font-weight: 700;
-  color: var(--lp-text);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
 }
 .hero-proof-grid {
   width: 100%;
@@ -666,14 +761,15 @@ function goPrimary() {
   font-weight: 600;
   border-radius: 10px;
   padding: 10px 28px;
-  background: transparent;
-  color: var(--lp-text-dim);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.86);
+  border-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
 }
 .hero-btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--lp-text);
-  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .landing-page.landing-dark .hero-btn-secondary {
@@ -771,7 +867,7 @@ function goPrimary() {
 .simple-steps-section {
   position: relative;
   z-index: 1;
-  padding: 0 24px 88px;
+  padding: 42px 24px 88px;
 }
 
 .simple-steps-grid {
@@ -1015,6 +1111,40 @@ function goPrimary() {
   }
   .hero-title { font-size: 2rem; }
   .hero-sub { font-size: 0.88rem; }
+  .hero-section {
+    min-height: 560px;
+    padding: 116px 18px 62px;
+  }
+  .hero-media-grid {
+    inset: -22px -44px -34px;
+    grid-template-columns: repeat(3, minmax(130px, 1fr));
+    grid-template-rows: repeat(3, 176px);
+    gap: 10px;
+    transform: rotate(-5deg) scale(1.08);
+    filter: blur(2.5px) saturate(1.05) brightness(0.82);
+    opacity: 0.84;
+  }
+  .hero-media-img-1 { grid-column: 1; grid-row: 1; }
+  .hero-media-img-2 { grid-column: 2; grid-row: 1; }
+  .hero-media-img-3 { grid-column: 3; grid-row: 1; }
+  .hero-media-img-4 { grid-column: 1; grid-row: 2; }
+  .hero-media-img-5 { grid-column: 3; grid-row: 2; }
+  .hero-media-img-6 { grid-column: 1; grid-row: 3; }
+  .hero-media-img-7 { grid-column: 2; grid-row: 3; }
+  .hero-media-img-8 { grid-column: 3; grid-row: 3; }
+  .hero-media-img-9 { grid-column: 2; grid-row: 2; opacity: 0.74; }
+  .hero-media-img {
+    border-radius: 14px;
+  }
+  .hero-media-shade {
+    background:
+      radial-gradient(ellipse at center, rgba(6, 7, 12, 0.8) 0%, rgba(6, 7, 12, 0.62) 36%, rgba(6, 7, 12, 0.2) 68%, rgba(6, 7, 12, 0.38) 100%),
+      linear-gradient(180deg, rgba(6, 7, 12, 0.44) 0%, rgba(6, 7, 12, 0.24) 46%, rgba(6, 7, 12, 0.68) 86%, var(--lp-bg) 100%);
+  }
+  .hero-content-centered {
+    padding: 26px 8px 22px;
+    background: radial-gradient(ellipse at center, rgba(6, 7, 12, 0.68) 0%, rgba(6, 7, 12, 0.44) 56%, rgba(6, 7, 12, 0) 78%);
+  }
   .hero-actions {
     flex-direction: column;
     width: 100%;
