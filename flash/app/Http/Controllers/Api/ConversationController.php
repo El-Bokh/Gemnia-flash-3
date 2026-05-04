@@ -152,7 +152,6 @@ class ConversationController extends Controller
             'content' => ['required', 'string', 'max:5000'],
             'image' => ['required', 'image', 'max:10240'],
             'mask_image' => ['required', 'image', 'max:5120'],
-            'rendered_image' => ['nullable', 'image', 'max:10240'],
             'source_message_id' => ['nullable', 'integer'],
             'aspect_ratio' => ['nullable', 'string', 'in:1:1,3:4,4:3,9:16,16:9'],
         ]);
@@ -218,7 +217,6 @@ class ConversationController extends Controller
 
         $imageFile = $request->file('image');
         $maskFile = $request->file('mask_image');
-        $renderedImageFile = $request->file('rendered_image');
 
         $sourcePath = $imageFile->store('chat-inpainting/' . $request->user()->id, 'public');
         $maskPath = $maskFile->store('chat-inpainting-masks/' . $request->user()->id, 'public');
@@ -249,15 +247,41 @@ class ConversationController extends Controller
             'purpose'       => 'mask',
         ]);
 
-        $preparedSource = $this->prepareImageForApi($imageFile->getRealPath(), $imageFile->getMimeType() ?: 'image/jpeg');
-        $preparedMask = $this->prepareImageForApi($maskFile->getRealPath(), $maskFile->getMimeType() ?: 'image/png');
-        $aspectRatio = $data['aspect_ratio'] ?? $this->inferAspectRatioFromImage($imageFile->getRealPath());
+        $sourceFullPath = $imageFile->getRealPath();
+        $maskFullPath = $maskFile->getRealPath();
+        [$sourceWidth, $sourceHeight] = $this->imageDimensions($sourceFullPath);
+
+        $preparedSource = $this->prepareImageForApi($sourceFullPath, $imageFile->getMimeType() ?: 'image/jpeg');
+        // Re-read prepared dimensions (after possible downscale to 1536)
+        $preparedSourceBytes = base64_decode($preparedSource['data']);
+        $preparedSourceInfo = @getimagesizefromstring($preparedSourceBytes);
+        $alignedW = $preparedSourceInfo[0] ?? $sourceWidth ?: 1024;
+        $alignedH = $preparedSourceInfo[1] ?? $sourceHeight ?: 1024;
+        $preparedMask = $this->prepareMaskForApi($maskFullPath, (int) $alignedW, (int) $alignedH);
+        $preparedMaskBytes = base64_decode($preparedMask['data']);
+        $sourceHash = hash('sha256', $preparedSourceBytes);
+        $maskHash = hash('sha256', $preparedMaskBytes);
+        $debugUuid = (string) Str::uuid();
+
+        $aspectRatio = $data['aspect_ratio'] ?? $this->inferAspectRatioFromImage($sourceFullPath);
         $userPrompt = trim($data['content']);
-        $inpaintPrompt = $this->buildInpaintingPrompt($userPrompt);
-        $useSemanticObjectRecolor = $this->isObjectAwareRecolorPrompt($userPrompt);
-        $activeInpaintPrompt = $useSemanticObjectRecolor
-            ? $this->buildObjectAwareRecolorPrompt($userPrompt)
-            : $inpaintPrompt;
+
+        $gemini = new GeminiService('image', $aspectRatio);
+        $rewrittenPrompt = $gemini->rewriteForInpaintingMask($userPrompt);
+        $activeInpaintPrompt = $rewrittenPrompt !== '' ? $rewrittenPrompt : $userPrompt;
+
+        Log::info('Inpainting request prepared', [
+            'debug_uuid' => $debugUuid,
+            'user_id' => $request->user()->id,
+            'conversation_id' => $conversation->id,
+            'source_dim' => [$alignedW, $alignedH],
+            'mask_dim' => [$preparedMask['width'], $preparedMask['height']],
+            'mask_white_pct' => $preparedMask['white_pct'],
+            'source_hash' => $sourceHash,
+            'mask_hash' => $maskHash,
+            'user_prompt' => $userPrompt,
+            'rewritten_prompt' => $activeInpaintPrompt,
+        ]);
 
         $userMsg = $conversation->messages()->create([
             'role'       => 'user',
@@ -295,27 +319,40 @@ class ConversationController extends Controller
             ],
         ];
 
-        $gemini = new GeminiService('image', $aspectRatio);
         $processedPrompt = $activeInpaintPrompt;
         $modelUsed = $gemini->getModel();
         $engineProvider = 'gemini';
-        $localRenderedImageFile = $useSemanticObjectRecolor && $renderedImageFile ? $renderedImageFile : null;
-        $maskDilation = $useSemanticObjectRecolor ? 0.0 : 0.025;
+        $maskDilation = 0.0;
         $startedAt = now();
 
-        if ($localRenderedImageFile) {
+        if (! empty($preparedMask['gd_missing'])) {
             $result = [
-                'success' => true,
+                'success' => false,
                 'content' => null,
                 'images' => [],
-                'error' => null,
+                'error' => 'Image editing is unavailable: the server is missing the PHP GD extension. Enable extension=gd in php.ini and restart the web server.',
+                'model_used' => $modelUsed,
+                'engine_provider' => 'gemini',
+                'prompt_used' => $activeInpaintPrompt,
             ];
-            $modelUsed = 'browser-canvas-recolor';
-            $engineProvider = 'local';
+        } elseif ($preparedMask['white_pct'] <= 0.0) {
+            $result = [
+                'success' => false,
+                'content' => null,
+                'images' => [],
+                'error' => 'The mask is empty. Please paint over the area you want to edit and try again.',
+                'model_used' => $modelUsed,
+                'engine_provider' => 'gemini',
+                'prompt_used' => $activeInpaintPrompt,
+            ];
         } elseif ($gemini->getAuthMethod() === 'service_account') {
-            $result = $useSemanticObjectRecolor
-                ? $gemini->inpaintWithMask($preparedSource, $preparedMask, $activeInpaintPrompt, null, 0.0)
-                : $gemini->inpaintWithMask($preparedSource, $preparedMask, $activeInpaintPrompt, 'EDIT_MODE_INPAINT_INSERTION', $maskDilation);
+            $result = $gemini->inpaintWithMask(
+                $preparedSource,
+                $preparedMask,
+                $activeInpaintPrompt,
+                'EDIT_MODE_INPAINT_INSERTION',
+                $maskDilation,
+            );
 
             if ($result['success']) {
                 $processedPrompt = $result['prompt_used'] ?? $processedPrompt;
@@ -323,13 +360,17 @@ class ConversationController extends Controller
                 $engineProvider = $result['engine_provider'] ?? $engineProvider;
             } else {
                 Log::warning('Explicit-mask inpainting failed, falling back to Gemini native image editing', [
+                    'debug_uuid' => $debugUuid,
                     'user_id' => $request->user()->id,
                     'conversation_id' => $conversation->id,
                     'error' => $result['error'] ?? 'Unknown error',
-                    'edit_strategy' => $useSemanticObjectRecolor ? 'object_aware_recolor' : 'masked_inpainting',
                 ]);
 
+                $imagenAttempt = $result;
                 $result = $gemini->chatWithParts([], $currentParts);
+                if (is_array($result)) {
+                    $result['imagen_attempt'] = $imagenAttempt;
+                }
             }
         } else {
             $result = $gemini->chatWithParts([], $currentParts);
@@ -358,9 +399,14 @@ class ConversationController extends Controller
                 'has_source_image' => true,
                 'has_mask_image' => true,
                 'source_message_id' => $sourceMessage?->id,
-                'mask_transport' => $engineProvider === 'local' ? 'local_canvas' : ($engineProvider === 'imagen' ? 'explicit_mask' : 'semantic_mask'),
-                'edit_strategy' => $engineProvider === 'local' ? 'local_mask_recolor' : ($useSemanticObjectRecolor ? 'object_aware_recolor' : 'masked_inpainting'),
+                'mask_transport' => $engineProvider === 'imagen' ? 'explicit_mask' : 'semantic_mask',
+                'edit_strategy' => 'masked_inpainting',
                 'mask_dilation' => $maskDilation,
+                'mask_white_pct' => $preparedMask['white_pct'],
+                'source_hash' => $sourceHash,
+                'mask_hash' => $maskHash,
+                'source_dim' => [$alignedW, $alignedH],
+                'debug_uuid' => $debugUuid,
             ],
             'metadata'           => [
                 'source' => 'conversation',
@@ -368,57 +414,39 @@ class ConversationController extends Controller
                 'user_message_id' => $userMsg->id,
                 'source_message_id' => $sourceMessage?->id,
                 'engine_provider' => $engineProvider,
-                'edit_strategy' => $engineProvider === 'local' ? 'local_mask_recolor' : ($useSemanticObjectRecolor ? 'object_aware_recolor' : 'masked_inpainting'),
+                'edit_strategy' => 'masked_inpainting',
+                'debug_uuid' => $debugUuid,
             ],
             'error_message'      => $result['success'] ? null : ($result['error'] ?? 'Unknown error'),
             'started_at'         => $startedAt,
             'completed_at'       => $completedAt,
         ]);
 
+        $generatedImageUrl = null;
+        $outputBytes = null;
+        $outputExt = 'png';
+        $outputHash = null;
+        $identicalToSource = null;
+
         if ($result['success']) {
-            $generatedImageUrl = null;
-
-            if ($localRenderedImageFile) {
-                $mimeType = $localRenderedImageFile->getMimeType() ?: 'image/png';
-                $ext = str_contains($mimeType, 'jpeg') || str_contains($mimeType, 'jpg') ? 'jpg' : 'png';
-                $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $ext;
-                $imageBytes = file_get_contents($localRenderedImageFile->getRealPath());
-
-                Storage::disk('public')->put($fileName, $imageBytes);
-
-                MediaFile::create([
-                    'user_id'       => $request->user()->id,
-                    'file_name'     => basename($fileName),
-                    'original_name' => 'recolored-image.' . $ext,
-                    'file_path'     => $fileName,
-                    'disk'          => 'public',
-                    'mime_type'     => $mimeType,
-                    'file_size'     => strlen($imageBytes),
-                    'collection'    => 'chat',
-                    'purpose'       => 'output',
-                ]);
-
-                $generatedImageUrl = '/storage/' . $fileName;
-
-                $aiRequest->update([
-                    'output_image_path' => $generatedImageUrl,
-                ]);
-            } elseif (! empty($result['images'])) {
+            if (! empty($result['images'])) {
                 $firstImage = $result['images'][0];
-                $ext = str_contains($firstImage['mime_type'], 'png') ? 'png' : 'jpg';
-                $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $ext;
-                $imageBytes = base64_decode($firstImage['data']);
+                $outputExt = str_contains($firstImage['mime_type'], 'png') ? 'png' : 'jpg';
+                $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $outputExt;
+                $outputBytes = base64_decode($firstImage['data']);
+                $outputHash = hash('sha256', $outputBytes);
+                $identicalToSource = ($outputHash === $sourceHash);
 
-                Storage::disk('public')->put($fileName, $imageBytes);
+                Storage::disk('public')->put($fileName, $outputBytes);
 
                 MediaFile::create([
                     'user_id'       => $request->user()->id,
                     'file_name'     => basename($fileName),
-                    'original_name' => 'inpainted-image.' . $ext,
+                    'original_name' => 'inpainted-image.' . $outputExt,
                     'file_path'     => $fileName,
                     'disk'          => 'public',
                     'mime_type'     => $firstImage['mime_type'],
-                    'file_size'     => strlen($imageBytes),
+                    'file_size'     => strlen($outputBytes),
                     'collection'    => 'chat',
                     'purpose'       => 'output',
                 ]);
@@ -441,7 +469,8 @@ class ConversationController extends Controller
                     'source_message_id' => $sourceMessage?->id,
                     'mask_image_url' => $maskUrl,
                     'source_image_url' => $sourceUrl,
-                    'edit_strategy' => $engineProvider === 'local' ? 'local_mask_recolor' : ($useSemanticObjectRecolor ? 'object_aware_recolor' : 'masked_inpainting'),
+                    'edit_strategy' => 'masked_inpainting',
+                    'debug_uuid' => $debugUuid,
                 ],
             ]);
         } else {
@@ -462,7 +491,49 @@ class ConversationController extends Controller
                     'source_message_id' => $sourceMessage?->id,
                     'mask_image_url' => $maskUrl,
                     'source_image_url' => $sourceUrl,
+                    'debug_uuid' => $debugUuid,
                 ],
+            ]);
+        }
+
+        // Persist debug artifacts (source/mask/output/request/response/summary)
+        $this->saveInpaintingDebugArtifacts($debugUuid, [
+            'source_bytes' => $preparedSourceBytes,
+            'source_ext' => str_contains($preparedSource['mime_type'], 'png') ? 'png' : 'jpg',
+            'mask_bytes' => $preparedMaskBytes,
+            'output_bytes' => $outputBytes,
+            'output_ext' => $outputExt,
+            'request' => $this->sanitizeImagenRequestForDebug($result['request_body'] ?? null),
+            'response' => $result['response_body'] ?? null,
+            'summary' => [
+                'user_id' => $request->user()->id,
+                'conversation_id' => $conversation->id,
+                'ai_request_id' => $aiRequest->id,
+                'user_prompt' => $userPrompt,
+                'rewritten_prompt' => $activeInpaintPrompt,
+                'processed_prompt' => $processedPrompt,
+                'engine_provider' => $engineProvider,
+                'model_used' => $modelUsed,
+                'success' => (bool) $result['success'],
+                'error' => $result['error'] ?? null,
+                'rai_filtered' => $result['rai_filtered'] ?? false,
+                'rai_reasons' => $result['rai_reasons'] ?? [],
+                'http_status' => $result['http_status'] ?? null,
+                'source_hash' => $sourceHash,
+                'mask_hash' => $maskHash,
+                'output_hash' => $outputHash,
+                'identical_to_source' => $identicalToSource,
+                'mask_white_pct' => $preparedMask['white_pct'],
+                'source_dim' => [$alignedW, $alignedH],
+                'mask_dim' => [$preparedMask['width'], $preparedMask['height']],
+                'mask_dilation' => $maskDilation,
+            ],
+        ]);
+
+        if ($identicalToSource === true) {
+            Log::warning('Inpainting output is byte-identical to source', [
+                'debug_uuid' => $debugUuid,
+                'ai_request_id' => $aiRequest->id,
             ]);
         }
 
@@ -1501,29 +1572,35 @@ class ConversationController extends Controller
         }
 
         $preparedSource = $this->prepareImageForApi($sourceFullPath, mime_content_type($sourceFullPath) ?: 'image/jpeg');
-        $preparedMask = $this->prepareImageForApi($maskFullPath, mime_content_type($maskFullPath) ?: 'image/png');
+        $preparedSourceBytes = base64_decode($preparedSource['data']);
+        $preparedSourceInfo = @getimagesizefromstring($preparedSourceBytes);
+        $alignedW = $preparedSourceInfo[0] ?? 1024;
+        $alignedH = $preparedSourceInfo[1] ?? 1024;
+        $preparedMask = $this->prepareMaskForApi($maskFullPath, (int) $alignedW, (int) $alignedH);
+        $preparedMaskBytes = base64_decode($preparedMask['data']);
+        $sourceHash = hash('sha256', $preparedSourceBytes);
+        $maskHash = hash('sha256', $preparedMaskBytes);
+        $debugUuid = (string) Str::uuid();
+
         $userPrompt = trim($userMessage->content ?? $originalAiRequest->user_prompt ?? '');
-        $useSemanticObjectRecolor = $this->isObjectAwareRecolorPrompt($userPrompt);
 
-        if ($this->isLocalMaskRecolorRequest($originalAiRequest)) {
-            return $this->regenerateLocalMaskRecolorMessage(
-                $request,
-                $conversation,
-                $aiMessage,
-                $userMessage,
-                $originalAiRequest,
-                $usageService,
-                $consumption,
-                $creditCost,
-                (string) $sourceUrl,
-                (string) $maskUrl,
-                $userPrompt,
-            );
-        }
+        $gemini = new GeminiService('image', $this->inferAspectRatioFromImage($sourceFullPath));
+        $rewrittenPrompt = $gemini->rewriteForInpaintingMask($userPrompt);
+        $processedPrompt = $rewrittenPrompt !== '' ? $rewrittenPrompt : $userPrompt;
 
-        $processedPrompt = $useSemanticObjectRecolor
-            ? $this->buildObjectAwareRecolorPrompt($userPrompt)
-            : $this->buildInpaintingPrompt($userPrompt);
+        Log::info('Inpainting regeneration prepared', [
+            'debug_uuid' => $debugUuid,
+            'user_id' => $request->user()->id,
+            'conversation_id' => $conversation->id,
+            'original_ai_request_id' => $originalAiRequest->id,
+            'source_dim' => [$alignedW, $alignedH],
+            'mask_dim' => [$preparedMask['width'], $preparedMask['height']],
+            'mask_white_pct' => $preparedMask['white_pct'],
+            'source_hash' => $sourceHash,
+            'mask_hash' => $maskHash,
+            'user_prompt' => $userPrompt,
+            'rewritten_prompt' => $processedPrompt,
+        ]);
 
         $currentParts = [
             ['text' => $processedPrompt],
@@ -1541,16 +1618,39 @@ class ConversationController extends Controller
             ],
         ];
 
-        $gemini = new GeminiService('image', $this->inferAspectRatioFromImage($sourceFullPath));
         $modelUsed = $gemini->getModel();
         $engineProvider = 'gemini';
-        $maskDilation = $useSemanticObjectRecolor ? 0.0 : 0.025;
+        $maskDilation = 0.0;
         $startedAt = now();
 
-        if ($gemini->getAuthMethod() === 'service_account') {
-            $result = $useSemanticObjectRecolor
-                ? $gemini->inpaintWithMask($preparedSource, $preparedMask, $processedPrompt, null, 0.0)
-                : $gemini->inpaintWithMask($preparedSource, $preparedMask, $processedPrompt, 'EDIT_MODE_INPAINT_INSERTION', $maskDilation);
+        if (! empty($preparedMask['gd_missing'])) {
+            $result = [
+                'success' => false,
+                'content' => null,
+                'images' => [],
+                'error' => 'Image editing is unavailable: the server is missing the PHP GD extension. Enable extension=gd in php.ini and restart the web server.',
+                'model_used' => $modelUsed,
+                'engine_provider' => 'gemini',
+                'prompt_used' => $processedPrompt,
+            ];
+        } elseif ($preparedMask['white_pct'] <= 0.0) {
+            $result = [
+                'success' => false,
+                'content' => null,
+                'images' => [],
+                'error' => 'The mask is empty. Please paint over the area you want to edit and try again.',
+                'model_used' => $modelUsed,
+                'engine_provider' => 'gemini',
+                'prompt_used' => $processedPrompt,
+            ];
+        } elseif ($gemini->getAuthMethod() === 'service_account') {
+            $result = $gemini->inpaintWithMask(
+                $preparedSource,
+                $preparedMask,
+                $processedPrompt,
+                'EDIT_MODE_INPAINT_INSERTION',
+                $maskDilation,
+            );
 
             if ($result['success']) {
                 $processedPrompt = $result['prompt_used'] ?? $processedPrompt;
@@ -1558,13 +1658,18 @@ class ConversationController extends Controller
                 $engineProvider = $result['engine_provider'] ?? $engineProvider;
             } else {
                 Log::warning('Explicit-mask inpainting regeneration failed, falling back to Gemini native image editing', [
+                    'debug_uuid' => $debugUuid,
                     'user_id' => $request->user()->id,
                     'conversation_id' => $conversation->id,
                     'original_ai_request_id' => $originalAiRequest->id,
                     'error' => $result['error'] ?? 'Unknown error',
                 ]);
 
+                $imagenAttempt = $result;
                 $result = $gemini->chatWithParts([], $currentParts);
+                if (is_array($result)) {
+                    $result['imagen_attempt'] = $imagenAttempt;
+                }
             }
         } else {
             $result = $gemini->chatWithParts([], $currentParts);
@@ -1592,8 +1697,13 @@ class ConversationController extends Controller
                 'has_source_image' => true,
                 'has_mask_image' => true,
                 'mask_transport' => $engineProvider === 'imagen' ? 'explicit_mask' : 'semantic_mask',
-                'edit_strategy' => $useSemanticObjectRecolor ? 'object_aware_recolor' : 'masked_inpainting',
+                'edit_strategy' => 'masked_inpainting',
                 'mask_dilation' => $maskDilation,
+                'mask_white_pct' => $preparedMask['white_pct'],
+                'source_hash' => $sourceHash,
+                'mask_hash' => $maskHash,
+                'source_dim' => [$alignedW, $alignedH],
+                'debug_uuid' => $debugUuid,
             ],
             'metadata'           => [
                 'source' => 'regenerate',
@@ -1601,32 +1711,39 @@ class ConversationController extends Controller
                 'original_message_id' => $aiMessage->id,
                 'generation_mode' => 'inpainting',
                 'engine_provider' => $engineProvider,
-                'edit_strategy' => $useSemanticObjectRecolor ? 'object_aware_recolor' : 'masked_inpainting',
+                'edit_strategy' => 'masked_inpainting',
+                'debug_uuid' => $debugUuid,
             ],
             'error_message'      => $result['success'] ? null : ($result['error'] ?? 'Unknown error'),
             'started_at'         => $startedAt,
             'completed_at'       => $completedAt,
         ]);
 
-        if ($result['success']) {
-            $generatedImageUrl = null;
+        $generatedImageUrl = null;
+        $outputBytes = null;
+        $outputExt = 'png';
+        $outputHash = null;
+        $identicalToSource = null;
 
+        if ($result['success']) {
             if (! empty($result['images'])) {
                 $firstImage = $result['images'][0];
-                $ext = str_contains($firstImage['mime_type'], 'png') ? 'png' : 'jpg';
-                $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $ext;
-                $imageBytes = base64_decode($firstImage['data']);
+                $outputExt = str_contains($firstImage['mime_type'], 'png') ? 'png' : 'jpg';
+                $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $outputExt;
+                $outputBytes = base64_decode($firstImage['data']);
+                $outputHash = hash('sha256', $outputBytes);
+                $identicalToSource = ($outputHash === $sourceHash);
 
-                Storage::disk('public')->put($fileName, $imageBytes);
+                Storage::disk('public')->put($fileName, $outputBytes);
 
                 MediaFile::create([
                     'user_id'       => $request->user()->id,
                     'file_name'     => basename($fileName),
-                    'original_name' => 'inpainted-image.' . $ext,
+                    'original_name' => 'inpainted-image.' . $outputExt,
                     'file_path'     => $fileName,
                     'disk'          => 'public',
                     'mime_type'     => $firstImage['mime_type'],
-                    'file_size'     => strlen($imageBytes),
+                    'file_size'     => strlen($outputBytes),
                     'collection'    => 'chat',
                     'purpose'       => 'output',
                 ]);
@@ -1646,7 +1763,8 @@ class ConversationController extends Controller
                     'source_message_id' => $userMessage->id,
                     'mask_image_url' => $maskUrl,
                     'source_image_url' => $sourceUrl,
-                    'edit_strategy' => $useSemanticObjectRecolor ? 'object_aware_recolor' : 'masked_inpainting',
+                    'edit_strategy' => 'masked_inpainting',
+                    'debug_uuid' => $debugUuid,
                 ],
             ]);
 
@@ -1669,143 +1787,50 @@ class ConversationController extends Controller
                     'source_message_id' => $userMessage->id,
                     'mask_image_url' => $maskUrl,
                     'source_image_url' => $sourceUrl,
+                    'debug_uuid' => $debugUuid,
                 ],
             ]);
         }
 
-        $responseConversation = $conversation->fresh()->load('messages');
-        $quotaStats = $usageService->computeWarningLevel(
-            $consumption['remaining'],
-            $consumption['subscription']->credits_total ?? 0
-        );
-
-        return response()->json([
-            'success' => true,
-            'data'    => [
-                'ai_message'   => $newAiMsg,
-                'conversation' => $responseConversation,
-            ],
-            'quota' => [
-                'remaining' => $consumption['remaining'],
-                'warning'   => $quotaStats,
+        $this->saveInpaintingDebugArtifacts($debugUuid, [
+            'source_bytes' => $preparedSourceBytes,
+            'source_ext' => str_contains($preparedSource['mime_type'], 'png') ? 'png' : 'jpg',
+            'mask_bytes' => $preparedMaskBytes,
+            'output_bytes' => $outputBytes,
+            'output_ext' => $outputExt,
+            'request' => $this->sanitizeImagenRequestForDebug($result['request_body'] ?? null),
+            'response' => $result['response_body'] ?? null,
+            'summary' => [
+                'user_id' => $request->user()->id,
+                'conversation_id' => $conversation->id,
+                'ai_request_id' => $newAiRequest->id,
+                'original_ai_request_id' => $originalAiRequest->id,
+                'user_prompt' => $userPrompt,
+                'rewritten_prompt' => $processedPrompt,
+                'engine_provider' => $engineProvider,
+                'model_used' => $modelUsed,
+                'success' => (bool) $result['success'],
+                'error' => $result['error'] ?? null,
+                'rai_filtered' => $result['rai_filtered'] ?? false,
+                'rai_reasons' => $result['rai_reasons'] ?? [],
+                'http_status' => $result['http_status'] ?? null,
+                'source_hash' => $sourceHash,
+                'mask_hash' => $maskHash,
+                'output_hash' => $outputHash,
+                'identical_to_source' => $identicalToSource,
+                'mask_white_pct' => $preparedMask['white_pct'],
+                'source_dim' => [$alignedW, $alignedH],
+                'mask_dim' => [$preparedMask['width'], $preparedMask['height']],
+                'mask_dilation' => $maskDilation,
             ],
         ]);
-    }
 
-    private function regenerateLocalMaskRecolorMessage(
-        Request $request,
-        Conversation $conversation,
-        ConversationMessage $aiMessage,
-        ConversationMessage $userMessage,
-        AiRequest $originalAiRequest,
-        UsageService $usageService,
-        array $consumption,
-        int $creditCost,
-        string $sourceUrl,
-        string $maskUrl,
-        string $userPrompt,
-    ): JsonResponse {
-        $outputPath = $this->storagePathFromUrl((string) $originalAiRequest->output_image_path);
-        $outputFullPath = $outputPath ? Storage::disk('public')->path($outputPath) : null;
-
-        if (! $outputFullPath || ! file_exists($outputFullPath)) {
-            $usageService->refund($request->user(), $creditCost, 'ai_failure', [
-                'original_ai_request_id' => $originalAiRequest->id,
-                'error' => 'Original local recolor output image is missing.',
+        if ($identicalToSource === true) {
+            Log::warning('Inpainting regeneration output is byte-identical to source', [
+                'debug_uuid' => $debugUuid,
+                'ai_request_id' => $newAiRequest->id,
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Original local recolor output image is missing.',
-            ], 404);
         }
-
-        $startedAt = now();
-        $mimeType = mime_content_type($outputFullPath) ?: 'image/png';
-        $ext = str_contains($mimeType, 'jpeg') || str_contains($mimeType, 'jpg') ? 'jpg' : 'png';
-        $fileName = 'ai-generated/' . $request->user()->id . '/' . Str::uuid() . '.' . $ext;
-        $imageBytes = file_get_contents($outputFullPath);
-
-        if ($imageBytes === false) {
-            $usageService->refund($request->user(), $creditCost, 'ai_failure', [
-                'original_ai_request_id' => $originalAiRequest->id,
-                'error' => 'Could not read original local recolor output image.',
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Could not read original local recolor output image.',
-            ], 500);
-        }
-
-        Storage::disk('public')->put($fileName, $imageBytes);
-        $generatedImageUrl = '/storage/' . $fileName;
-        $completedAt = now();
-
-        $newAiRequest = AiRequest::create([
-            'user_id'            => $request->user()->id,
-            'subscription_id'    => $consumption['subscription']?->id,
-            'type'               => 'inpainting',
-            'status'             => 'completed',
-            'user_prompt'        => $userPrompt,
-            'processed_prompt'   => $originalAiRequest->processed_prompt ?: $userPrompt,
-            'model_used'         => 'browser-canvas-recolor',
-            'engine_provider'    => 'local',
-            'credits_consumed'   => $creditCost,
-            'input_image_path'   => $sourceUrl,
-            'output_image_path'  => $generatedImageUrl,
-            'mask_image_path'    => $maskUrl,
-            'processing_time_ms' => (int) round($startedAt->diffInMilliseconds($completedAt)),
-            'ip_address'         => $request->ip(),
-            'user_agent'         => $request->userAgent(),
-            'request_payload'    => [
-                'prompt' => $originalAiRequest->processed_prompt ?: $userPrompt,
-                'has_source_image' => true,
-                'has_mask_image' => true,
-                'mask_transport' => 'local_canvas',
-                'edit_strategy' => 'local_mask_recolor',
-                'source_message_id' => $userMessage->id,
-            ],
-            'metadata'           => [
-                'source' => 'regenerate',
-                'original_ai_request_id' => $originalAiRequest->id,
-                'original_message_id' => $aiMessage->id,
-                'generation_mode' => 'inpainting',
-                'engine_provider' => 'local',
-                'edit_strategy' => 'local_mask_recolor',
-            ],
-            'started_at'         => $startedAt,
-            'completed_at'       => $completedAt,
-        ]);
-
-        MediaFile::create([
-            'user_id'       => $request->user()->id,
-            'file_name'     => basename($fileName),
-            'original_name' => 'recolored-image.' . $ext,
-            'file_path'     => $fileName,
-            'disk'          => 'public',
-            'mime_type'     => $mimeType,
-            'file_size'     => strlen($imageBytes),
-            'collection'    => 'chat',
-            'purpose'       => 'output',
-        ]);
-
-        $newAiMsg = $conversation->messages()->create([
-            'ai_request_id' => $newAiRequest->id,
-            'role'          => 'assistant',
-            'content'       => '',
-            'image_url'     => $generatedImageUrl,
-            'status'        => 'sent',
-            'metadata'      => [
-                'edit_mode' => 'inpainting',
-                'source_message_id' => $userMessage->id,
-                'mask_image_url' => $maskUrl,
-                'source_image_url' => $sourceUrl,
-                'edit_strategy' => 'local_mask_recolor',
-            ],
-        ]);
-
-        $aiMessage->delete();
 
         $responseConversation = $conversation->fresh()->load('messages');
         $quotaStats = $usageService->computeWarningLevel(
@@ -2120,144 +2145,6 @@ class ConversationController extends Controller
         }
     }
 
-    private function buildInpaintingPrompt(string $userPrompt): string
-    {
-        return trim(implode("\n", [
-            'Requested edit: ' . $userPrompt,
-            'Use image 1 as the source and image 2 as the black-and-white mask.',
-            'Edit only the white mask region. Black mask pixels must remain visually unchanged.',
-            'Complete the requested edit. If it asks to remove, replace, add, insert, or put an object, remove the masked object and place the requested object inside the same selected footprint, not larger.',
-            'For remove or replace requests, the final white-mask area must not contain the removed selected object; do not keep, duplicate, or redraw the selected items inside the mask.',
-            'For object replacement on a surface, reconstruct the underlying surface only inside the white mask, then anchor the new object naturally on that surface with matching perspective, light, and shadow.',
-            'Do not alter, blur, repaint, relight, or reinterpret any background outside the white mask, including windows, shelves, desk edges, walls, books outside the mask, and surrounding objects.',
-            'Return exactly one final edited image.',
-        ]));
-    }
-
-    private function isObjectAwareRecolorPrompt(string $userPrompt): bool
-    {
-        $prompt = mb_strtolower($userPrompt);
-
-        if ($this->detectTargetRecolor($userPrompt) === null) {
-            return false;
-        }
-
-        if (preg_match('/\b(recolou?r|change\s+(?:the\s+)?colou?r|change\s+.*\bto\s+(?:red|blue|green|yellow|black|white|pink|purple|orange|brown|gray|grey|gold|silver)|paint|dye|make|turn)\b/i', $userPrompt) === 1) {
-            return true;
-        }
-
-        return preg_match('/(غيّر|غير|بدّل|بدل|حوّل|حول|اجعل|خلي|خلّي|لوّن|لون|اصبغ|إصبغ|صبغ|ادهان|ادهن|لون|اللون|ألوان|الوان)/u', $prompt) === 1;
-    }
-
-    private function isLocalMaskRecolorRequest(AiRequest $aiRequest): bool
-    {
-        return $aiRequest->engine_provider === 'local'
-            || data_get($aiRequest->request_payload, 'edit_strategy') === 'local_mask_recolor'
-            || data_get($aiRequest->metadata, 'edit_strategy') === 'local_mask_recolor';
-    }
-
-    private function buildObjectAwareRecolorPrompt(string $userPrompt): string
-    {
-        $targetColor = $this->detectTargetRecolor($userPrompt);
-        $targetColorName = $targetColor['name'] ?? trim($userPrompt);
-        $recolorLine = $targetColor
-            ? "Recolor the chair frame, chair seat, chair back, chair spindles, and the draped shawl touched by the mask to {$targetColorName}."
-            : 'Recolor the chair frame, chair seat, chair back, chair spindles, and the draped shawl touched by the mask to the requested color.';
-
-        return trim(implode("\n", [
-            $recolorLine,
-            'Preserve the original chair geometry, wood grain, slats, fabric folds, contours, texture, lighting, shadows, perspective, and all details.',
-            'Do not fill the mask shape and do not replace the objects.',
-        ]));
-    }
-
-    private function detectTargetRecolor(string $userPrompt): ?array
-    {
-        $prompt = mb_strtolower($userPrompt);
-        $colors = [
-            'red' => [
-                'name' => 'red',
-                'hex' => '#c40000',
-                'avoid' => 'yellow, orange, brown, gold, or mustard',
-                'patterns' => ['red', 'الأحمر', 'احمر', 'أحمر', 'حمراء', 'حمرا'],
-            ],
-            'blue' => [
-                'name' => 'blue',
-                'hex' => '#0057ff',
-                'avoid' => 'cyan, teal, green, or purple',
-                'patterns' => ['blue', 'الأزرق', 'ازرق', 'أزرق', 'زرقاء'],
-            ],
-            'yellow' => [
-                'name' => 'yellow',
-                'hex' => '#ffd000',
-                'avoid' => 'orange, red, brown, or beige',
-                'patterns' => ['yellow', 'الأصفر', 'اصفر', 'أصفر', 'صفراء'],
-            ],
-            'green' => [
-                'name' => 'green',
-                'hex' => '#1f9d45',
-                'avoid' => 'yellow, teal, blue, or brown',
-                'patterns' => ['green', 'الأخضر', 'اخضر', 'أخضر', 'خضراء'],
-            ],
-            'black' => [
-                'name' => 'black',
-                'hex' => '#111111',
-                'avoid' => 'gray, brown, or navy',
-                'patterns' => ['black', 'الأسود', 'اسود', 'أسود', 'سوداء'],
-            ],
-            'white' => [
-                'name' => 'white',
-                'hex' => '#f5f5f5',
-                'avoid' => 'gray, beige, yellow, or cream',
-                'patterns' => ['white', 'الأبيض', 'ابيض', 'أبيض', 'بيضاء'],
-            ],
-            'pink' => [
-                'name' => 'pink',
-                'hex' => '#ff4da6',
-                'avoid' => 'red, purple, or orange',
-                'patterns' => ['pink', 'وردي', 'زهري'],
-            ],
-            'purple' => [
-                'name' => 'purple',
-                'hex' => '#7b2cff',
-                'avoid' => 'blue, pink, or burgundy',
-                'patterns' => ['purple', 'بنفسجي'],
-            ],
-            'orange' => [
-                'name' => 'orange',
-                'hex' => '#ff7a00',
-                'avoid' => 'red, yellow, brown, or gold',
-                'patterns' => ['orange', 'برتقالي'],
-            ],
-            'brown' => [
-                'name' => 'brown',
-                'hex' => '#7a3f17',
-                'avoid' => 'orange, red, yellow, or black',
-                'patterns' => ['brown', 'بني'],
-            ],
-            'gray' => [
-                'name' => 'gray',
-                'hex' => '#808080',
-                'avoid' => 'black, white, blue, or beige',
-                'patterns' => ['gray', 'grey', 'رمادي'],
-            ],
-        ];
-
-        foreach ($colors as $color) {
-            foreach ($color['patterns'] as $pattern) {
-                if (str_contains($prompt, mb_strtolower($pattern))) {
-                    return [
-                        'name' => $color['name'],
-                        'hex' => $color['hex'],
-                        'avoid' => $color['avoid'],
-                    ];
-                }
-            }
-        }
-
-        return null;
-    }
-
     private function storagePathFromUrl(string $url): ?string
     {
         $path = trim($url);
@@ -2403,9 +2290,11 @@ class ConversationController extends Controller
 
         $isRegeneration = $this->isReferenceOnlyImageFollowUp($content, $ordinal !== null);
 
-        // Never attach inline reference images — sending base64 image data
-        // triggers Google 417 anti-automation blocks. Instead, merge any edit
-        // instructions into the text prompt and regenerate as text-to-image.
+        // Never attach inline reference images to text follow-ups: sending base64
+        // image data to gemini-3.1-flash-image-preview triggers Google 417
+        // anti-automation blocks. For real image editing the user must use the
+        // inpaint editor (which goes through Vertex Imagen and DOES accept
+        // inline images). Text follow-ups regenerate from the merged prompt.
         return [
             'prompt' => $this->mergeImageFollowUpPrompt($basePrompt, $content, $ordinal !== null),
             'reference_image_url' => null,
@@ -2697,7 +2586,7 @@ class ConversationController extends Controller
     /**
      * Prepare an image for Gemini/Imagen requests while preserving the original mime type when GD is unavailable.
      */
-    private function prepareImageForApi(string $filePath, string $mimeType, int $maxDim = 1024, int $quality = 80): array
+    private function prepareImageForApi(string $filePath, string $mimeType, int $maxDim = 1536, int $quality = 92): array
     {
         $normalizedMime = strtolower(trim($mimeType)) ?: 'image/jpeg';
         $rawBytes = file_get_contents($filePath);
@@ -2818,5 +2707,204 @@ class ConversationController extends Controller
             'image/gif' => function_exists('imagecreatefromgif'),
             default => false,
         };
+    }
+
+    /**
+     * Prepare a mask image for the Imagen explicit-mask API.
+     *
+     * - Forces a binary black/white PNG (white = edit, black = keep).
+     * - Resizes (nearest-neighbour) to match the source dimensions to guarantee
+     *   pixel-perfect alignment with the source bytes that we send to Vertex.
+     * - Reports the percentage of white pixels so the caller can detect empty
+     *   or inverted masks.
+     *
+     * @return array{mime_type:string,data:string,width:int,height:int,white_pct:float}
+     */
+    private function prepareMaskForApi(string $maskPath, int $targetWidth, int $targetHeight): array
+    {
+        $rawBytes = (string) @file_get_contents($maskPath);
+        $maskWidth = max(1, (int) $targetWidth);
+        $maskHeight = max(1, (int) $targetHeight);
+
+        if (! function_exists('imagecreatetruecolor')) {
+            // GD is required to validate and binarize the inpaint mask. Without it
+            // we cannot compute mask_white_pct and would silently report an empty
+            // mask, so we mark this state explicitly so the caller can surface it.
+            Log::error('Inpainting requires the PHP GD extension, but it is not loaded. Enable extension=gd in php.ini.');
+            return [
+                'mime_type' => 'image/png',
+                'data' => base64_encode($rawBytes),
+                'width' => $maskWidth,
+                'height' => $maskHeight,
+                'white_pct' => 0.0,
+                'gd_missing' => true,
+            ];
+        }
+
+        if ($rawBytes === '') {
+            return [
+                'mime_type' => 'image/png',
+                'data' => base64_encode($rawBytes),
+                'width' => $maskWidth,
+                'height' => $maskHeight,
+                'white_pct' => 0.0,
+            ];
+        }
+
+        $src = @imagecreatefromstring($rawBytes);
+        if (! $src) {
+            return [
+                'mime_type' => 'image/png',
+                'data' => base64_encode($rawBytes),
+                'width' => $maskWidth,
+                'height' => $maskHeight,
+                'white_pct' => 0.0,
+            ];
+        }
+
+        $srcW = imagesx($src);
+        $srcH = imagesy($src);
+
+        $dst = imagecreatetruecolor($maskWidth, $maskHeight);
+        if (! $dst) {
+            imagedestroy($src);
+            return [
+                'mime_type' => 'image/png',
+                'data' => base64_encode($rawBytes),
+                'width' => $maskWidth,
+                'height' => $maskHeight,
+                'white_pct' => 0.0,
+            ];
+        }
+
+        // Use nearest-neighbour-ish copy (no smoothing artifacts) by disabling alphablending.
+        imagealphablending($dst, false);
+        $black = imagecolorallocate($dst, 0, 0, 0);
+        imagefilledrectangle($dst, 0, 0, $maskWidth, $maskHeight, $black);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $maskWidth, $maskHeight, $srcW, $srcH);
+
+        // Binarize: anything with luminance >= threshold or non-zero alpha strokes -> white.
+        $whiteCount = 0;
+        $totalPixels = $maskWidth * $maskHeight;
+        $threshold = 32; // out of 255
+
+        for ($y = 0; $y < $maskHeight; $y++) {
+            for ($x = 0; $x < $maskWidth; $x++) {
+                $rgba = imagecolorat($dst, $x, $y);
+                $alpha = ($rgba >> 24) & 0x7F; // 0 = opaque, 127 = transparent
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                $alphaFactor = (127 - $alpha) / 127.0;
+                $luminance = (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) * $alphaFactor;
+
+                if ($luminance >= $threshold) {
+                    imagesetpixel($dst, $x, $y, 0xFFFFFF);
+                    $whiteCount++;
+                } else {
+                    imagesetpixel($dst, $x, $y, 0x000000);
+                }
+            }
+        }
+
+        ob_start();
+        imagepng($dst, null, 1);
+        $pngBytes = (string) ob_get_clean();
+
+        imagedestroy($src);
+        imagedestroy($dst);
+
+        $whitePct = $totalPixels > 0 ? ($whiteCount / $totalPixels) * 100.0 : 0.0;
+
+        return [
+            'mime_type' => 'image/png',
+            'data' => base64_encode($pngBytes),
+            'width' => $maskWidth,
+            'height' => $maskHeight,
+            'white_pct' => round($whitePct, 4),
+        ];
+    }
+
+    /**
+     * Return the [width, height] of an image file, or [0, 0] if unknown.
+     *
+     * @return array{0:int,1:int}
+     */
+    private function imageDimensions(string $filePath): array
+    {
+        $size = @getimagesize($filePath);
+        if (! $size || empty($size[0]) || empty($size[1])) {
+            return [0, 0];
+        }
+        return [(int) $size[0], (int) $size[1]];
+    }
+
+    /**
+     * Save inpainting debug artifacts under storage/app/private/inpaint-debug/{uuid}-*.
+     *
+     * Returns the directory-relative prefix used for all artifacts so callers can
+     * log it back to the user/admin UI.
+     */
+    private function saveInpaintingDebugArtifacts(string $uuid, array $payload): string
+    {
+        $prefix = 'inpaint-debug/' . $uuid;
+        $disk = Storage::disk('local');
+
+        try {
+            if (! empty($payload['source_bytes'])) {
+                $disk->put($prefix . '-source.' . ($payload['source_ext'] ?? 'jpg'), $payload['source_bytes']);
+            }
+            if (! empty($payload['mask_bytes'])) {
+                $disk->put($prefix . '-mask.png', $payload['mask_bytes']);
+            }
+            if (! empty($payload['output_bytes'])) {
+                $disk->put($prefix . '-output.' . ($payload['output_ext'] ?? 'png'), $payload['output_bytes']);
+            }
+            if (isset($payload['request'])) {
+                $disk->put($prefix . '-request.json', json_encode($payload['request'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            }
+            if (isset($payload['response'])) {
+                $disk->put($prefix . '-response.json', is_string($payload['response']) ? $payload['response'] : json_encode($payload['response'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            }
+            if (isset($payload['summary'])) {
+                $disk->put($prefix . '-summary.json', json_encode($payload['summary'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to save inpainting debug artifacts', [
+                'uuid' => $uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $prefix;
+    }
+
+    /**
+     * Strip the request body of huge base64 image payloads so it can be stored
+     * as a readable JSON debug artifact.
+     */
+    private function sanitizeImagenRequestForDebug(?array $request): ?array
+    {
+        if (! is_array($request)) {
+            return $request;
+        }
+
+        $clone = $request;
+        if (isset($clone['instances']) && is_array($clone['instances'])) {
+            foreach ($clone['instances'] as $i => $instance) {
+                if (! isset($instance['referenceImages']) || ! is_array($instance['referenceImages'])) {
+                    continue;
+                }
+                foreach ($instance['referenceImages'] as $j => $ref) {
+                    $bytes = (string) data_get($ref, 'referenceImage.bytesBase64Encoded', '');
+                    if ($bytes !== '') {
+                        $clone['instances'][$i]['referenceImages'][$j]['referenceImage']['bytesBase64Encoded']
+                            = '<base64 ' . strlen($bytes) . ' chars, sha256=' . hash('sha256', $bytes) . '>';
+                    }
+                }
+            }
+        }
+
+        return $clone;
     }
 }

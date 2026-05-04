@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
@@ -28,31 +28,13 @@ const isDrawing = ref(false)
 const lastPoint = ref<{ x: number; y: number } | null>(null)
 const localObjectUrl = ref<string | null>(null)
 const editorId = `inpaint-prompt-${Math.random().toString(36).slice(2)}`
-const SOURCE_MAX_DIMENSION = 768
-const SOURCE_JPEG_QUALITY = 0.78
-const MASK_MAX_DIMENSION = 768
+// Preserve source quality so the inpainting model has enough fidelity to work with.
+// Both the source image and the binary mask are exported at the same max dimension
+// so they share an identical pixel grid when sent to the backend.
+const SOURCE_MAX_DIMENSION = 1536
+const SOURCE_JPEG_QUALITY = 0.92
+const MASK_MAX_DIMENSION = 1536
 const MASK_BINARY_THRESHOLD = 20
-const LOCAL_RECOLOR_STRENGTH = 0.86
-
-interface TargetColor {
-  name: string
-  rgb: [number, number, number]
-  patterns: string[]
-}
-
-const TARGET_COLORS: TargetColor[] = [
-  { name: 'red', rgb: [196, 0, 0], patterns: ['red', 'الأحمر', 'احمر', 'أحمر', 'حمراء', 'حمرا'] },
-  { name: 'blue', rgb: [0, 87, 255], patterns: ['blue', 'الأزرق', 'ازرق', 'أزرق', 'زرقاء'] },
-  { name: 'yellow', rgb: [255, 208, 0], patterns: ['yellow', 'الأصفر', 'اصفر', 'أصفر', 'صفراء'] },
-  { name: 'green', rgb: [31, 157, 69], patterns: ['green', 'الأخضر', 'اخضر', 'أخضر', 'خضراء'] },
-  { name: 'black', rgb: [17, 17, 17], patterns: ['black', 'الأسود', 'اسود', 'أسود', 'سوداء'] },
-  { name: 'white', rgb: [245, 245, 245], patterns: ['white', 'الأبيض', 'ابيض', 'أبيض', 'بيضاء'] },
-  { name: 'pink', rgb: [255, 77, 166], patterns: ['pink', 'وردي', 'زهري'] },
-  { name: 'purple', rgb: [123, 44, 255], patterns: ['purple', 'بنفسجي'] },
-  { name: 'orange', rgb: [255, 122, 0], patterns: ['orange', 'برتقالي'] },
-  { name: 'brown', rgb: [122, 63, 23], patterns: ['brown', 'بني'] },
-  { name: 'gray', rgb: [128, 128, 128], patterns: ['gray', 'grey', 'رمادي'] },
-]
 
 const sourceSrc = computed(() => localObjectUrl.value || props.sourceUrl || '')
 const canSubmit = computed(() => Boolean(prompt.value.trim() && hasMask.value && imageLoaded.value && !props.disabled))
@@ -220,141 +202,6 @@ function hardenMask(canvas: HTMLCanvasElement) {
   context.putImageData(imageData, 0, 0)
 }
 
-function detectTargetColor(content: string): TargetColor | null {
-  const normalized = content.toLowerCase()
-  const targetColor = TARGET_COLORS.find(color => color.patterns.some(pattern => normalized.includes(pattern.toLowerCase()))) ?? null
-  if (!targetColor) return null
-
-  const asksForRecolor = /\b(recolou?r|change\s+(?:the\s+)?colou?r|color|paint|dye|make|turn)\b/i.test(content)
-    || /(غيّر|غير|بدّل|بدل|حوّل|حول|اجعل|خلي|خلّي|لوّن|لون|اصبغ|إصبغ|صبغ|ادهان|ادهن)/u.test(content)
-    || /(لون|اللون|ألوان|الوان)/u.test(content)
-
-  if (!asksForRecolor) return null
-  return targetColor
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value))
-}
-
-function rgbToHsl(red: number, green: number, blue: number): [number, number, number] {
-  red /= 255
-  green /= 255
-  blue /= 255
-
-  const max = Math.max(red, green, blue)
-  const min = Math.min(red, green, blue)
-  let hue = 0
-  let saturation = 0
-  const lightness = (max + min) / 2
-
-  if (max !== min) {
-    const delta = max - min
-    saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min)
-    switch (max) {
-      case red:
-        hue = (green - blue) / delta + (green < blue ? 6 : 0)
-        break
-      case green:
-        hue = (blue - red) / delta + 2
-        break
-      default:
-        hue = (red - green) / delta + 4
-        break
-    }
-    hue /= 6
-  }
-
-  return [hue, saturation, lightness]
-}
-
-function hslToRgb(hue: number, saturation: number, lightness: number): [number, number, number] {
-  if (saturation === 0) {
-    const value = Math.round(lightness * 255)
-    return [value, value, value]
-  }
-
-  const hueToRgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1
-    if (t > 1) t -= 1
-    if (t < 1 / 6) return p + (q - p) * 6 * t
-    if (t < 1 / 2) return q
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
-    return p
-  }
-
-  const q = lightness < 0.5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation
-  const p = 2 * lightness - q
-
-  return [
-    Math.round(hueToRgb(p, q, hue + 1 / 3) * 255),
-    Math.round(hueToRgb(p, q, hue) * 255),
-    Math.round(hueToRgb(p, q, hue - 1 / 3) * 255),
-  ]
-}
-
-async function createLocalRecolorFile(targetColor: TargetColor) {
-  const image = imageRef.value
-  const maskCanvas = maskCanvasRef.value
-  if (!image || !maskCanvas || !image.naturalWidth || !image.naturalHeight) return null
-
-  const dimensions = resizedDimensions(image.naturalWidth, image.naturalHeight, SOURCE_MAX_DIMENSION)
-  const sourceCanvas = document.createElement('canvas')
-  sourceCanvas.width = dimensions.width
-  sourceCanvas.height = dimensions.height
-  const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true })
-  if (!sourceContext) return null
-
-  sourceContext.fillStyle = '#ffffff'
-  sourceContext.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height)
-  sourceContext.imageSmoothingEnabled = true
-  sourceContext.imageSmoothingQuality = 'high'
-  sourceContext.drawImage(image, 0, 0, sourceCanvas.width, sourceCanvas.height)
-
-  const scaledMaskCanvas = document.createElement('canvas')
-  scaledMaskCanvas.width = sourceCanvas.width
-  scaledMaskCanvas.height = sourceCanvas.height
-  const maskContext = scaledMaskCanvas.getContext('2d', { willReadFrequently: true })
-  if (!maskContext) return null
-
-  maskContext.fillStyle = '#000000'
-  maskContext.fillRect(0, 0, scaledMaskCanvas.width, scaledMaskCanvas.height)
-  maskContext.imageSmoothingEnabled = true
-  maskContext.imageSmoothingQuality = 'high'
-  maskContext.drawImage(maskCanvas, 0, 0, scaledMaskCanvas.width, scaledMaskCanvas.height)
-  hardenMask(scaledMaskCanvas)
-
-  const sourceImageData = sourceContext.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
-  const maskImageData = maskContext.getImageData(0, 0, scaledMaskCanvas.width, scaledMaskCanvas.height)
-  const sourcePixels = sourceImageData.data
-  const maskPixels = maskImageData.data
-  const [targetHue, targetSaturation] = rgbToHsl(...targetColor.rgb)
-
-  for (let index = 0; index < sourcePixels.length; index += 4) {
-    const maskValue = maskPixels[index] ?? 0
-    if (maskValue < 220) continue
-
-    const red = sourcePixels[index] ?? 0
-    const green = sourcePixels[index + 1] ?? 0
-    const blue = sourcePixels[index + 2] ?? 0
-    const [, sourceSaturation, sourceLightness] = rgbToHsl(red, green, blue)
-
-    const neutralHighlight = sourceLightness > 0.82 && sourceSaturation < 0.18
-    const strength = neutralHighlight ? LOCAL_RECOLOR_STRENGTH * 0.42 : LOCAL_RECOLOR_STRENGTH
-    const recolorSaturation = clamp(Math.max(0.5, targetSaturation, sourceSaturation * 0.45 + 0.42), 0, 0.95)
-    const recolorLightness = clamp(sourceLightness * 0.92 + 0.035, 0.035, 0.88)
-    const [newRed, newGreen, newBlue] = hslToRgb(targetHue, recolorSaturation, recolorLightness)
-
-    sourcePixels[index] = Math.round(red * (1 - strength) + newRed * strength)
-    sourcePixels[index + 1] = Math.round(green * (1 - strength) + newGreen * strength)
-    sourcePixels[index + 2] = Math.round(blue * (1 - strength) + newBlue * strength)
-  }
-
-  sourceContext.putImageData(sourceImageData, 0, 0)
-  const blob = await canvasToBlob(sourceCanvas, 'image/png')
-  return new File([blob], `local-recolor-${targetColor.name}.png`, { type: 'image/png' })
-}
-
 async function createCompressedSourceFile() {
   const image = imageRef.value
   if (!image || !image.naturalWidth || !image.naturalHeight) return null
@@ -377,10 +224,16 @@ async function createCompressedSourceFile() {
 }
 
 async function createMaskFile() {
+  const image = imageRef.value
   const maskCanvas = maskCanvasRef.value
   if (!maskCanvas) throw new Error('Mask canvas is not ready')
 
-  const dimensions = resizedDimensions(maskCanvas.width, maskCanvas.height, MASK_MAX_DIMENSION)
+  // Use the SAME target dimensions as the exported source so the mask aligns
+  // pixel-for-pixel with what the model actually sees. The backend will also
+  // resize the mask to match the source bytes as a safety net.
+  const baseWidth = image?.naturalWidth || maskCanvas.width
+  const baseHeight = image?.naturalHeight || maskCanvas.height
+  const dimensions = resizedDimensions(baseWidth, baseHeight, MASK_MAX_DIMENSION)
 
   const exportCanvas = document.createElement('canvas')
   exportCanvas.width = dimensions.width
@@ -388,10 +241,11 @@ async function createMaskFile() {
   const context = exportCanvas.getContext('2d')
   if (!context) throw new Error('Mask export is not supported')
 
+  // Black background = "keep". White strokes = "edit".
   context.fillStyle = '#000000'
   context.fillRect(0, 0, exportCanvas.width, exportCanvas.height)
-  context.imageSmoothingEnabled = true
-  context.imageSmoothingQuality = 'high'
+  // Disable smoothing so brush edges remain near-binary before hardening.
+  context.imageSmoothingEnabled = false
   context.drawImage(maskCanvas, 0, 0, exportCanvas.width, exportCanvas.height)
   hardenMask(exportCanvas)
 
@@ -418,16 +272,13 @@ async function createSourceFile() {
 async function handleSubmit() {
   if (!canSubmit.value) return
 
-  const targetColor = detectTargetColor(prompt.value.trim())
   const image = await createSourceFile()
   const mask = await createMaskFile()
-  const renderedImage = targetColor ? await createLocalRecolorFile(targetColor).catch(() => null) : null
 
   emit('submit', {
     content: prompt.value.trim(),
     image,
     mask,
-    ...(renderedImage ? { renderedImage } : {}),
   })
   emit('close')
 }
@@ -437,6 +288,7 @@ function handleClose() {
   emit('close')
 }
 </script>
+
 
 <template>
   <Teleport to="body">

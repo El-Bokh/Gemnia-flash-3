@@ -810,20 +810,34 @@ class GeminiService
             if (! $response->successful()) {
                 $errorMsg = $response->json('error.message', 'Unknown error');
                 $responseBody = $response->body();
+                $status = $response->status();
                 Log::error('Gemini native image model failed', [
                     'model'         => $imageGenModel,
-                    'status'        => $response->status(),
+                    'status'        => $status,
                     'error'         => $errorMsg,
                     'is_editing'    => $hasReferenceImages,
                     'auth_method'   => $requestAuthMethod,
                     'response_body' => mb_substr($responseBody, 0, 2000),
                 ]);
 
+                // HTTP 417 (or any HTML response containing the Google "Sorry..."
+                // anti-automation page) means the upstream is rejecting the
+                // request because of inline reference images. Tell the user to
+                // use the inpainting editor (which goes through Vertex Imagen
+                // and is not subject to the same block).
+                $looksLikeAntiAutomation = $status === 417
+                    || str_contains($responseBody, 'sending automated queries')
+                    || str_contains($responseBody, 'Sorry...');
+
+                $userError = $looksLikeAntiAutomation && $hasReferenceImages
+                    ? 'Image-editing requests with attached photos are being temporarily blocked by the upstream model. Please open the image and use the brush editor (“Edit”) to make targeted changes.'
+                    : 'Image generation failed. Please try again with a different prompt.';
+
                 return [
                     'success' => false,
                     'content' => null,
                     'images'  => [],
-                    'error'   => 'Image generation failed. Please try again with a different prompt.',
+                    'error'   => $userError,
                 ];
             }
 
@@ -1107,7 +1121,8 @@ SYSTEM;
         array $maskImage,
         string $prompt,
         ?string $editMode = 'EDIT_MODE_INPAINT_INSERTION',
-        float $maskDilation = self::IMAGEN_USER_MASK_DILATION,
+        float $maskDilation = 0.0,
+        array $extra = [],
     ): array
     {
         $authCheck = $this->checkAuth();
@@ -1155,9 +1170,23 @@ SYSTEM;
             ];
         }
 
+        // Caller is expected to have rewritten the prompt to a full final-image
+        // English description. We still translate as a safety net for raw Arabic
+        // input bypassing the rewrite layer.
         $translatedPrompt = $this->translateForImageEdit($prompt);
         $model = self::IMAGEN_MASK_EDIT_MODEL;
         $url = $this->buildEndpointUrl($model, 'predict');
+
+        $negativePrompt = trim((string) ($extra['negative_prompt']
+            ?? 'blurry, low quality, deformed, distorted, extra limbs, extra fingers, '
+                . 'duplicate people, duplicate face, mutated face, low resolution, '
+                . 'jpeg artifacts, watermark, text, logo, unchanged, identical to original'));
+
+        $guidanceScale = (float) ($extra['guidance_scale'] ?? 75);
+        $baseSteps = (int) ($extra['base_steps'] ?? 75);
+        $personGeneration = (string) ($extra['person_generation'] ?? 'allow_adult');
+        $safetySetting = (string) ($extra['safety_setting'] ?? 'block_only_high');
+        $sampleCount = max(1, (int) ($extra['sample_count'] ?? 1));
 
         $instance = [
             'prompt' => $translatedPrompt,
@@ -1185,34 +1214,47 @@ SYSTEM;
             ],
         ];
 
+        $parameters = [
+            'sampleCount' => $sampleCount,
+            'guidanceScale' => $guidanceScale,
+            'negativePrompt' => $negativePrompt,
+            'personGeneration' => $personGeneration,
+            'safetySetting' => $safetySetting,
+            'editConfig' => [
+                'baseSteps' => $baseSteps,
+            ],
+            'outputOptions' => [
+                'mimeType' => 'image/png',
+            ],
+        ];
+
+        if ($editMode !== null) {
+            $parameters['editMode'] = $editMode;
+        }
+
+        $requestBody = [
+            'instances' => [$instance],
+            'parameters' => $parameters,
+        ];
+
         Log::info('Trying Imagen explicit-mask inpainting', [
             'model' => $model,
             'prompt' => $translatedPrompt,
-            'auth_method' => $this->authMethod,
-            'mask_mode' => 'MASK_MODE_USER_PROVIDED',
             'mask_dilation' => $maskDilation,
             'edit_mode' => $editMode,
+            'guidance_scale' => $guidanceScale,
+            'base_steps' => $baseSteps,
+            'person_generation' => $personGeneration,
+            'safety_setting' => $safetySetting,
         ]);
 
         try {
             $request = Http::timeout(self::IMAGE_REQUEST_TIMEOUT_SECONDS);
             $request = $this->applyAuth($request);
 
-            $parameters = [
-                'sampleCount' => 1,
-                'outputOptions' => [
-                    'mimeType' => 'image/png',
-                ],
-            ];
+            $response = $request->post($url, $requestBody);
 
-            if ($editMode !== null) {
-                $parameters['editMode'] = $editMode;
-            }
-
-            $response = $request->post($url, [
-                'instances' => [$instance],
-                'parameters' => $parameters,
-            ]);
+            $rawResponseBody = $response->body();
 
             if (! $response->successful()) {
                 $errorMsg = $response->json('error.message', 'Unknown Imagen API error');
@@ -1221,7 +1263,7 @@ SYSTEM;
                     'model' => $model,
                     'status' => $response->status(),
                     'error' => $errorMsg,
-                    'response_body' => mb_substr($response->body(), 0, 2000),
+                    'response_body' => mb_substr($rawResponseBody, 0, 2000),
                 ]);
 
                 return [
@@ -1232,11 +1274,15 @@ SYSTEM;
                     'model_used' => $model,
                     'engine_provider' => 'imagen',
                     'prompt_used' => $translatedPrompt,
+                    'request_body' => $requestBody,
+                    'response_body' => $rawResponseBody,
+                    'http_status' => $response->status(),
                 ];
             }
 
             $predictions = $response->json('predictions', []);
             $images = [];
+            $raiReasons = [];
 
             foreach ($predictions as $prediction) {
                 $imagePayload = $prediction['_self'] ?? $prediction;
@@ -1246,25 +1292,38 @@ SYSTEM;
                         'mime_type' => $imagePayload['mimeType'] ?? 'image/png',
                     ];
                 }
+                if (isset($imagePayload['raiFilteredReason'])) {
+                    $raiReasons[] = $imagePayload['raiFilteredReason'];
+                }
             }
 
             if (empty($images)) {
                 Log::error('Imagen explicit-mask inpainting returned no images', [
                     'model' => $model,
+                    'rai_reasons' => $raiReasons,
                     'prediction_keys' => array_map(
                         static fn (array $prediction): array => array_keys($prediction),
                         $predictions,
                     ),
                 ]);
 
+                $errorMessage = ! empty($raiReasons)
+                    ? 'Image was filtered by safety policy: ' . implode('; ', $raiReasons)
+                    : 'No image was generated. Please try again with a different prompt or a larger mask.';
+
                 return [
                     'success' => false,
                     'content' => null,
                     'images' => [],
-                    'error' => 'No image was generated. Please try again with a different prompt.',
+                    'error' => $errorMessage,
                     'model_used' => $model,
                     'engine_provider' => 'imagen',
                     'prompt_used' => $translatedPrompt,
+                    'rai_filtered' => ! empty($raiReasons),
+                    'rai_reasons' => $raiReasons,
+                    'request_body' => $requestBody,
+                    'response_body' => $rawResponseBody,
+                    'http_status' => $response->status(),
                 ];
             }
 
@@ -1276,6 +1335,11 @@ SYSTEM;
                 'model_used' => $model,
                 'engine_provider' => 'imagen',
                 'prompt_used' => $translatedPrompt,
+                'rai_filtered' => false,
+                'rai_reasons' => [],
+                'request_body' => $requestBody,
+                'response_body' => $rawResponseBody,
+                'http_status' => $response->status(),
             ];
         } catch (\Throwable $e) {
             Log::error('Imagen explicit-mask inpainting exception', [
@@ -1291,8 +1355,132 @@ SYSTEM;
                 'model_used' => $model,
                 'engine_provider' => 'imagen',
                 'prompt_used' => $translatedPrompt,
+                'request_body' => $requestBody,
+                'response_body' => null,
+                'http_status' => 0,
             ];
         }
+    }
+
+    /**
+     * Rewrite a user's natural-language inpainting/edit instruction into a single
+     * full final-image English prompt suitable for Imagen explicit-mask editing.
+     *
+     * The rewrite must:
+     *  - describe the FINAL image (not the instruction),
+     *  - clearly state the new desired content,
+     *  - never mention the removed/original entity (no "man", "person", "old object", etc.),
+     *  - preserve lighting, shadows, camera angle, perspective, scale, texture, photographic style,
+     *  - leave everything outside the masked area unchanged,
+     *  - use neutral location words like "in the edited region" or "in the masked area".
+     */
+    public function rewriteForInpaintingMask(string $userPrompt): string
+    {
+        $userPrompt = trim($userPrompt);
+        if ($userPrompt === '') {
+            return $userPrompt;
+        }
+
+        $authCheck = $this->checkAuth();
+        if ($authCheck !== null) {
+            return $userPrompt;
+        }
+
+        $cacheKey = 'inpaint_prompt_rewrite:v2:' . md5($userPrompt);
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        $systemInstruction = <<<'SYSTEM'
+You convert natural-language image-edit instructions into a single English prompt
+for an inpainting model that uses an explicit user-provided mask. The mask defines
+the area to be edited; everything outside the mask stays unchanged.
+
+OUTPUT RULES:
+1. Output ONE clean English paragraph. No quotes, no markdown, no explanation,
+   no list, no preface like "A photo of".
+2. Describe the FINAL full image after the edit, not the instruction.
+3. Clearly and concretely describe the NEW desired content that should appear
+   inside the masked area. You MUST use specific nouns when the user asks for them
+   (for example: "adult Arab woman", "red leather handbag", "blue baseball cap",
+   "wooden dining table", "ankh symbol", "natural sky background"). Do not
+   abstract the new content into vague words.
+4. NEVER reference the original/removed/previous entity. Forbidden phrasings include
+   (but are not limited to): "the man", "the woman", "original man", "old hat",
+   "previous subject", "removed person", "replacing the man", "in place of the man",
+   "where the man was", "instead of the X", "the prior X". The model must not see
+   the prior content's identity. This rule applies ONLY to the entity being removed
+   or replaced; nouns describing the NEW desired content are encouraged.
+5. Use neutral location phrasing like "naturally positioned in the masked area",
+   "naturally integrated in the edited region", or "occupying the masked area".
+6. Preserve and explicitly mention: original lighting, shadows, camera angle,
+   perspective, scale, texture, materials, depth of field, and photographic style
+   of the rest of the scene.
+7. State that everything outside the edited region remains unchanged.
+8. For RECOLOR requests: preserve the original shape, geometry, texture, material,
+   edges, highlights, folds, and lighting; only the color changes to the requested
+   color. You MAY name the object whose color is being changed if that object
+   itself is being kept (e.g. "the bag is now red") — that is not a removal.
+9. For REPLACE requests: describe the new subject/object naturally integrated and
+   anchored to the surrounding surface, with matching perspective and shadow,
+   WITHOUT naming the entity that was there before.
+10. For REMOVAL requests: describe the natural background/fill that should
+    plausibly exist behind where something was, again WITHOUT naming what was there.
+11. Translate any non-English input to English first.
+
+CORRECT EXAMPLE (replace request):
+"The original scene remains unchanged, with an adult Arab woman wearing traditional
+clothing naturally positioned in the masked area, matching the original lighting,
+shadows, camera angle, perspective, scale, and photographic style."
+
+WRONG EXAMPLE (mentions the removed entity):
+"An Arab woman replacing the man where the man was."
+SYSTEM;
+
+        try {
+            $url = $this->buildEndpointUrl($this->textModel, 'generateContent');
+            $request = Http::timeout(20);
+            $request = $this->applyAuth($request);
+
+            $response = $request->post($url, [
+                'contents' => [
+                    ['role' => 'user', 'parts' => [['text' => $userPrompt]]],
+                ],
+                'systemInstruction' => [
+                    'parts' => [['text' => $systemInstruction]],
+                ],
+                'generationConfig' => [
+                    'temperature'     => 0.4,
+                    'maxOutputTokens' => 512,
+                    'thinkingConfig'  => ['thinkingBudget' => 0],
+                ],
+            ]);
+
+            if ($response->successful()) {
+                $rewritten = trim($response->json('candidates.0.content.parts.0.text', ''));
+                $rewritten = trim($rewritten, "\"'`");
+                if ($rewritten !== '') {
+                    Cache::put($cacheKey, $rewritten, now()->addHours(6));
+                    Log::info('Inpainting prompt rewritten', [
+                        'original' => $userPrompt,
+                        'rewritten' => $rewritten,
+                    ]);
+                    return $rewritten;
+                }
+            } else {
+                Log::warning('Inpainting prompt rewrite API failed', [
+                    'status' => $response->status(),
+                    'error' => $response->json('error.message', 'Unknown'),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Inpainting prompt rewrite failed, using original', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $userPrompt;
     }
 
     private function imagenGenerate(array $currentParts): array
@@ -1681,7 +1869,10 @@ PROMPT;
 
     private function sendNativeImageRequest(string $model, array $contents, array $generationConfig, string $authMode): array
     {
-        $request = Http::timeout(self::IMAGE_REQUEST_TIMEOUT_SECONDS);
+        // Use a shorter timeout than PHP's max_execution_time (180s) so we can
+        // fail fast and return a clean error to the client instead of letting
+        // PHP kill the script mid-flight when Google hangs the connection.
+        $request = Http::timeout(120)->connectTimeout(10);
 
         if ($authMode === 'service_account') {
             $url = "https://aiplatform.googleapis.com/v1beta1/projects/{$this->projectId}/locations/global/publishers/google/models/{$model}:generateContent";
