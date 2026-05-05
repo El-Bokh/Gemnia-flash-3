@@ -67,8 +67,8 @@ class PlanFeatureLimitsSeeder extends Seeder
             [
                 'name'        => 'Video Generation',
                 'slug'        => 'video_generation',
-                'type'        => 'other',
-                'description' => 'Generate short videos with Vertex AI Veo',
+                'type'        => 'video_generation',
+                'description' => 'Generate short AI videos from prompts and image references',
                 'is_active'   => true,
                 'sort_order'  => 11,
             ],

@@ -25,7 +25,7 @@ class FeatureController extends Controller
     {
         $filters = $request->validate([
             'search'    => ['sometimes', 'string', 'max:100'],
-            'type'      => ['sometimes', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,other'],
+            'type'      => ['sometimes', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,chat,styled_chat,multimodal,video_generation,text_to_video,image_to_video,other'],
             'is_active' => ['sometimes', 'boolean'],
             'sort_by'   => ['sometimes', 'string', 'in:name,slug,type,sort_order,created_at,plans_count'],
             'sort_dir'  => ['sometimes', 'string', 'in:asc,desc'],

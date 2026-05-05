@@ -20,7 +20,7 @@ class UpdateFeatureRequest extends FormRequest
             'name'        => ['sometimes', 'string', 'max:100'],
             'slug'        => ['sometimes', 'string', 'max:100', Rule::unique('features', 'slug')->ignore($featureId), 'regex:/^[a-z0-9_]+$/'],
             'description' => ['nullable', 'string', 'max:500'],
-            'type'        => ['sometimes', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,chat,styled_chat,multimodal,other'],
+            'type'        => ['sometimes', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,chat,styled_chat,multimodal,video_generation,text_to_video,image_to_video,other'],
             'is_active'   => ['sometimes', 'boolean'],
             'sort_order'  => ['sometimes', 'integer', 'min:0'],
             'metadata'    => ['sometimes', 'nullable', 'array'],

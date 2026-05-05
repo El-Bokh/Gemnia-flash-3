@@ -91,7 +91,7 @@ class AdminDashboardSeeder extends Seeder
             ['name' => 'Image to Image',   'slug' => 'image_to_image',   'type' => 'image_to_image'],
             ['name' => 'Inpainting',       'slug' => 'inpainting',       'type' => 'inpainting'],
             ['name' => 'Upscale',          'slug' => 'upscale',          'type' => 'upscale'],
-            ['name' => 'Video Generation', 'slug' => 'video_generation', 'type' => 'other'],
+            ['name' => 'Video Generation', 'slug' => 'video_generation', 'type' => 'video_generation'],
         ] as $f) {
             $features[$f['slug']] = Feature::firstOrCreate(
                 ['slug' => $f['slug']],

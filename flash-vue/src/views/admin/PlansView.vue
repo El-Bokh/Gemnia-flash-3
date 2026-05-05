@@ -73,6 +73,7 @@ const featureTypeOptions = computed(() => [
   { label: t('aiRequests.imageToImage'), value: 'image_to_image' },
   { label: t('aiRequests.inpainting'), value: 'inpainting' },
   { label: t('aiRequests.upscale'), value: 'upscale' },
+  { label: t('aiRequests.videos'), value: 'video_generation' },
   { label: t('aiRequests.other'), value: 'other' },
 ] as Array<{ label: string; value: 'all' | NonNullable<ListFeaturesParams['type']> }>)
 
@@ -286,6 +287,12 @@ function featureTypeLabel(type: Feature['type']) {
     image_to_image: 'Image→Image',
     inpainting: 'Inpainting',
     upscale: 'Upscale',
+    video_generation: 'Video',
+    text_to_video: 'Text→Video',
+    image_to_video: 'Image→Video',
+    chat: 'Chat',
+    styled_chat: 'Styled Chat',
+    multimodal: 'Multimodal',
     other: 'Other',
   }[type] || type
 }
@@ -296,6 +303,12 @@ function featureTypeColor(type: Feature['type']) {
     image_to_image: '#0ea5e9',
     inpainting: '#10b981',
     upscale: '#f59e0b',
+    video_generation: '#ef4444',
+    text_to_video: '#ef4444',
+    image_to_video: '#ef4444',
+    chat: '#6366f1',
+    styled_chat: '#6366f1',
+    multimodal: '#14b8a6',
     other: '#6b7280',
   }[type] || '#6366f1'
 }

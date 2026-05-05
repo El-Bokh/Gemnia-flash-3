@@ -32,6 +32,7 @@ class FeatureResource extends JsonResource
                     'usage_limit'     => $p->pivot->usage_limit,
                     'limit_period'    => $p->pivot->limit_period,
                     'credits_per_use' => $p->pivot->credits_per_use,
+                    'constraints'     => $p->pivot->constraints ? json_decode($p->pivot->constraints, true) : null,
                 ])
             ),
 

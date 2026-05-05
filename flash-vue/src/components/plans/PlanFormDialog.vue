@@ -13,16 +13,22 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 
 type LimitPeriod = 'day' | 'week' | 'month' | 'year' | 'lifetime' | null
+type FeatureConstraints = Record<string, unknown> | null
+type VideoResolution = '720p' | '1080p' | null
 
 interface EditableFeatureDraft {
   feature_id: number
   name: string
+  slug: string
   type: Feature['type']
   selected: boolean
   is_enabled: boolean
   usage_limit: number | null
   limit_period: LimitPeriod
   credits_per_use: number
+  constraints: FeatureConstraints
+  max_duration_seconds: number | null
+  max_resolution: VideoResolution
 }
 
 const props = defineProps<{
@@ -51,6 +57,11 @@ const periodOptions = computed(() => [
   { label: t('planForm.year'), value: 'year' },
 ] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>)
 
+const videoResolutionOptions = computed(() => [
+  { label: t('planForm.upTo720p'), value: '720p' },
+  { label: t('planForm.upTo1080p'), value: '1080p' },
+] as Array<{ label: string; value: Exclude<VideoResolution, null> }>)
+
 const form = ref({
   name: '',
   slug: '',
@@ -73,6 +84,12 @@ function featureTypeColor(type: Feature['type']) {
     image_to_image: '#0ea5e9',
     inpainting: '#10b981',
     upscale: '#f59e0b',
+    video_generation: '#ef4444',
+    text_to_video: '#ef4444',
+    image_to_video: '#ef4444',
+    chat: '#6366f1',
+    styled_chat: '#6366f1',
+    multimodal: '#14b8a6',
     other: '#6b7280',
   }[type] || '#6366f1'
 }
@@ -83,8 +100,70 @@ function featureTypeLabel(type: Feature['type']) {
     image_to_image: 'Image→Image',
     inpainting: 'Inpainting',
     upscale: 'Upscale',
+    video_generation: 'Video',
+    text_to_video: 'Text→Video',
+    image_to_video: 'Image→Video',
+    chat: 'Chat',
+    styled_chat: 'Styled Chat',
+    multimodal: 'Multimodal',
     other: 'Other',
   }[type] || type
+}
+
+function isVideoFeature(type: Feature['type'], slug?: string | null) {
+  return slug === 'video_generation' || ['video_generation', 'text_to_video', 'image_to_video'].includes(String(type))
+}
+
+function isVideoDraft(draft: EditableFeatureDraft) {
+  return isVideoFeature(draft.type, draft.slug)
+}
+
+function normalizeConstraints(value: unknown): FeatureConstraints {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null
+    } catch {
+      return null
+    }
+  }
+
+  return typeof value === 'object' && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : null
+}
+
+function readNumberConstraint(constraints: FeatureConstraints, key: string, fallback: number | null = null) {
+  const rawValue = constraints?.[key]
+  const numericValue = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : fallback
+}
+
+function readVideoResolution(constraints: FeatureConstraints, fallback: VideoResolution = null): VideoResolution {
+  const rawValue = constraints?.max_resolution
+  return rawValue === '720p' || rawValue === '1080p' ? rawValue : fallback
+}
+
+function buildFeatureConstraints(feature: EditableFeatureDraft): FeatureConstraints {
+  const constraints = normalizeConstraints(feature.constraints) || {}
+
+  if (!isVideoDraft(feature)) {
+    return Object.keys(constraints).length ? constraints : null
+  }
+
+  if (feature.max_duration_seconds && feature.max_duration_seconds > 0) {
+    constraints.max_duration_seconds = Number(feature.max_duration_seconds)
+  } else {
+    delete constraints.max_duration_seconds
+  }
+
+  if (feature.max_resolution) {
+    constraints.max_resolution = feature.max_resolution
+  } else {
+    delete constraints.max_resolution
+  }
+
+  return Object.keys(constraints).length ? constraints : null
 }
 
 async function ensureFeaturesLoaded() {
@@ -97,22 +176,34 @@ async function ensureFeaturesLoaded() {
       { id: 1, name: 'Text to Image', slug: 'text-to-image', description: 'Prompt-based image generation.', type: 'text_to_image', is_active: true, sort_order: 1, metadata: null, created_at: null, updated_at: null, plans_count: 4 },
       { id: 2, name: 'Image to Image', slug: 'image-to-image', description: 'Transform existing assets.', type: 'image_to_image', is_active: true, sort_order: 2, metadata: null, created_at: null, updated_at: null, plans_count: 3 },
       { id: 3, name: 'Upscale', slug: 'upscale', description: 'Upscale image output.', type: 'upscale', is_active: true, sort_order: 3, metadata: null, created_at: null, updated_at: null, plans_count: 3 },
-      { id: 4, name: 'Priority Queue', slug: 'priority-queue', description: 'Priority processing lane.', type: 'other', is_active: true, sort_order: 4, metadata: null, created_at: null, updated_at: null, plans_count: 2 },
+      { id: 4, name: 'Video Generation', slug: 'video_generation', description: 'Generate short AI videos.', type: 'video_generation', is_active: true, sort_order: 4, metadata: null, created_at: null, updated_at: null, plans_count: 2 },
+      { id: 5, name: 'Priority Queue', slug: 'priority-queue', description: 'Priority processing lane.', type: 'other', is_active: true, sort_order: 5, metadata: null, created_at: null, updated_at: null, plans_count: 2 },
     ]
   }
 }
 
 function hydrateDrafts() {
-  featureDrafts.value = availableFeatures.value.map(feature => ({
-    feature_id: feature.id,
-    name: feature.name,
-    type: feature.type,
-    selected: false,
-    is_enabled: true,
-    usage_limit: null,
-    limit_period: 'lifetime',
-    credits_per_use: 0,
-  }))
+  featureDrafts.value = availableFeatures.value.map(feature => {
+    const videoFeature = isVideoFeature(feature.type, feature.slug)
+    const constraints: FeatureConstraints = videoFeature
+      ? { max_duration_seconds: 8, max_resolution: '1080p' }
+      : null
+
+    return {
+      feature_id: feature.id,
+      name: feature.name,
+      slug: feature.slug,
+      type: feature.type,
+      selected: false,
+      is_enabled: true,
+      usage_limit: null,
+      limit_period: 'lifetime',
+      credits_per_use: videoFeature ? 10 : 0,
+      constraints,
+      max_duration_seconds: videoFeature ? 8 : null,
+      max_resolution: videoFeature ? '1080p' : null,
+    }
+  })
 }
 
 async function loadPlanDetail() {
@@ -128,6 +219,9 @@ async function loadPlanDetail() {
       draft.usage_limit = feature.pivot.usage_limit
       draft.limit_period = feature.pivot.limit_period as LimitPeriod
       draft.credits_per_use = feature.pivot.credits_per_use
+      draft.constraints = normalizeConstraints(feature.pivot.constraints)
+      draft.max_duration_seconds = isVideoDraft(draft) ? readNumberConstraint(draft.constraints, 'max_duration_seconds', 8) : null
+      draft.max_resolution = isVideoDraft(draft) ? readVideoResolution(draft.constraints, '1080p') : null
     }
   } catch {
     // noop
@@ -206,7 +300,7 @@ function buildSelectedFeatures(): StorePlanFeaturePayload[] {
       usage_limit: feature.usage_limit,
       limit_period: feature.limit_period ?? 'lifetime',
       credits_per_use: feature.credits_per_use,
-      constraints: null,
+      constraints: buildFeatureConstraints(feature),
     }))
 }
 
@@ -377,6 +471,23 @@ function close() {
                 <input v-model.number="draft.credits_per_use" type="number" min="0" class="native-input small" />
               </div>
             </div>
+
+            <div v-if="isVideoDraft(draft)" class="video-config-panel">
+              <div class="video-config-head">
+                <span>{{ t('planForm.videoControls') }}</span>
+                <small>{{ t('planForm.videoControlsDesc') }}</small>
+              </div>
+              <div class="video-config-grid">
+                <div>
+                  <span class="mini-label">{{ t('planForm.maxDurationSeconds') }}</span>
+                  <input v-model.number="draft.max_duration_seconds" type="number" min="1" max="8" class="native-input small" />
+                </div>
+                <div>
+                  <span class="mini-label">{{ t('planForm.maxResolution') }}</span>
+                  <Select v-model="draft.max_resolution" :options="videoResolutionOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
+                </div>
+              </div>
+            </div>
           </div>
         </article>
       </div>
@@ -491,8 +602,37 @@ function close() {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
+.video-config-panel {
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, #ef4444 24%, var(--card-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, #ef4444 7%, var(--card-bg));
+}
+.video-config-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.video-config-head span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.video-config-head small {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  text-align: end;
+}
+.video-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
 @media (max-width: 640px) {
   .feature-config-grid { grid-template-columns: 1fr; }
+  .video-config-grid { grid-template-columns: 1fr; }
 }
 
 :deep(.plan-form-dialog .p-dialog-header) {

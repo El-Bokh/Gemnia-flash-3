@@ -17,7 +17,7 @@ class StoreFeatureRequest extends FormRequest
             'name'        => ['required', 'string', 'max:100'],
             'slug'        => ['required', 'string', 'max:100', 'unique:features,slug', 'regex:/^[a-z0-9_]+$/'],
             'description' => ['nullable', 'string', 'max:500'],
-            'type'        => ['required', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,chat,styled_chat,multimodal,other'],
+            'type'        => ['required', 'string', 'in:text_to_image,image_to_image,inpainting,upscale,chat,styled_chat,multimodal,video_generation,text_to_video,image_to_video,other'],
             'is_active'   => ['sometimes', 'boolean'],
             'sort_order'  => ['sometimes', 'integer', 'min:0'],
             'metadata'    => ['sometimes', 'nullable', 'array'],

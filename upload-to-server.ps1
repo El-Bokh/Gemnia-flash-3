@@ -369,6 +369,7 @@ Run-Or-Fail '4/5  Clearing Laravel caches on server...' {
         'find app bootstrap config database resources routes -type f -exec chmod 644 {} +'
         'rm -f bootstrap/cache/*.php'
         'if command -v composer >/dev/null 2>&1; then composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader; fi'
+        'php artisan migrate --force'
         'php artisan config:clear'
         'php artisan route:clear'
         'php artisan view:clear'

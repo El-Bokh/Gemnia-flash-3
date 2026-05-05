@@ -16,6 +16,8 @@ import TabPanel from 'primevue/tabpanel'
 import ProgressBar from 'primevue/progressbar'
 
 type LimitPeriod = 'day' | 'week' | 'month' | 'year' | 'lifetime' | null
+type FeatureConstraints = Record<string, unknown> | null
+type VideoResolution = '720p' | '1080p' | null
 
 interface FeatureDraft {
   feature_id: number
@@ -25,6 +27,9 @@ interface FeatureDraft {
   usage_limit: number | null
   limit_period: LimitPeriod
   credits_per_use: number
+  constraints: FeatureConstraints
+  max_duration_seconds: number | null
+  max_resolution: VideoResolution
 }
 
 const props = defineProps<{
@@ -52,6 +57,11 @@ const periodOptions = computed(() => [
   { label: t('planForm.year'), value: 'year' },
 ] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>)
 
+const videoResolutionOptions = computed(() => [
+  { label: t('planForm.upTo720p'), value: '720p' },
+  { label: t('planForm.upTo1080p'), value: '1080p' },
+] as Array<{ label: string; value: Exclude<VideoResolution, null> }>)
+
 watch(
   () => props.visible,
   visible => {
@@ -65,15 +75,23 @@ watch(
 )
 
 function hydrateFeatureDrafts(plan: PlanDetail) {
-  featureDrafts.value = plan.features.map(feature => ({
-    feature_id: feature.id,
-    name: feature.name,
-    type: feature.type,
-    is_enabled: feature.pivot.is_enabled,
-    usage_limit: feature.pivot.usage_limit,
-    limit_period: feature.pivot.limit_period as LimitPeriod,
-    credits_per_use: feature.pivot.credits_per_use,
-  }))
+  featureDrafts.value = plan.features.map(feature => {
+    const constraints = normalizeConstraints(feature.pivot.constraints)
+    const videoFeature = isVideoFeature(feature.type, feature.slug)
+
+    return {
+      feature_id: feature.id,
+      name: feature.name,
+      type: feature.type,
+      is_enabled: feature.pivot.is_enabled,
+      usage_limit: feature.pivot.usage_limit,
+      limit_period: feature.pivot.limit_period as LimitPeriod,
+      credits_per_use: feature.pivot.credits_per_use,
+      constraints,
+      max_duration_seconds: videoFeature ? readNumberConstraint(constraints, 'max_duration_seconds', 8) : null,
+      max_resolution: videoFeature ? readVideoResolution(constraints, '1080p') : null,
+    }
+  })
 }
 
 async function loadPlan() {
@@ -117,7 +135,7 @@ async function saveFeatureDraft(draft: FeatureDraft) {
       usage_limit: draft.usage_limit,
       limit_period: draft.limit_period ?? 'lifetime',
       credits_per_use: draft.credits_per_use,
-      constraints: null,
+      constraints: buildFeatureConstraints(draft),
     })
     await loadPlan()
     emit('updated')
@@ -260,6 +278,12 @@ function featureTypeLabel(type: PlanDetailFeatureItem['type']) {
     image_to_image: 'Image→Image',
     inpainting: 'Inpainting',
     upscale: 'Upscale',
+    video_generation: 'Video',
+    text_to_video: 'Text→Video',
+    image_to_video: 'Image→Video',
+    chat: 'Chat',
+    styled_chat: 'Styled Chat',
+    multimodal: 'Multimodal',
     other: 'Other',
   }[type] || type
 }
@@ -270,8 +294,71 @@ function featureTypeColor(type: PlanDetailFeatureItem['type']) {
     image_to_image: '#0ea5e9',
     inpainting: '#10b981',
     upscale: '#f59e0b',
+    video_generation: '#ef4444',
+    text_to_video: '#ef4444',
+    image_to_video: '#ef4444',
+    chat: '#6366f1',
+    styled_chat: '#6366f1',
+    multimodal: '#14b8a6',
     other: '#6b7280',
   }[type] || '#6366f1'
+}
+
+function isVideoFeature(type: PlanDetailFeatureItem['type'], slug?: string | null) {
+  return slug === 'video_generation' || ['video_generation', 'text_to_video', 'image_to_video'].includes(String(type))
+}
+
+function isVideoDraft(draft: FeatureDraft) {
+  const feature = detail.value?.features.find(item => item.id === draft.feature_id)
+  return isVideoFeature(draft.type, feature?.slug)
+}
+
+function normalizeConstraints(value: unknown): FeatureConstraints {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null
+    } catch {
+      return null
+    }
+  }
+
+  return typeof value === 'object' && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : null
+}
+
+function readNumberConstraint(constraints: FeatureConstraints, key: string, fallback: number | null = null) {
+  const rawValue = constraints?.[key]
+  const numericValue = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : fallback
+}
+
+function readVideoResolution(constraints: FeatureConstraints, fallback: VideoResolution = null): VideoResolution {
+  const rawValue = constraints?.max_resolution
+  return rawValue === '720p' || rawValue === '1080p' ? rawValue : fallback
+}
+
+function buildFeatureConstraints(draft: FeatureDraft): FeatureConstraints {
+  const constraints = normalizeConstraints(draft.constraints) || {}
+
+  if (!isVideoDraft(draft)) {
+    return Object.keys(constraints).length ? constraints : null
+  }
+
+  if (draft.max_duration_seconds && draft.max_duration_seconds > 0) {
+    constraints.max_duration_seconds = Number(draft.max_duration_seconds)
+  } else {
+    delete constraints.max_duration_seconds
+  }
+
+  if (draft.max_resolution) {
+    constraints.max_resolution = draft.max_resolution
+  } else {
+    delete constraints.max_resolution
+  }
+
+  return Object.keys(constraints).length ? constraints : null
 }
 
 function subscriberStatusSeverity(status: string) {
@@ -413,6 +500,23 @@ function subscriberStatusSeverity(status: string) {
                   <div>
                     <span class="mini-label">{{ t('planDetail.creditsPerUse') }}</span>
                     <input v-model.number="draft.credits_per_use" type="number" min="0" class="native-input" />
+                  </div>
+                </div>
+
+                <div v-if="isVideoDraft(draft)" class="video-config-panel">
+                  <div class="video-config-head">
+                    <span>{{ t('planForm.videoControls') }}</span>
+                    <small>{{ t('planForm.videoControlsDesc') }}</small>
+                  </div>
+                  <div class="video-config-grid">
+                    <div>
+                      <span class="mini-label">{{ t('planForm.maxDurationSeconds') }}</span>
+                      <input v-model.number="draft.max_duration_seconds" type="number" min="1" max="8" class="native-input" />
+                    </div>
+                    <div>
+                      <span class="mini-label">{{ t('planForm.maxResolution') }}</span>
+                      <Select v-model="draft.max_resolution" :options="videoResolutionOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
+                    </div>
                   </div>
                 </div>
 
@@ -658,6 +762,44 @@ function subscriberStatusSeverity(status: string) {
 
 @media (min-width: 480px) {
   .edit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.video-config-panel {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, #ef4444 24%, var(--card-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, #ef4444 7%, var(--card-bg));
+}
+
+.video-config-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.video-config-head span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.video-config-head small {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  text-align: end;
+}
+
+.video-config-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 480px) {
+  .video-config-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .mini-label {

@@ -16,6 +16,8 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 
 type LimitPeriod = 'day' | 'week' | 'month' | 'year' | 'lifetime' | null
+type FeatureConstraints = Record<string, unknown> | null
+type VideoResolution = '720p' | '1080p' | null
 
 interface PlanDraft {
   plan_id: number
@@ -28,6 +30,9 @@ interface PlanDraft {
   usage_limit: number | null
   limit_period: LimitPeriod
   credits_per_use: number
+  constraints: FeatureConstraints
+  max_duration_seconds: number | null
+  max_resolution: VideoResolution
 }
 
 const props = defineProps<{
@@ -55,6 +60,11 @@ const periodOptions = computed(() => [
   { label: t('planDetail.month'), value: 'month' },
   { label: t('planDetail.year'), value: 'year' },
 ] as Array<{ label: string; value: Exclude<LimitPeriod, null> }>)
+
+const videoResolutionOptions = computed(() => [
+  { label: t('planForm.upTo720p'), value: '720p' },
+  { label: t('planForm.upTo1080p'), value: '1080p' },
+] as Array<{ label: string; value: Exclude<VideoResolution, null> }>)
 
 watch(
   () => props.visible,
@@ -85,8 +95,11 @@ async function ensurePlansLoaded() {
 }
 
 function hydrateAssignments(plans: Plan[], featurePlans: FeaturePlanItem[] = []) {
+  const videoFeature = isVideoFeatureDetail()
+
   assignments.value = plans.map(plan => {
     const linked = featurePlans.find(item => item.id === plan.id)
+    const constraints = normalizeConstraints(linked?.constraints) || (videoFeature ? { max_duration_seconds: 8, max_resolution: '1080p' } : null)
 
     return {
       plan_id: plan.id,
@@ -98,7 +111,10 @@ function hydrateAssignments(plans: Plan[], featurePlans: FeaturePlanItem[] = [])
       is_enabled: linked?.is_enabled ?? true,
       usage_limit: linked?.usage_limit ?? null,
       limit_period: (linked?.limit_period as LimitPeriod) ?? 'lifetime',
-      credits_per_use: linked?.credits_per_use ?? 0,
+      credits_per_use: linked?.credits_per_use ?? (videoFeature ? 10 : 0),
+      constraints,
+      max_duration_seconds: videoFeature ? readNumberConstraint(constraints, 'max_duration_seconds', 8) : null,
+      max_resolution: videoFeature ? readVideoResolution(constraints, '1080p') : null,
     }
   })
 }
@@ -135,6 +151,7 @@ async function saveAssignments() {
           usage_limit: item.usage_limit,
           limit_period: item.limit_period ?? 'lifetime',
           credits_per_use: item.credits_per_use,
+          constraints: buildPlanConstraints(item),
         })),
     })
     await loadFeature()
@@ -192,6 +209,12 @@ function featureTypeLabel(type: Feature['type']) {
     image_to_image: 'Image→Image',
     inpainting: 'Inpainting',
     upscale: 'Upscale',
+    video_generation: 'Video',
+    text_to_video: 'Text→Video',
+    image_to_video: 'Image→Video',
+    chat: 'Chat',
+    styled_chat: 'Styled Chat',
+    multimodal: 'Multimodal',
     other: 'Other',
   }[type] || type
 }
@@ -202,8 +225,70 @@ function featureTypeColor(type: Feature['type']) {
     image_to_image: '#0ea5e9',
     inpainting: '#10b981',
     upscale: '#f59e0b',
+    video_generation: '#ef4444',
+    text_to_video: '#ef4444',
+    image_to_video: '#ef4444',
+    chat: '#6366f1',
+    styled_chat: '#6366f1',
+    multimodal: '#14b8a6',
     other: '#6b7280',
   }[type] || '#6366f1'
+}
+
+function isVideoFeature(type: Feature['type'], slug?: string | null) {
+  return slug === 'video_generation' || ['video_generation', 'text_to_video', 'image_to_video'].includes(String(type))
+}
+
+function isVideoFeatureDetail() {
+  return detail.value ? isVideoFeature(detail.value.type, detail.value.slug) : false
+}
+
+function normalizeConstraints(value: unknown): FeatureConstraints {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null
+    } catch {
+      return null
+    }
+  }
+
+  return typeof value === 'object' && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : null
+}
+
+function readNumberConstraint(constraints: FeatureConstraints, key: string, fallback: number | null = null) {
+  const rawValue = constraints?.[key]
+  const numericValue = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : fallback
+}
+
+function readVideoResolution(constraints: FeatureConstraints, fallback: VideoResolution = null): VideoResolution {
+  const rawValue = constraints?.max_resolution
+  return rawValue === '720p' || rawValue === '1080p' ? rawValue : fallback
+}
+
+function buildPlanConstraints(draft: PlanDraft): FeatureConstraints {
+  const constraints = normalizeConstraints(draft.constraints) || {}
+
+  if (!isVideoFeatureDetail()) {
+    return Object.keys(constraints).length ? constraints : null
+  }
+
+  if (draft.max_duration_seconds && draft.max_duration_seconds > 0) {
+    constraints.max_duration_seconds = Number(draft.max_duration_seconds)
+  } else {
+    delete constraints.max_duration_seconds
+  }
+
+  if (draft.max_resolution) {
+    constraints.max_resolution = draft.max_resolution
+  } else {
+    delete constraints.max_resolution
+  }
+
+  return Object.keys(constraints).length ? constraints : null
 }
 
 function formatDate(value: string | null) {
@@ -342,6 +427,23 @@ function formatMoney(amount: number) {
                     <div>
                       <span class="mini-label">{{ t('planDetail.creditsPerUse') }}</span>
                       <input v-model.number="draft.credits_per_use" type="number" min="0" class="native-input" />
+                    </div>
+                  </div>
+
+                  <div v-if="isVideoFeatureDetail()" class="video-config-panel">
+                    <div class="video-config-head">
+                      <span>{{ t('planForm.videoControls') }}</span>
+                      <small>{{ t('planForm.videoControlsDesc') }}</small>
+                    </div>
+                    <div class="video-config-grid">
+                      <div>
+                        <span class="mini-label">{{ t('planForm.maxDurationSeconds') }}</span>
+                        <input v-model.number="draft.max_duration_seconds" type="number" min="1" max="8" class="native-input" />
+                      </div>
+                      <div>
+                        <span class="mini-label">{{ t('planForm.maxResolution') }}</span>
+                        <Select v-model="draft.max_resolution" :options="videoResolutionOptions" optionLabel="label" optionValue="value" size="small" class="w-full" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -548,6 +650,43 @@ function formatMoney(amount: number) {
 
 @media (min-width: 480px) {
   .edit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.video-config-panel {
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, #ef4444 24%, var(--card-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, #ef4444 7%, var(--card-bg));
+}
+
+.video-config-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.video-config-head span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.video-config-head small {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  text-align: end;
+}
+
+.video-config-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 480px) {
+  .video-config-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .mini-label {

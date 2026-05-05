@@ -30,6 +30,7 @@ const typeOptions = computed(() => [
   { label: t('featureForm.imageToImage'), value: 'image_to_image' },
   { label: t('featureForm.inpainting'), value: 'inpainting' },
   { label: t('featureForm.upscale'), value: 'upscale' },
+  { label: t('featureForm.videoGeneration'), value: 'video_generation' },
   { label: t('featureForm.other'), value: 'other' },
 ] as Array<{ label: string; value: FeatureType }>)
 

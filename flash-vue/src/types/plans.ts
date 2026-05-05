@@ -15,7 +15,7 @@ export interface FeaturePivotWithId {
   usage_limit: number | null
   limit_period: string | null
   credits_per_use: number
-  constraints: string | null
+  constraints: Record<string, unknown> | string | null
 }
 
 // ─── Plan Feature Items (nested in plan list — flat, no pivot object) ──
@@ -30,7 +30,7 @@ export interface PlanFeatureItem {
   usage_limit: number | null
   limit_period: string | null
   credits_per_use: number
-  constraints: string | null
+  constraints: Record<string, unknown> | string | null
 }
 
 // ─── Plan Detail Feature Items (nested in plan detail — with pivot) ──
@@ -150,6 +150,7 @@ export interface FeaturePlanItem {
   usage_limit: number | null
   limit_period: string | null
   credits_per_use: number
+  constraints?: Record<string, unknown> | string | null
 }
 
 export interface Feature {
@@ -181,7 +182,7 @@ export interface UpdateFeatureLimitResponse {
   usage_limit: number | null
   limit_period: string | null
   credits_per_use: number
-  constraints: string | null
+  constraints: Record<string, unknown> | string | null
 }
 
 // ─── Comparison Response ────────────────────────────────────
@@ -298,7 +299,7 @@ export interface UpdateFeatureLimitPayload {
 
 // ─── Request Payloads — Features ────────────────────────────
 
-export type FeatureType = 'text_to_image' | 'image_to_image' | 'inpainting' | 'upscale' | 'other'
+export type FeatureType = 'text_to_image' | 'image_to_image' | 'inpainting' | 'upscale' | 'chat' | 'styled_chat' | 'multimodal' | 'video_generation' | 'text_to_video' | 'image_to_video' | 'other'
 
 export interface ListFeaturesParams {
   search?: string
@@ -334,6 +335,7 @@ export interface AssignToPlansItem {
   usage_limit?: number | null
   limit_period?: 'day' | 'week' | 'month' | 'year' | 'lifetime'
   credits_per_use?: number
+  constraints?: Record<string, unknown> | null
 }
 
 export interface AssignToPlansPayload {

@@ -24,7 +24,7 @@ useSeo({
     url: 'https://klek.studio',
     applicationCategory: 'DesignApplication',
     operatingSystem: 'Web',
-    description: 'AI-powered platform for generating stunning images, creative designs, and visual content.',
+    description: 'AI-powered platform for generating stunning images, short videos, creative designs, and visual content.',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   },
 })
