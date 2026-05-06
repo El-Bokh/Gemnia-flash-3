@@ -26,9 +26,12 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Quota ──
   const quota = ref<QuotaInfo>({
     has_subscription: false,
+    plan_id: null,
     plan_name: null,
     plan_slug: null,
     plan_is_free: true,
+    billing_cycle: null,
+    payment_gateway: null,
     credits_remaining: 0,
     credits_total: 0,
     credits_used: 0,
@@ -39,6 +42,7 @@ export const useAuthStore = defineStore('auth', () => {
     requests_today: 0,
     requests_this_month: 0,
     warning_level: 'depleted',
+    can_renew: false,
   })
 
   const hasQuota = computed(() => quota.value.has_subscription && quota.value.credits_remaining > 0)

@@ -22,7 +22,8 @@ scp -r "E:\Gemnia flash 3\flash-vue\dist" root@72.61.192.23:/var/www/Gemnia-flas
 
 # Server-side refresh
 cd /var/www/Gemnia-flash-3
-git pull origin main
+git fetch origin
+git reset --hard origin/main
 
 
 mkdir -p public/build

@@ -327,17 +327,29 @@ class UsageService
         $subscription = $this->getActiveSubscription($user);
 
         if (! $subscription) {
+            $latestSubscription = $this->findLatestSubscription($user);
+            $latestCreditsTotal = (int) ($latestSubscription?->credits_total ?? 0);
+            $latestCreditsRemaining = (int) ($latestSubscription?->credits_remaining ?? 0);
+
             return [
                 'has_subscription' => false,
-                'plan_name'        => null,
+                'plan_id'          => $latestSubscription?->plan_id,
+                'plan_name'        => $latestSubscription?->plan?->name,
+                'plan_slug'        => $latestSubscription?->plan?->slug,
+                'plan_is_free'     => (bool) ($latestSubscription?->plan?->is_free ?? true),
+                'billing_cycle'    => $latestSubscription?->billing_cycle,
+                'payment_gateway'  => $latestSubscription?->payment_gateway,
                 'credits_remaining'=> 0,
-                'credits_total'    => 0,
+                'credits_total'    => $latestCreditsTotal,
+                'credits_used'     => max(0, $latestCreditsTotal - $latestCreditsRemaining),
                 'usage_percentage' => 100,
-                'period_start'     => null,
-                'period_end'       => null,
+                'period_start'     => $latestSubscription?->starts_at?->toIso8601String(),
+                'period_end'       => $latestSubscription?->ends_at?->toIso8601String(),
+                'status'           => $latestSubscription?->status ?? 'none',
                 'requests_today'   => 0,
                 'requests_this_month' => 0,
                 'warning_level'    => 'depleted', // none, low, critical, depleted
+                'can_renew'        => (bool) ($latestSubscription && ! ($latestSubscription->plan?->is_free ?? true)),
             ];
         }
 
@@ -365,9 +377,12 @@ class UsageService
 
         return [
             'has_subscription'    => true,
+            'plan_id'             => $subscription->plan_id,
             'plan_name'           => $subscription->plan->name ?? 'Unknown',
             'plan_slug'           => $subscription->plan->slug ?? null,
             'plan_is_free'        => $subscription->plan->is_free ?? true,
+            'billing_cycle'       => $subscription->billing_cycle,
+            'payment_gateway'     => $subscription->payment_gateway,
             'credits_remaining'   => $subscription->credits_remaining,
             'credits_total'       => $subscription->credits_total,
             'credits_used'        => $used,
@@ -378,7 +393,18 @@ class UsageService
             'requests_today'      => $requestsToday,
             'requests_this_month' => $requestsThisMonth,
             'warning_level'       => $warningLevel,
+            'can_renew'           => ! ($subscription->plan->is_free ?? true)
+                && ($subscription->credits_remaining <= 0 || ($subscription->ends_at && $subscription->ends_at->lte(now()))),
         ];
+    }
+
+    private function findLatestSubscription(User $user): ?Subscription
+    {
+        return $user->subscriptions()
+            ->with('plan')
+            ->latest('starts_at')
+            ->latest('id')
+            ->first();
     }
 
     private function findCurrentSubscription(User $user, bool $lockForUpdate = false): ?Subscription

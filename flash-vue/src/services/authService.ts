@@ -31,9 +31,12 @@ export interface LoginResponse {
 
 export interface QuotaInfo {
   has_subscription: boolean
+  plan_id: number | null
   plan_name: string | null
   plan_slug: string | null
   plan_is_free: boolean
+  billing_cycle: 'monthly' | 'yearly' | null
+  payment_gateway: string | null
   credits_remaining: number
   credits_total: number
   credits_used: number
@@ -44,6 +47,7 @@ export interface QuotaInfo {
   requests_today: number
   requests_this_month: number
   warning_level: 'none' | 'low' | 'critical' | 'depleted'
+  can_renew: boolean
 }
 
 export interface MeResponse {

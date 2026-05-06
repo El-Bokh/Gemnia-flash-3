@@ -89,6 +89,7 @@ Route::middleware(['auth:sanctum', 'platform.maintenance'])->group(function () {
     // Subscription & Quota
     Route::get('/subscription', [SubscriptionController::class, 'show'])->name('subscription.show');
     Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])->name('subscription.upgrade');
+    Route::post('/subscription/renew',   [SubscriptionController::class, 'renew'])->name('subscription.renew');
     Route::post('/subscription/cancel',  [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
 
     // Notifications

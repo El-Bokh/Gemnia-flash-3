@@ -446,6 +446,7 @@ function handleClose() {
   justify-content: center;
   min-width: 0;
   min-height: 340px;
+  padding: 10px;
   border: 1px solid var(--card-border);
   border-radius: 8px;
   background: repeating-conic-gradient(rgba(148, 163, 184, 0.16) 0% 25%, transparent 0% 50%) 50% / 22px 22px;
@@ -455,14 +456,21 @@ function handleClose() {
 .canvas-stage {
   position: relative;
   display: inline-block;
+  width: fit-content;
+  height: fit-content;
   max-width: 100%;
   max-height: min(66vh, 640px);
+  max-height: min(66dvh, 640px);
+  line-height: 0;
 }
 
 .source-image {
   display: block;
+  width: auto;
+  height: auto;
   max-width: 100%;
   max-height: min(66vh, 640px);
+  max-height: min(66dvh, 640px);
   user-select: none;
   object-fit: contain;
 }
@@ -564,24 +572,44 @@ function handleClose() {
   }
 
   .inpaint-dialog {
-    max-height: 100%;
+    width: 100%;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
   }
 
   .inpaint-body {
     grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
   }
 
   .canvas-shell {
-    min-height: 260px;
+    min-height: 0;
+    max-height: min(48vh, 420px);
+    max-height: min(48dvh, 420px);
+    padding: 6px;
   }
 
   .canvas-stage,
   .source-image {
-    max-height: 54vh;
+    max-height: min(44vh, 380px);
+    max-height: min(44dvh, 380px);
+  }
+
+  .inpaint-prompt {
+    min-height: 96px;
   }
 
   .control-actions {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .canvas-stage,
+  .source-image {
+    max-height: min(40vh, 340px);
+    max-height: min(40dvh, 340px);
   }
 }
 </style>

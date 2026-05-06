@@ -233,12 +233,30 @@ class SubscriptionService
     /**
      * Renew an expired subscription (auto-renew flow).
      */
+    public function renewCurrent(User $user): array
+    {
+        $subscription = $user->subscriptions()
+            ->whereIn('status', ['active', 'expired', 'past_due'])
+            ->latest('starts_at')
+            ->latest('id')
+            ->first();
+
+        if (! $subscription) {
+            return ['success' => false, 'message' => 'No renewable subscription found.'];
+        }
+
+        return $this->renew($subscription);
+    }
+
+    /**
+     * Renew an expired or depleted subscription.
+     */
     public function renew(Subscription $subscription): array
     {
         return DB::transaction(function () use ($subscription) {
             $subscription = Subscription::lockForUpdate()->findOrFail($subscription->id);
 
-            if ($subscription->status !== 'active' && $subscription->status !== 'expired') {
+            if (! in_array($subscription->status, ['active', 'expired', 'past_due'], true)) {
                 return ['success' => false, 'message' => 'Subscription cannot be renewed.'];
             }
 
@@ -247,6 +265,18 @@ class SubscriptionService
 
             if (! $plan || ! $plan->is_active) {
                 return ['success' => false, 'message' => 'Plan is no longer available.'];
+            }
+
+            if (
+                $subscription->status === 'active'
+                && $subscription->credits_remaining > 0
+                && ($subscription->ends_at === null || $subscription->ends_at->isFuture())
+            ) {
+                return ['success' => false, 'message' => 'Your current plan still has available credits.'];
+            }
+
+            if (! $plan->is_free && $subscription->payment_gateway === 'gumroad') {
+                return ['success' => false, 'message' => 'Please complete checkout to renew this plan.'];
             }
 
             $credits = $subscription->billing_cycle === 'yearly'
@@ -263,6 +293,7 @@ class SubscriptionService
                 'credits_total'     => $credits,
                 'starts_at'         => now(),
                 'ends_at'           => $newEndsAt,
+                'auto_renew'        => true,
             ]);
 
             CreditLedger::create([

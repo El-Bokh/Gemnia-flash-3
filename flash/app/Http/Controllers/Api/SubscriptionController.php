@@ -57,6 +57,7 @@ class SubscriptionController extends Controller
                     'credits_yearly'  => $plan->credits_yearly,
                     'is_free'         => $plan->is_free,
                     'is_featured'     => $plan->is_featured,
+                    'sort_order'      => $plan->sort_order,
                     'trial_days'      => $plan->trial_days,
                     'checkout_url'    => $checkoutUrl,
                     'features'        => $plan->features->map(fn ($f) => [
@@ -139,6 +140,36 @@ class SubscriptionController extends Controller
         }
 
         // Return updated quota
+        $usageService = new UsageService();
+        $quota = $usageService->getUsageStats($request->user());
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'data'    => [
+                'quota' => $quota,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/subscription/renew
+     *
+     * Renew the current/latest renewable subscription when it does not require
+     * an external payment checkout.
+     */
+    public function renew(Request $request): JsonResponse
+    {
+        $subscriptionService = app(SubscriptionService::class);
+        $result = $subscriptionService->renewCurrent($request->user());
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
         $usageService = new UsageService();
         $quota = $usageService->getUsageStats($request->user());
 

@@ -9,6 +9,14 @@ import {
   changePassword as changePasswordApi,
   type ProfileData,
 } from '@/services/profileService'
+import {
+  buildPlanCheckoutUrl,
+  getPlans,
+  renewSubscription,
+  upgradeSubscription,
+  type BillingCycle,
+  type Plan,
+} from '@/services/subscriptionService'
 import { useSeo } from '@/composables/useSeo'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -38,10 +46,15 @@ const successMsg = ref('')
 const errorMsg = ref('')
 const pwSuccess = ref('')
 const pwError = ref('')
+const subSuccess = ref('')
+const subError = ref('')
 const profileLoading = ref(true)
+const subscriptionPlansLoading = ref(false)
+const subscriptionAction = ref<'renew' | 'upgrade' | null>(null)
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 const selectedAvatarFile = ref<File | null>(null)
 const avatarPreviewUrl = ref<string | null>(auth.user.avatar)
+const subscriptionPlans = ref<Plan[]>([])
 
 // ── Profile form — populated from backend ──
 const profileForm = ref({
@@ -160,6 +173,18 @@ function handleAvatarSelected(event: Event) {
   avatarPreviewUrl.value = URL.createObjectURL(file)
 }
 
+async function loadSubscriptionPlans() {
+  subscriptionPlansLoading.value = true
+  try {
+    const res = await getPlans()
+    subscriptionPlans.value = res.data ?? []
+  } catch {
+    subscriptionPlans.value = []
+  } finally {
+    subscriptionPlansLoading.value = false
+  }
+}
+
 // ── Load real user data on mount ──
 onMounted(async () => {
   try {
@@ -177,12 +202,42 @@ onMounted(async () => {
     profileLoading.value = false
   }
   // Load subscription/quota data
-  await auth.refreshQuota()
+  await Promise.all([auth.refreshQuota(), loadSubscriptionPlans()])
 })
 
 // ── Quota computed helpers ──
 const q = computed(() => auth.quota)
 const hasSubscription = computed(() => q.value.has_subscription)
+const paidPlans = computed(() =>
+  [...subscriptionPlans.value]
+    .filter(plan => !plan.is_free)
+    .sort((a, b) => ((a.sort_order ?? 0) - (b.sort_order ?? 0)) || (a.id - b.id)),
+)
+const currentPlanIndex = computed(() => paidPlans.value.findIndex(plan => {
+  if (q.value.plan_id != null) return plan.id === q.value.plan_id
+  return plan.slug === q.value.plan_slug
+}))
+const renewalPlan = computed(() => {
+  if (currentPlanIndex.value >= 0) return paidPlans.value[currentPlanIndex.value]
+  if (q.value.plan_slug) return paidPlans.value.find(plan => plan.slug === q.value.plan_slug) ?? null
+  return null
+})
+const upgradeTargetPlan = computed(() => {
+  if (currentPlanIndex.value >= 0) return paidPlans.value[currentPlanIndex.value + 1] ?? null
+  return paidPlans.value.find(plan => plan.slug !== q.value.plan_slug) ?? null
+})
+const subscriptionNeedsAction = computed(() => {
+  if (q.value.plan_is_free || (!q.value.plan_id && !q.value.plan_slug)) return false
+  return q.value.can_renew || q.value.credits_remaining <= 0 || ['expired', 'past_due', 'cancelled'].includes(q.value.status)
+})
+const canRenewPlan = computed(() => subscriptionNeedsAction.value && Boolean(renewalPlan.value))
+const canUpgradePlan = computed(() => subscriptionNeedsAction.value && Boolean(upgradeTargetPlan.value))
+const subscriptionActionTitle = computed(() => (
+  hasSubscription.value ? t('profile.subscriptionDepletedTitle') : t('profile.subscriptionEndedTitle')
+))
+const subscriptionActionDesc = computed(() => (
+  hasSubscription.value ? t('profile.subscriptionDepletedDesc') : t('profile.subscriptionEndedDesc')
+))
 const creditsBarColor = computed(() => {
   if (q.value.warning_level === 'depleted') return '#ef4444'
   if (q.value.warning_level === 'critical') return '#f97316'
@@ -256,6 +311,60 @@ async function changePassword() {
     pwError.value = extractFirstError(err, t('profile.passwordFailed'))
   } finally {
     pwSaving.value = false
+  }
+}
+
+function billingCycleForPlan(plan: Plan): BillingCycle {
+  return plan.slug === 'gumroad-6-months' ? 'yearly' : 'monthly'
+}
+
+function openCheckout(plan: Plan) {
+  const checkoutUrl = buildPlanCheckoutUrl(plan, auth.user.email)
+  if (!checkoutUrl) return false
+
+  window.location.href = checkoutUrl
+  return true
+}
+
+async function renewCurrentSubscription() {
+  const plan = renewalPlan.value
+  if (!plan || subscriptionAction.value) return
+
+  subSuccess.value = ''
+  subError.value = ''
+
+  if (openCheckout(plan)) return
+
+  subscriptionAction.value = 'renew'
+  try {
+    const res = await renewSubscription()
+    await auth.refreshQuota()
+    subSuccess.value = res.message || t('profile.renewSuccess')
+  } catch (err: unknown) {
+    subError.value = extractFirstError(err, t('profile.subscriptionActionFailed'))
+  } finally {
+    subscriptionAction.value = null
+  }
+}
+
+async function upgradeToHigherPlan() {
+  const plan = upgradeTargetPlan.value
+  if (!plan || subscriptionAction.value) return
+
+  subSuccess.value = ''
+  subError.value = ''
+
+  if (openCheckout(plan)) return
+
+  subscriptionAction.value = 'upgrade'
+  try {
+    const res = await upgradeSubscription(plan.id, billingCycleForPlan(plan))
+    await auth.refreshQuota()
+    subSuccess.value = res.message || t('profile.upgradeSuccess')
+  } catch (err: unknown) {
+    subError.value = extractFirstError(err, t('profile.subscriptionActionFailed'))
+  } finally {
+    subscriptionAction.value = null
   }
 }
 </script>
@@ -438,6 +547,9 @@ async function changePassword() {
         <!-- ═══ SUBSCRIPTION TAB ═══ -->
         <TabPanel value="subscription">
           <div class="tab-content">
+            <Message v-if="subSuccess" severity="success" :closable="true" @close="subSuccess = ''">{{ subSuccess }}</Message>
+            <Message v-if="subError" severity="error" :closable="true" @close="subError = ''">{{ subError }}</Message>
+
             <!-- Has subscription -->
             <template v-if="hasSubscription">
               <section class="section-card">
@@ -483,13 +595,70 @@ async function changePassword() {
                       <span>{{ t('profile.periodEnd') }}: {{ q.period_end ? new Date(q.period_end).toLocaleDateString() : t('profile.unlimited') }}</span>
                     </div>
                   </div>
+
+                  <div v-if="subscriptionNeedsAction" class="sub-action-panel">
+                    <div class="sub-action-copy">
+                      <h3>{{ subscriptionActionTitle }}</h3>
+                      <p>{{ subscriptionActionDesc }}</p>
+                    </div>
+                    <div class="sub-actions">
+                      <Button
+                        v-if="canRenewPlan"
+                        :label="t('profile.renewSamePlan')"
+                        icon="pi pi-refresh"
+                        size="small"
+                        :loading="subscriptionAction === 'renew'"
+                        :disabled="subscriptionAction !== null || subscriptionPlansLoading"
+                        @click="renewCurrentSubscription"
+                      />
+                      <Button
+                        v-if="canUpgradePlan"
+                        :label="upgradeTargetPlan ? t('profile.upgradeToPlan', { plan: upgradeTargetPlan.name }) : t('profile.upgradePlan')"
+                        icon="pi pi-arrow-up"
+                        severity="secondary"
+                        outlined
+                        size="small"
+                        :loading="subscriptionAction === 'upgrade'"
+                        :disabled="subscriptionAction !== null || subscriptionPlansLoading"
+                        @click="upgradeToHigherPlan"
+                      />
+                    </div>
+                  </div>
                 </div>
               </section>
             </template>
 
             <!-- No subscription -->
             <template v-else>
-              <section class="section-card" style="text-align: center; padding: 40px 20px;">
+              <section v-if="subscriptionNeedsAction" class="section-card empty-subscription-card">
+                <i class="pi pi-credit-card empty-subscription-icon" />
+                <h2 class="section-title">{{ subscriptionActionTitle }}</h2>
+                <p class="section-desc">{{ subscriptionActionDesc }}</p>
+                <div class="sub-actions centered">
+                  <Button
+                    v-if="canRenewPlan"
+                    :label="t('profile.renewSamePlan')"
+                    icon="pi pi-refresh"
+                    size="small"
+                    :loading="subscriptionAction === 'renew'"
+                    :disabled="subscriptionAction !== null || subscriptionPlansLoading"
+                    @click="renewCurrentSubscription"
+                  />
+                  <Button
+                    v-if="canUpgradePlan"
+                    :label="upgradeTargetPlan ? t('profile.upgradeToPlan', { plan: upgradeTargetPlan.name }) : t('profile.upgradePlan')"
+                    icon="pi pi-arrow-up"
+                    severity="secondary"
+                    outlined
+                    size="small"
+                    :loading="subscriptionAction === 'upgrade'"
+                    :disabled="subscriptionAction !== null || subscriptionPlansLoading"
+                    @click="upgradeToHigherPlan"
+                  />
+                </div>
+              </section>
+
+              <section v-else class="section-card" style="text-align: center; padding: 40px 20px;">
                 <i class="pi pi-credit-card" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 12px;" />
                 <h2 class="section-title" style="margin-bottom: 4px;">{{ t('profile.noSubscription') }}</h2>
                 <p class="section-desc" style="margin-bottom: 16px;">{{ t('profile.noSubscriptionDesc') }}</p>
@@ -942,6 +1111,81 @@ async function changePassword() {
 .sub-period-item i {
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+.sub-action-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--card-border);
+}
+
+.sub-action-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sub-action-copy h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sub-action-copy p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.sub-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.sub-actions.centered {
+  justify-content: center;
+}
+
+.sub-actions :deep(.p-button) {
+  border-radius: 8px;
+}
+
+.empty-subscription-card {
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-subscription-icon {
+  color: var(--text-muted);
+  font-size: 2.5rem;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 640px) {
+  .sub-plan-row,
+  .sub-action-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sub-plan-info {
+    justify-content: space-between;
+  }
+
+  .sub-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* ── Usage tab ── */

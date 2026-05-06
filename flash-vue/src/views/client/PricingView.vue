@@ -4,12 +4,10 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import { getPlans, upgradeSubscription } from '@/services/subscriptionService'
+import { buildPlanCheckoutUrl, getPlans, upgradeSubscription } from '@/services/subscriptionService'
 import { useAuthStore } from '@/stores/auth'
 import { useLayoutStore } from '@/stores/layout'
 import { useSeo } from '@/composables/useSeo'
-
-const GUMROAD_CHECKOUT_URL = 'https://klekstudio.gumroad.com/l/membership'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -92,11 +90,9 @@ async function selectPlan(plan: any) {
   // (returned by the backend from config). Redirect with the user's email
   // pre-filled. The actual subscription is activated by the Gumroad webhook
   // (POST /webhook/gumroad) once payment succeeds.
-  const baseUrl: string = plan.checkout_url || GUMROAD_CHECKOUT_URL
-  if (baseUrl) {
-    const email = encodeURIComponent(auth.user?.email ?? '')
-    const sep = baseUrl.includes('?') ? '&' : '?'
-    window.location.href = `${baseUrl}${sep}email=${email}&wanted=true`
+  const checkoutUrl = buildPlanCheckoutUrl(plan, auth.user?.email)
+  if (checkoutUrl) {
+    window.location.href = checkoutUrl
     return
   }
 
